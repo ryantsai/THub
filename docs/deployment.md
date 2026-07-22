@@ -86,7 +86,11 @@ Back up the THub database before migrations that transform or delete data. Revie
 
 ## Configuration
 
-Both hosts require the same `ConnectionStrings:THub` value. The worker also supports:
+For local Development/debugging, both hosts use `THub.Debug` on `(localdb)\MSSQLLocalDB`. This development connection is defined only in `appsettings.Development.json`, and those files are excluded from publish output.
+
+Every published environment must provide the same real SQL Server `ConnectionStrings:THub` value to both hosts through environment-specific external configuration or an organization-approved secret/configuration provider. Base `appsettings.json` files intentionally contain no fallback connection string, so a missing deployment value fails at startup instead of silently connecting to a developer database.
+
+The worker also supports:
 
 ```json
 {
@@ -97,7 +101,7 @@ Both hosts require the same `ConnectionStrings:THub` value. The worker also supp
 }
 ```
 
-Use environment-specific external configuration or an organization-approved secret/configuration provider. Do not edit secrets into checked-in `appsettings` files or publish output.
+Do not edit production credentials into checked-in `appsettings` files or publish output. LocalDB must never be used as a production or shared-environment control plane.
 
 ## Health and monitoring
 

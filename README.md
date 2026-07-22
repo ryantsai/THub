@@ -81,17 +81,18 @@ The dependency direction is `Web/Worker -> Infrastructure/Application -> Domain`
    dotnet restore
    ```
 
-2. Set the `THub` connection string in each terminal that will launch the web or worker process. Do not commit credentials:
+2. Confirm SQL Server LocalDB is installed:
 
    ```powershell
-   $env:ConnectionStrings__THub = 'Server=localhost;Database=THub;Trusted_Connection=True;TrustServerCertificate=True'
+   sqllocaldb info MSSQLLocalDB
    ```
 
-   Use the approved external secret/configuration provider for deployed environments.
+   Both Development hosts use the same `THub.Debug` LocalDB database through their checked-in `appsettings.Development.json` files. LocalDB uses the same EF Core SQL Server provider and migrations as the actual SQL Server environment.
 
 3. Apply the metadata schema:
 
    ```powershell
+   $env:ASPNETCORE_ENVIRONMENT = 'Development'
    dotnet tool run dotnet-ef database update --project src/THub.Infrastructure --startup-project src/THub.Web
    ```
 
@@ -106,6 +107,24 @@ The dependency direction is `Web/Worker -> Infrastructure/Application -> Domain`
    ```powershell
    dotnet run --project src/THub.Worker
    ```
+
+Base settings intentionally contain no database connection string. Non-Development environments must provide `ConnectionStrings:THub` through the approved deployment configuration or secret provider. Development settings are excluded from publish output.
+
+## VS Code: debug everything
+
+1. Open the repository root in VS Code.
+2. Install the recommended **C# Dev Kit** extension when prompted.
+3. Open **Run and Debug** (`Ctrl+Shift+D`).
+4. Select **THub: Debug All** and press `F5`.
+
+The compound profile runs one preparation task, then starts the web/frontend/backend host and worker under separate .NET debugger sessions. Preparation automatically:
+
+- restores local .NET tools and NuGet packages;
+- starts `MSSQLLocalDB`;
+- builds the Debug solution;
+- applies EF Core migrations to `THub.Debug`.
+
+The web application opens automatically at its HTTPS development URL. Stopping either debugger stops the complete compound session. Web-only and Worker-only profiles are also available.
 
 ### Automated browser testing
 
@@ -152,6 +171,8 @@ The service identity needs only the SQL Server and file-system permissions requi
 
 ## Configuration and security
 
+- LocalDB is for Development/debugging only. Never use `(localdb)\MSSQLLocalDB` in a published environment.
+- Published web and worker environments must supply a real SQL Server `ConnectionStrings:THub`; startup fails fast when it is missing.
 - Replace the placeholder `CONTOSO\THub ...` groups under `Authorization:RoleMappings`.
 - Production currently gives an authenticated unmapped account the configured default role (`Viewer`). Use an invalid/empty default when explicit group membership must be mandatory.
 - Never put source-system passwords or tokens in `DataConnection.ConfigurationJson`; store a protected secret reference.

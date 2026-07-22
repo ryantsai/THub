@@ -81,6 +81,8 @@ Target responsibilities:
 
 The `thub` schema is the durable boundary shared by the web and worker processes. It currently stores workflow definitions, workflow runs, and connection metadata. SQL retry behavior is configured through EF Core, and `IDbContextFactory<THubDbContext>` is used because Blazor circuits and singleton background services do not share normal request-scoped lifetimes.
 
+Development/debugging uses the `THub.Debug` database on SQL Server LocalDB. Published environments use a separately provisioned SQL Server connection supplied through deployment configuration. Both use the same EF Core SQL Server provider and migrations; Development configuration is excluded from publish output.
+
 SQL Server is not used as a generic blob store for file contents or run logs without a deliberate later decision.
 
 ## 5. Code boundaries and dependency rules

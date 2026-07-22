@@ -1,0 +1,103 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "THub: Debug Web Only",
+      "type": "coreclr",
+      "request": "launch",
+      "preLaunchTask": "THub: Prepare Debug",
+      "program": "${workspaceFolder}/src/THub.Web/bin/Debug/net10.0/THub.Web.dll",
+      "cwd": "${workspaceFolder}/src/THub.Web",
+      "stopAtEntry": false,
+      "justMyCode": true,
+      "console": "internalConsole",
+      "internalConsoleOptions": "openOnSessionStart",
+      "checkForDevCert": true,
+      "env": {
+        "ASPNETCORE_ENVIRONMENT": "Development",
+        "ASPNETCORE_URLS": "https://localhost:7032;http://localhost:5253"
+      },
+      "serverReadyAction": {
+        "action": "openExternally",
+        "pattern": "\\bNow listening on:\\s+(https?://\\S+)"
+      },
+      "presentation": {
+        "group": "THub",
+        "order": 2
+      }
+    },
+    {
+      "name": "THub: Debug Worker Only",
+      "type": "coreclr",
+      "request": "launch",
+      "preLaunchTask": "THub: Prepare Debug",
+      "program": "${workspaceFolder}/src/THub.Worker/bin/Debug/net10.0/THub.Worker.dll",
+      "cwd": "${workspaceFolder}/src/THub.Worker",
+      "stopAtEntry": false,
+      "justMyCode": true,
+      "console": "integratedTerminal",
+      "env": {
+        "DOTNET_ENVIRONMENT": "Development"
+      },
+      "presentation": {
+        "group": "THub",
+        "order": 3
+      }
+    },
+    {
+      "name": "THub.Internal.Web",
+      "type": "coreclr",
+      "request": "launch",
+      "program": "${workspaceFolder}/src/THub.Web/bin/Debug/net10.0/THub.Web.dll",
+      "cwd": "${workspaceFolder}/src/THub.Web",
+      "stopAtEntry": false,
+      "justMyCode": true,
+      "console": "internalConsole",
+      "internalConsoleOptions": "openOnSessionStart",
+      "checkForDevCert": true,
+      "env": {
+        "ASPNETCORE_ENVIRONMENT": "Development",
+        "ASPNETCORE_URLS": "https://localhost:7032;http://localhost:5253"
+      },
+      "serverReadyAction": {
+        "action": "openExternally",
+        "pattern": "\\bNow listening on:\\s+(https?://\\S+)"
+      },
+      "presentation": {
+        "hidden": true
+      }
+    },
+    {
+      "name": "THub.Internal.Worker",
+      "type": "coreclr",
+      "request": "launch",
+      "program": "${workspaceFolder}/src/THub.Worker/bin/Debug/net10.0/THub.Worker.dll",
+      "cwd": "${workspaceFolder}/src/THub.Worker",
+      "stopAtEntry": false,
+      "justMyCode": true,
+      "console": "integratedTerminal",
+      "env": {
+        "DOTNET_ENVIRONMENT": "Development"
+      },
+      "presentation": {
+        "hidden": true
+      }
+    }
+  ],
+  "compounds": [
+    {
+      "name": "THub: Debug All",
+      "configurations": [
+        "THub.Internal.Web",
+        "THub.Internal.Worker"
+      ],
+      "preLaunchTask": "THub: Prepare Debug",
+      "stopAll": true,
+      "presentation": {
+        "group": "THub",
+        "order": 1
+      }
+    }
+  ]
+}
+

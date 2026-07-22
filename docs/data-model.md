@@ -8,6 +8,7 @@
 - JSON stores versioned node settings and graph structure; indexed lifecycle/query fields remain relational columns.
 - Secrets are never stored in graph or connection JSON. Persist a secret identifier/reference only.
 - All timestamps are stored in UTC. Schedule evaluation also stores an explicit time-zone identifier.
+- Development uses SQL Server LocalDB (`THub.Debug`) so the same SQL Server provider, schema, and migrations are exercised locally; published environments use an externally configured SQL Server instance.
 
 ## Current relational model
 
@@ -102,10 +103,10 @@ These are target concepts, not current schema promises. Add migrations and an AD
 
 ## EF Core conventions
 
+- Use LocalDB only under the Development environment. Do not introduce a second EF provider or divergent debug schema.
 - Migrations live under `src/THub.Infrastructure/Persistence/Migrations`.
 - Mapping belongs in `THubDbContext` or dedicated infrastructure configurations.
 - Domain entities do not reference EF Core attributes.
 - Use explicit string lengths, conversions, indexes, delete behaviors, and SQL types for large JSON/text.
 - Do not call `EnsureCreated` for application startup. Apply reviewed migrations operationally.
 - Avoid using EF's in-memory provider to validate SQL behavior; prefer SQL Server integration tests or SQLite only where relational semantics are sufficient.
-

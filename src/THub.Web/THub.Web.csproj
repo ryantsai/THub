@@ -1,6 +1,12 @@
 <Project Sdk="Microsoft.NET.Sdk.Web">
 
   <ItemGroup>
+    <Content Update="appsettings.Development.json">
+      <CopyToPublishDirectory>Never</CopyToPublishDirectory>
+    </Content>
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\THub.Application\THub.Application.csproj" />
     <ProjectReference Include="..\THub.Infrastructure\THub.Infrastructure.csproj" />
   </ItemGroup>

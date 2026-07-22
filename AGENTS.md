@@ -95,6 +95,8 @@ When adding a node kind, update the domain enum/model, configuration contract, v
 ## Database and migrations
 
 - SQL Server is the authoritative control plane.
+- Development/debugging uses `THub.Debug` on `(localdb)\MSSQLLocalDB`; published environments must receive a real SQL Server connection from deployment configuration.
+- Keep LocalDB settings in `appsettings.Development.json` and excluded from publish output. Do not add a fallback connection string to base settings.
 - EF mappings/migrations belong in `THub.Infrastructure`.
 - Migrations live in `src/THub.Infrastructure/Persistence/Migrations`.
 - Use `THub.Web` as the EF startup project.
@@ -189,6 +191,8 @@ dotnet format THub.slnx --verify-no-changes
 dotnet build THub.slnx
 dotnet test THub.slnx --no-build
 ```
+
+The supported VS Code compound profile is `THub: Debug All`. Keep `.vscode/launch.json`, `.vscode/tasks.json`, `scripts/prepare-debug.ps1`, launch URLs, target framework paths, and Development database setup synchronized when host projects or framework versions change.
 
 For dependency changes, also run:
 
