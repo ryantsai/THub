@@ -47,7 +47,8 @@ try
         app.UseHsts();
     }
 
-    app.UseStatusCodePagesWithReExecute("/not-found", createScopeForStatusCodePages: true);
+    app.UseStatusCodePages(statusCodeContext =>
+        StatusCodePageHandler.HandleAsync(statusCodeContext.HttpContext));
     app.UseHttpsRedirection();
     app.UseSerilogRequestLogging();
     app.UseAuthentication();
@@ -80,3 +81,5 @@ finally
 {
     Log.CloseAndFlush();
 }
+
+public partial class Program;

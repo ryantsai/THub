@@ -83,6 +83,18 @@ The `thub` schema is the durable product boundary shared by the web and worker p
 
 Development/debugging uses the `THub.Debug` database on SQL Server LocalDB. Published environments use a separately provisioned SQL Server connection supplied through deployment configuration. Both use the same EF Core SQL Server provider and migrations; Development configuration is excluded from publish output.
 
+### Scheduler ownership boundary
+
+| Concern | Authoritative owner | Notes |
+| --- | --- | --- |
+| Workflow status, version, cron text, time zone, and `NextRunAtUtc` | THub (`thub.Workflows`) | Revalidated whenever a trigger fires |
+| Next-fire timing, misfires, scheduler locks, and cluster check-ins | Quartz (`quartz.QRTZ_*`) | Accessed only through Quartz APIs |
+| Logical occurrence identity | THub run plus Quartz trigger metadata | Stored as `ScheduledForUtc` and protected by a THub unique index |
+| Run lifecycle and execution result | THub (`thub.WorkflowRuns`) | Quartz does not represent or update workflow execution state |
+| Step lifecycle, retries, and leases | THub, future model | Must not be moved into Quartz jobs or trigger state |
+
+Quartz job/trigger data are deliberately references, not execution payloads. The firing job calls an Application port, which reloads the workflow, checks that the expected version is still published, and creates the THub-owned run. This prevents persisted Quartz state from bypassing product rules after a workflow is edited or paused.
+
 SQL Server is not used as a generic blob store for file contents or run logs without a deliberate later decision.
 
 ## 5. Code boundaries and dependency rules
@@ -255,8 +267,9 @@ The exact topology, Kerberos/SPN requirements, and service-account model remain 
 
 - Domain tests cover aggregate behavior and invariants.
 - Application tests cover graph validation and cron calculation; domain tests cover scheduled occurrence identity.
+- Worker tests cover stable Quartz identities, persisted occurrence metadata, and five-field-cron-to-one-shot-trigger mapping.
 - Add SQL integration tests for EF mappings, transactions, scheduling concurrency, and future run leasing.
-- Add `WebApplicationFactory` tests for auth/policy/endpoint wiring.
+- Web integration tests cover loopback Development authentication and status-code handling; expand them for policy and endpoint wiring as those surfaces grow.
 - Keep Playwright checks for critical designer and management flows, using the loopback development identity only.
 - Add connector contract tests with representative encodings, schemas, nulls, large batches, and cancellation.
 

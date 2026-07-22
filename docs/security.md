@@ -26,6 +26,8 @@ Production uses ASP.NET Core Negotiate/Windows Authentication. It is appropriate
 
 Do not turn this handler into a general development header, accept a caller-selected identity, or enable it in production.
 
+The checked-in VS Code web debug profiles explicitly enable this handler so F5 does not depend on browser Negotiate behavior. The normal Development app setting remains disabled, allowing `dotnet run` without an override to exercise real Windows Authentication.
+
 ## Authorization
 
 THub uses permission policies rather than scattering raw role checks.
@@ -128,5 +130,10 @@ No publication runtime should ship until ADR-0007 is resolved.
 
 Structured logs may contain identities, workflow/run/step IDs, counts, timings, normalized error categories, and correlation IDs. They must not contain credentials, access tokens, unbounded row data, full connection strings, or raw sensitive payloads.
 
-Data previews must be permission-checked, bounded, short-lived, and masked according to future column-classification policy.
+Serilog writes local rolling JSON files in addition to console output. Treat the log directory as operational data: grant write access only to the corresponding host identity, grant read access only to approved operators/collectors, monitor disk usage, and apply the documented retention policy. Do not grant workflow authors direct filesystem access to logs.
 
+Quartz persists job and trigger data in SQL Server. That data is restricted to workflow ID, expected version, cron text, time-zone ID, and the logical scheduled occurrence timestamp. Never place graph JSON, connection configuration, credentials, webhook headers, executable arguments, or source rows in a `JobDataMap`.
+
+Continue using structured message templates and bounded scalar properties through `ILogger<T>`. Do not log serialized request bodies, database commands containing sensitive values, or exceptions without considering whether their messages expose connection details.
+
+Data previews must be permission-checked, bounded, short-lived, and masked according to future column-classification policy.

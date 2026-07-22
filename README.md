@@ -21,6 +21,8 @@ THub.Worker (Windows Service + persistent Quartz scheduler; execution host in la
 
 The web application owns management and design interactions. The worker owns durable background work. SQL Server is their coordination boundary. See the full [architecture description](docs/architecture.md) and [architecture decision records](docs/adr/README.md).
 
+Quartz owns schedule timing, persistence, misfire handling, and cluster coordination only. THub remains authoritative for workflow versions, queued runs, run state, and future step-run state. A Quartz fire is therefore a request to create a THub run, not the run itself.
+
 ## Capability status
 
 | Capability | Status | Notes |
@@ -59,9 +61,10 @@ The web application owns management and design interactions. The worker owns dur
 | `src/THub.Worker` | Windows Service host, Quartz reconciliation, and scheduled-run dispatch |
 | `src/THub.Application` | Use-case contracts, graph validation, schedule calculation |
 | `src/THub.Domain` | Workflow, run, and connection domain model |
-| `src/THub.Infrastructure` | EF Core persistence, migrations, SQL-backed scheduler coordination |
+| `src/THub.Infrastructure` | EF Core persistence, migrations, schedule projection, and THub run enqueueing |
 | `tests/THub.Domain.Tests` | Domain behavior tests |
 | `tests/THub.Application.Tests` | Application service tests |
+| `tests/THub.Web.Tests` | ASP.NET Core authentication and request-pipeline integration tests |
 | `tests/THub.Worker.Tests` | Quartz schedule mapping and worker integration unit tests |
 | `docs` | Architecture, ADRs, product decisions, and documentation index |
 | `scripts` | Operational helper scripts |
@@ -127,7 +130,7 @@ The compound profile runs one preparation task, then starts the web/frontend/bac
 - builds the Debug solution;
 - applies EF Core migrations to `THub.Debug`.
 
-The web application opens automatically at its HTTPS development URL. Stopping either debugger stops the complete compound session. Web-only and Worker-only profiles are also available. Development logs are written beneath `src/THub.Web/logs` and `src/THub.Worker/logs`; those directories are ignored by Git.
+The web application opens automatically at its HTTPS development URL. Stopping either debugger stops the complete compound session. Web-only and Worker-only profiles are also available. The VS Code web profiles explicitly enable the loopback-only Development identity so browser differences in Negotiate support do not block F5 debugging. Development logs are written beneath `src/THub.Web/logs` and `src/THub.Worker/logs`; those directories are ignored by Git.
 
 ### Automated browser testing
 
@@ -139,6 +142,8 @@ dotnet run --project src/THub.Web --launch-profile http
 ```
 
 The bypass is ignored outside the `Development` environment and refuses non-loopback clients. It must never be enabled in deployed configuration.
+
+To test real Windows/Negotiate authentication locally, run the `https` launch profile without setting `Authentication__DevelopmentBypass`; the checked-in Development setting remains `false`.
 
 ## Build and test
 

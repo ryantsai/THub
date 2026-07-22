@@ -9,6 +9,7 @@
   <Folder Name="/tests/">
     <Project Path="tests/THub.Application.Tests/THub.Application.Tests.csproj" />
     <Project Path="tests/THub.Domain.Tests/THub.Domain.Tests.csproj" />
+    <Project Path="tests/THub.Web.Tests/THub.Web.Tests.csproj" />
     <Project Path="tests/THub.Worker.Tests/THub.Worker.Tests.csproj" />
   </Folder>
 </Solution>

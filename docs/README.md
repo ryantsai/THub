@@ -2,10 +2,10 @@
 
 ## Architecture set
 
-- [Architecture overview](architecture.md): system context, runtime containers, code boundaries, flows, failure model, and roadmap.
-- [Data model](data-model.md): current schema, workflow graph contract, target persistence concepts, and migration conventions.
-- [Security architecture](security.md): authentication, authorization, trust boundaries, connectors, executables, and publications.
-- [Deployment and operations](deployment.md): recommended Windows topology, service/database deployment, health, and recovery.
+- [Architecture overview](architecture.md): system context, runtime containers, THub/Quartz ownership, flows, failure model, observability, and roadmap.
+- [Data model](data-model.md): THub and Quartz schemas, workflow graph contract, scheduled-run identity, target persistence concepts, and migration conventions.
+- [Security architecture](security.md): authentication, authorization, trust boundaries, scheduler/log data, connectors, executables, and publications.
+- [Deployment and operations](deployment.md): recommended Windows topology, service/database deployment, Quartz and Serilog configuration, health, and recovery.
 - [Architecture Decision Records](adr/README.md): accepted and proposed decisions with rationale and consequences.
 
 ## Product planning
@@ -18,4 +18,3 @@
 - Add/supersede an ADR for a material technology, boundary, security, persistence, or execution decision.
 - Keep planned and implemented behavior distinguishable.
 - Prefer links to one authoritative explanation over duplicating instructions across documents.
-

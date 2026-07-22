@@ -84,6 +84,8 @@ Apply migrations through a controlled deployment step. Runtime web/worker identi
 
 Back up the THub database before migrations that transform or delete data. Review generated SQL for large-table locks and destructive operations.
 
+The Quartz tables are vendor-defined but are installed through the THub migration chain. The worker validates the expected Quartz schema at startup and fails rather than creating or changing tables. Review the official SQL Server schema changes and create a forward THub migration before upgrading Quartz across a version that changes its persistence schema.
+
 ## Configuration
 
 For local Development/debugging, both hosts use `THub.Debug` on `(localdb)\MSSQLLocalDB`. This development connection is defined only in `appsettings.Development.json`, and those files are excluded from publish output.
@@ -109,6 +111,29 @@ The worker supports:
 
 `ReconciliationIntervalSeconds` controls how quickly changed THub schedule metadata is reflected in Quartz; it is not a due-work polling interval. Quartz persists timing and cluster state in the `quartz` schema. Both runtime hosts also support `Serilog:FilePath`; relative paths resolve from the host content root and environment variables are expanded.
 
+### Worker scheduler settings
+
+| Setting | Default | Valid range | Purpose |
+| --- | ---: | ---: | --- |
+| `Scheduler:ReconciliationIntervalSeconds` | 15 | 5–300 | Interval for projecting published THub schedules into Quartz and removing stale jobs |
+| `Scheduler:MaxConcurrency` | 10 | 1–100 | Quartz thread-pool concurrency; this is not a workflow-execution concurrency limit |
+| `Scheduler:DatabaseRetryIntervalSeconds` | 15 | 1–300 | Delay before Quartz retries unavailable job-store access |
+| `Scheduler:ClusterCheckinIntervalSeconds` | 10 | 5–300 | Scheduler instance heartbeat interval |
+| `Scheduler:ClusterCheckinMisfireThresholdSeconds` | 20 | 5–300 | Delay after which a cluster instance is considered failed or restarted |
+
+Environment-variable overrides use normal .NET configuration names, for example `Scheduler__MaxConcurrency` and `Serilog__FilePath`.
+
+### Scheduling behavior
+
+- Reconciliation creates one durable Quartz job and one one-shot trigger for each published scheduled workflow.
+- Cronos evaluates THub's five-field cron expression and time-zone ID; Quartz cron syntax is not exposed as the product contract.
+- Each trigger persists its exact logical occurrence. THub records that value as `WorkflowRun.ScheduledForUtc` and rejects a duplicate occurrence through a filtered unique index.
+- A stale trigger revalidates workflow status and version before enqueueing, so pausing or republishing a workflow prevents obsolete work from becoming a run.
+- After downtime, the missed one-shot occurrence fires once. The following occurrence is calculated from the recovery evaluation time rather than replaying an unbounded backlog.
+- Stop the Windows Service gracefully when possible. The Quartz hosted service waits for active jobs during normal host shutdown.
+
+Quartz schedule clustering does not authorize multiple workers to execute queued runs. Keep workflow execution single-worker until THub run claims, leases, attempts, and abandoned-run recovery are implemented.
+
 Do not edit production credentials into checked-in `appsettings` files or publish output. LocalDB must never be used as a production or shared-environment control plane.
 
 ## Health and monitoring
@@ -125,6 +150,8 @@ Required operational signals:
 - Disk/file-root capacity and file-processing quarantine counts.
 
 Serilog writes structured console output and daily rolling JSON files by default. Each file rolls at 50 MB and 14 files are retained. Create `%PROGRAMDATA%\THub\Logs` and grant the web/worker identities write access, or configure another approved absolute path. Route logs to centralized storage with retention and redaction controls. Windows Event Log is suitable for service lifecycle/errors but should not be the only workflow telemetry store.
+
+Default file names are `thub-web-.json` and `thub-worker-.json`. Development writes to each project's `logs` directory, which is excluded from Git. Production should alert on unwritable log destinations and disk pressure; local rolling files are a resilience buffer, not a substitute for centralized searchable telemetry.
 
 ## Recovery
 

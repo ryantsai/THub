@@ -13,7 +13,7 @@ Both hosts also need consistent structured logs with bounded local retention and
 
 ## Decision
 
-Keep SQL Server as the control plane and `THub.Worker` as the Windows Service boundary. Use Quartz.NET 3.18 as the scheduling substrate with its clustered ADO.NET job store in the `quartz` SQL schema.
+Keep SQL Server as the control plane and `THub.Worker` as the Windows Service boundary. Use Quartz.NET 3.18.2 as the scheduling substrate with its clustered ADO.NET job store in the `quartz` SQL schema.
 
 - A Quartz reconciliation job synchronizes published THub schedule metadata to one durable Quartz job and one one-shot trigger per workflow. It detects definition changes and removes schedules for paused, draft, archived, or deleted workflows.
 - Quartz owns persistence, timing, misfire detection, and scheduler cluster coordination. The reconciliation job does not scan for due workflows.
@@ -21,7 +21,7 @@ Keep SQL Server as the control plane and `THub.Worker` as the Windows Service bo
 - A missed one-shot trigger fires once when the scheduler recovers. The next occurrence is then calculated from the current evaluation time, so downtime does not produce an unbounded catch-up storm.
 - A Quartz fire calls an application port that verifies the workflow is still published at the expected version, inserts a THub-owned `WorkflowRun`, and advances `NextRunAtUtc`.
 - `WorkflowRun.ScheduledForUtc` records the logical occurrence. A filtered unique index on workflow ID, version, and scheduled time makes replay/recovery idempotent for that occurrence.
-- Quartz job data contains only workflow identifiers, version, cron text, and time-zone ID. It never contains workflow graphs, credentials, connection configuration, or row payloads.
+- Quartz job and trigger data contain only workflow identifiers, version, cron text, time-zone ID, and the logical scheduled occurrence timestamp. They never contain workflow graphs, credentials, connection configuration, or row payloads.
 - Quartz tables are created through the reviewed THub EF migration; neither runtime host mutates the schema at startup.
 
 Use Serilog as the provider behind `ILogger<T>` in both hosts. Write human-readable console output and daily rolling JSON files with a 50 MB per-file limit and 14-file retention default. The default deployed path is under `%PROGRAMDATA%\THub\Logs`; Development writes beneath each project content root. Production may replace or supplement the sink through an approved collector, but logs are not stored in the THub control-plane tables.

@@ -66,6 +66,8 @@ Web/Worker -> Infrastructure -> Application/Domain
 - Do not duplicate domain/application rules in the worker project.
 - Respect cancellation and use scopes/factories for scoped infrastructure.
 - Quartz coordinates schedule firing across clustered worker instances, but queued workflow execution still has no claim/lease model. Do not imply multi-worker execution safety until claim/lease support exists.
+- Keep Quartz job/trigger data limited to workflow identity, version, cron/time-zone metadata, and the logical scheduled occurrence. Reload and validate authoritative workflow state through Application ports when a trigger fires.
+- Preserve THub's five-field cron contract through `ScheduleCalculator`; do not silently replace it with Quartz cron syntax.
 
 ## Platform and coding conventions
 
@@ -77,6 +79,7 @@ Web/Worker -> Infrastructure -> Application/Domain
 - Use `DateTimeOffset` and UTC for persisted instants. Store an explicit time-zone ID for schedules.
 - Pass `CancellationToken` through I/O and long-running application paths.
 - Use structured `ILogger` messages; never concatenate or log secrets/row payloads.
+- Keep application code on `ILogger<T>` abstractions. Serilog bootstrap and sink configuration belong in the executable hosts.
 - Do not add a framework/library when the platform already provides a suitable feature unless the tradeoff is documented.
 - Preserve user changes and avoid unrelated formatting or refactors.
 
@@ -183,7 +186,7 @@ Behavior changes require proportionate tests:
 - Application validation, scheduling, and use cases: `THub.Application.Tests`.
 - Quartz schedule mapping and worker composition logic: `THub.Worker.Tests`.
 - SQL behavior: add integration tests against a relational database; do not rely on EF's in-memory provider for SQL semantics.
-- Authentication/HTTP pipeline: use ASP.NET Core integration tests.
+- Authentication/HTTP pipeline: use ASP.NET Core integration tests in `THub.Web.Tests`.
 - Blazor interaction: use browser automation for high-value flows.
 
 Before handing off a code change, run from the repository root:

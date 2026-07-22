@@ -15,7 +15,8 @@
       "checkForDevCert": true,
       "env": {
         "ASPNETCORE_ENVIRONMENT": "Development",
-        "ASPNETCORE_URLS": "https://localhost:7032;http://localhost:5253"
+        "ASPNETCORE_URLS": "https://localhost:7032;http://localhost:5253",
+        "Authentication__DevelopmentBypass": "true"
       },
       "serverReadyAction": {
         "action": "openExternally",
@@ -57,7 +58,8 @@
       "checkForDevCert": true,
       "env": {
         "ASPNETCORE_ENVIRONMENT": "Development",
-        "ASPNETCORE_URLS": "https://localhost:7032;http://localhost:5253"
+        "ASPNETCORE_URLS": "https://localhost:7032;http://localhost:5253",
+        "Authentication__DevelopmentBypass": "true"
       },
       "serverReadyAction": {
         "action": "openExternally",
@@ -100,4 +102,3 @@
     }
   ]
 }
-

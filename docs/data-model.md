@@ -70,6 +70,8 @@ Examples of safe configuration include database/server aliases, sheet names, del
 
 Quartz.NET owns the operational scheduler tables in the `quartz` schema. They contain durable jobs, one-shot triggers, fired-trigger state, cluster check-ins, and locks. THub creates and upgrades these tables through reviewed migrations, while runtime scheduling code accesses them only through Quartz APIs. Application and reporting code must not write directly to these tables.
 
+Quartz rows are operational projections, not the source of truth for workflow definitions or run history. Backups and disaster recovery should nevertheless include both schemas so persisted firing state stays aligned with THub schedule metadata. After recovery, reconciliation removes stale jobs and recreates missing jobs from published THub workflows.
+
 ## Workflow graph contract
 
 `WorkflowGraph` contains `Nodes` and `Edges`.
