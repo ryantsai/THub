@@ -44,10 +44,13 @@ Represents an execution request for a specific workflow version.
 | `WorkflowVersion` | Version frozen at enqueue time |
 | `Status` | Queued, Running, Succeeded, Failed, or Cancelled |
 | `TriggeredBy` | Scheduler or initiating identity/source |
+| `ScheduledForUtc` | Logical Quartz occurrence for scheduled runs; null for manual/event runs |
 | `QueuedAtUtc`, `StartedAtUtc`, `CompletedAtUtc` | Lifecycle timestamps |
 | `ErrorMessage` | Bounded terminal summary; never secret or row data |
 
 Claim/lease, attempt, and step-run fields are intentionally not invented yet. They require decisions about worker scale, retry, and cancellation semantics.
+
+Scheduled runs have a filtered unique index on `(WorkflowId, WorkflowVersion, ScheduledForUtc)`. This keeps Quartz recovery or repeated delivery idempotent for one logical occurrence without constraining manual runs, whose `ScheduledForUtc` is null.
 
 ### `thub.Connections`
 
@@ -62,6 +65,10 @@ Represents an approved connector configuration.
 | `CreatedBy`, `CreatedAtUtc` | Audit metadata |
 
 Examples of safe configuration include database/server aliases, sheet names, delimiters, and a secret reference. Raw passwords, tokens, or embedded connection strings containing credentials are not safe configuration.
+
+### `quartz.QRTZ_*`
+
+Quartz.NET owns the operational scheduler tables in the `quartz` schema. They contain durable jobs, one-shot triggers, fired-trigger state, cluster check-ins, and locks. THub creates and upgrades these tables through reviewed migrations, while runtime scheduling code accesses them only through Quartz APIs. Application and reporting code must not write directly to these tables.
 
 ## Workflow graph contract
 

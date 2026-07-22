@@ -13,7 +13,7 @@ IIS / THub.Web  -------------------+
                                       \
                                        > SQL Server / THub control plane
                                       /
-THub.Worker Windows Service --------+
+THub.Worker Windows Service --------+  (Quartz clustered scheduler)
       |
       +---- approved SQL Server databases
       +---- approved local/UNC file roots
@@ -90,16 +90,24 @@ For local Development/debugging, both hosts use `THub.Debug` on `(localdb)\MSSQL
 
 Every published environment must provide the same real SQL Server `ConnectionStrings:THub` value to both hosts through environment-specific external configuration or an organization-approved secret/configuration provider. Base `appsettings.json` files intentionally contain no fallback connection string, so a missing deployment value fails at startup instead of silently connecting to a developer database.
 
-The worker also supports:
+The worker supports:
 
 ```json
 {
   "Scheduler": {
-    "PollIntervalSeconds": 10,
-    "ErrorRetrySeconds": 30
+    "ReconciliationIntervalSeconds": 15,
+    "MaxConcurrency": 10,
+    "DatabaseRetryIntervalSeconds": 15,
+    "ClusterCheckinIntervalSeconds": 10,
+    "ClusterCheckinMisfireThresholdSeconds": 20
+  },
+  "Serilog": {
+    "FilePath": "%PROGRAMDATA%\\THub\\Logs\\thub-worker-.json"
   }
 }
 ```
+
+`ReconciliationIntervalSeconds` controls how quickly changed THub schedule metadata is reflected in Quartz; it is not a due-work polling interval. Quartz persists timing and cluster state in the `quartz` schema. Both runtime hosts also support `Serilog:FilePath`; relative paths resolve from the host content root and environment variables are expanded.
 
 Do not edit production credentials into checked-in `appsettings` files or publish output. LocalDB must never be used as a production or shared-environment control plane.
 
@@ -110,19 +118,19 @@ The web application exposes `/healthz` as a basic liveness endpoint. It currentl
 Required operational signals:
 
 - Web request/error rate and Blazor circuit failures.
-- Worker process/service state and scheduler tick failures.
+- Worker process/service state, Quartz cluster check-ins, misfires, and reconciliation failures.
 - SQL connectivity and query latency.
 - Queue depth, oldest queued age, due-schedule lag, and abandoned leases.
 - Workflow/step successes, failures, retries, cancellations, durations, and row counts.
 - Disk/file-root capacity and file-processing quarantine counts.
 
-Route logs to centralized storage with retention and redaction controls. Windows Event Log is suitable for service lifecycle/errors but should not be the only workflow telemetry store.
+Serilog writes structured console output and daily rolling JSON files by default. Each file rolls at 50 MB and 14 files are retained. Create `%PROGRAMDATA%\THub\Logs` and grant the web/worker identities write access, or configure another approved absolute path. Route logs to centralized storage with retention and redaction controls. Windows Event Log is suitable for service lifecycle/errors but should not be the only workflow telemetry store.
 
 ## Recovery
 
 - Web: restart/recycle; durable state remains in SQL Server.
-- Worker: restart; queued work remains. Automated abandoned-run recovery requires the future lease model.
+- Worker: restart; Quartz recovers persisted schedules and fires one missed occurrence, while queued THub runs remain. Automated abandoned-run recovery requires the future lease model.
 - Database: restore according to organizational RPO/RTO; workflow definitions, schedules, run state, and audit data are control-plane assets.
 - Configuration/secrets: back up through their owning systems, not by copying secrets into the THub database.
 
-The current scheduler is designed for one active scheduler instance. Do not start multiple production workers that schedule the same database until claim/lease and scale-out behavior is implemented and tested.
+Quartz is configured for clustered schedule coordination and scheduled occurrences are idempotent in THub. Multiple scheduler instances may share the same database when their clocks are synchronized. Do not enable queued workflow execution on multiple workers until THub run claim/lease and scale-out behavior is implemented and tested.

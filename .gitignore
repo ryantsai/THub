@@ -9,5 +9,6 @@
 TestResults/
 artifacts/
 output/
+**/logs/
 .env
 appsettings.Local.json

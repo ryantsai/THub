@@ -65,7 +65,7 @@ Web/Worker -> Infrastructure -> Application/Domain
 - Own host/service lifecycle and invoke Application services.
 - Do not duplicate domain/application rules in the worker project.
 - Respect cancellation and use scopes/factories for scoped infrastructure.
-- The current scheduler assumes one active instance. Do not imply multi-worker scheduling safety until claim/lease support exists.
+- Quartz coordinates schedule firing across clustered worker instances, but queued workflow execution still has no claim/lease model. Do not imply multi-worker execution safety until claim/lease support exists.
 
 ## Platform and coding conventions
 
@@ -95,6 +95,7 @@ When adding a node kind, update the domain enum/model, configuration contract, v
 ## Database and migrations
 
 - SQL Server is the authoritative control plane.
+- Quartz persistence lives in the `quartz` schema and is managed by reviewed THub migrations. Do not write directly to Quartz tables from application code.
 - Development/debugging uses `THub.Debug` on `(localdb)\MSSQLLocalDB`; published environments must receive a real SQL Server connection from deployment configuration.
 - Keep LocalDB settings in `appsettings.Development.json` and excluded from publish output. Do not add a fallback connection string to base settings.
 - EF mappings/migrations belong in `THub.Infrastructure`.
@@ -180,6 +181,7 @@ Behavior changes require proportionate tests:
 
 - Domain invariants/state transitions: `THub.Domain.Tests`.
 - Application validation, scheduling, and use cases: `THub.Application.Tests`.
+- Quartz schedule mapping and worker composition logic: `THub.Worker.Tests`.
 - SQL behavior: add integration tests against a relational database; do not rely on EF's in-memory provider for SQL semantics.
 - Authentication/HTTP pipeline: use ASP.NET Core integration tests.
 - Blazor interaction: use browser automation for high-value flows.
@@ -192,7 +194,7 @@ dotnet build THub.slnx
 dotnet test THub.slnx --no-build
 ```
 
-The supported VS Code compound profile is `THub: Debug All`. Keep `.vscode/launch.json`, `.vscode/tasks.json`, `scripts/prepare-debug.ps1`, launch URLs, target framework paths, and Development database setup synchronized when host projects or framework versions change.
+The supported VS Code compound profile is `THub: Debug All`. Keep `.vscode/launch.json`, `.vscode/tasks.json`, `scripts/prepare-debug.ps1`, launch URLs, target framework paths, Quartz schema setup, and Development database setup synchronized when host projects or framework versions change.
 
 For dependency changes, also run:
 

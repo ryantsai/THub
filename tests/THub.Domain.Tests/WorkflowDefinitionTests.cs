@@ -1,4 +1,5 @@
 using THub.Domain.Workflows;
+using THub.Domain.Runs;
 
 namespace THub.Domain.Tests;
 
@@ -25,5 +26,16 @@ public sealed class WorkflowDefinitionTests
         Assert.Equal(2, workflow.Version);
         Assert.Equal(WorkflowStatus.Draft, workflow.Status);
     }
-}
 
+    [Fact]
+    public void ScheduledRunRetainsItsLogicalOccurrence()
+    {
+        var scheduledForUtc = new DateTimeOffset(2026, 7, 22, 12, 30, 0, TimeSpan.Zero);
+
+        var run = new WorkflowRun(Guid.NewGuid(), 3, "quartz", scheduledForUtc);
+
+        Assert.Equal(scheduledForUtc, run.ScheduledForUtc);
+        Assert.Equal("quartz", run.TriggeredBy);
+        Assert.Equal(WorkflowRunStatus.Queued, run.Status);
+    }
+}

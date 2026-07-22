@@ -38,6 +38,9 @@ public sealed class THubDbContext(DbContextOptions<THubDbContext> options) : DbC
             entity.Property(x => x.TriggeredBy).HasMaxLength(256).IsRequired();
             entity.Property(x => x.ErrorMessage).HasMaxLength(4_000);
             entity.HasIndex(x => new { x.Status, x.QueuedAtUtc });
+            entity.HasIndex(x => new { x.WorkflowId, x.WorkflowVersion, x.ScheduledForUtc })
+                .IsUnique()
+                .HasFilter("[ScheduledForUtc] IS NOT NULL");
             entity.HasOne<WorkflowDefinition>()
                 .WithMany()
                 .HasForeignKey(x => x.WorkflowId)
@@ -56,4 +59,3 @@ public sealed class THubDbContext(DbContextOptions<THubDbContext> options) : DbC
         });
     }
 }
-

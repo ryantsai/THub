@@ -20,7 +20,8 @@ public static class DependencyInjection
             options.UseSqlServer(connectionString, sql =>
                 sql.EnableRetryOnFailure(maxRetryCount: 5)));
 
-        services.AddSingleton<ISchedulerCoordinator, SqlSchedulerCoordinator>();
+        services.AddSingleton<IWorkflowScheduleSource, SqlWorkflowScheduleSource>();
+        services.AddSingleton<IScheduledWorkflowRunEnqueuer, SqlScheduledWorkflowRunEnqueuer>();
         return services;
     }
 }

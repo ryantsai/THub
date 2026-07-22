@@ -17,8 +17,8 @@ Webhook calls, external executables, generated REST APIs, and permissioned onlin
 | Area | Current implementation | Target direction |
 | --- | --- | --- |
 | Web | Global Interactive Server Blazor app, Radzen shell, Windows auth/RBAC, in-memory designer | Persisted designer, schema mapping, management APIs, live run views |
-| Worker | Windows Service host, validated polling options, durable schedule enqueue | Run leasing, graph execution, retries, cancellation, telemetry |
-| Database | `thub` schema for workflows, runs, and connections | Immutable workflow versions, step runs, leases, audit, publications, secrets references |
+| Worker | Windows Service host, persistent Quartz scheduling, durable THub run enqueue | Run leasing, graph execution, retries, cancellation, telemetry |
+| Database | `thub` control-plane schema plus `quartz` operational scheduler schema | Immutable workflow versions, step runs, leases, audit, publications, secrets references |
 | Connectors | Node kinds and library dependencies | Streaming SQL/CSV/XLSX readers and writers |
 | Publications | UI/graph concepts only | Governed REST endpoints and audited editor surfaces |
 
@@ -40,7 +40,7 @@ Webhook calls, external executables, generated REST APIs, and permissioned onlin
 flowchart LR
     User[Windows user] -->|HTTPS / Negotiate| Web[THub.Web\nBlazor Interactive Server]
     Web -->|EF Core metadata| Sql[(SQL Server\nTHub control plane)]
-    Worker[THub.Worker\nWindows Service] -->|claim schedules and runs| Sql
+    Worker[THub.Worker\nWindows Service + Quartz] -->|schedule and queue runs| Sql
     Worker -->|read/write data| SourceSql[(Connected SQL Server)]
     Worker -->|read/write approved paths| Files[CSV / XLSX files]
     Worker -. future, allow-listed .-> External[Webhooks / executables]
@@ -66,8 +66,8 @@ Responsibilities now:
 
 - run under the .NET Generic Host as a Windows Service;
 - validate scheduler configuration at startup;
-- poll for due published workflows;
-- enqueue run records and advance schedules within a SQL transaction;
+- reconcile published THub schedules into durable Quartz jobs/triggers;
+- enqueue idempotent THub run records when Quartz fires and advance the next occurrence;
 - log structured success and failure information.
 
 Target responsibilities:
@@ -79,7 +79,7 @@ Target responsibilities:
 
 ### SQL Server control plane
 
-The `thub` schema is the durable boundary shared by the web and worker processes. It currently stores workflow definitions, workflow runs, and connection metadata. SQL retry behavior is configured through EF Core, and `IDbContextFactory<THubDbContext>` is used because Blazor circuits and singleton background services do not share normal request-scoped lifetimes.
+The `thub` schema is the durable product boundary shared by the web and worker processes. It stores workflow definitions, workflow runs, and connection metadata. The `quartz` schema stores Quartz jobs, triggers, cluster check-ins, and locks; application code accesses it only through Quartz APIs. SQL retry behavior is configured through EF Core, and `IDbContextFactory<THubDbContext>` is used because Blazor circuits and long-lived scheduling jobs do not share normal request-scoped lifetimes.
 
 Development/debugging uses the `THub.Debug` database on SQL Server LocalDB. Published environments use a separately provisioned SQL Server connection supplied through deployment configuration. Both use the same EF Core SQL Server provider and migrations; Development configuration is excluded from publish output.
 
@@ -121,21 +121,23 @@ The current table stores `GraphJson` on the workflow row. Before execution is im
 
 ```mermaid
 sequenceDiagram
-    participant W as THub.Worker
-    participant S as SqlSchedulerCoordinator
+    participant R as Quartz reconciliation job
+    participant Q as Quartz SQL job store
+    participant F as Scheduled workflow job
+    participant E as THub run enqueuer
     participant DB as SQL Server
-    W->>S: EnqueueDueWorkflowsAsync(nowUtc)
-    S->>DB: Begin serializable transaction
-    S->>DB: Read up to 25 due Published workflows
-    loop each due workflow
-        S->>DB: Insert Queued WorkflowRun
-        S->>DB: Update NextRunAtUtc
-    end
-    S->>DB: Commit
-    S-->>W: queued count
+    R->>DB: Read published schedules
+    R->>Q: Create/update one-shot triggers; remove stale jobs
+    Q-->>F: Fire persisted occurrence (including one recovery misfire)
+    F->>E: Enqueue(workflow, version, scheduledForUtc)
+    E->>DB: Verify published version
+    E->>DB: Insert unique Queued WorkflowRun
+    E->>DB: Advance NextRunAtUtc
 ```
 
-Current safety: the serializable transaction prevents duplicate schedule enqueueing from concurrent scheduler ticks under the current model.
+Quartz coordinates schedule firing through its clustered SQL job store. THub independently protects run ownership with a filtered unique index on `(WorkflowId, WorkflowVersion, ScheduledForUtc)`. A stale job cannot enqueue after a workflow is paused or changed because the application port revalidates status and version at the firing boundary.
+
+THub retains its five-field cron contract. Cronos calculates the next occurrence, represented as a one-shot Quartz trigger. If the worker was unavailable at that time, Quartz fires the missed occurrence once and THub calculates the following occurrence from the recovery time, avoiding an unbounded catch-up burst.
 
 Required before scale-out execution:
 
@@ -143,7 +145,7 @@ Required before scale-out execution:
 - optimistic concurrency token or atomic claim statement;
 - recovery of abandoned leases;
 - idempotency/retry semantics;
-- defined misfire behavior for schedules missed during downtime.
+- defined retry behavior for workflow execution failures (schedule misfires already fire once).
 
 ## 8. Data execution architecture
 
@@ -210,16 +212,18 @@ Migrations live in `src/THub.Infrastructure/Persistence/Migrations`. Production 
 ## 11. Availability, concurrency, and scale
 
 - The web host is stateless for durable data but Interactive Server circuits are process-bound. Multi-instance web deployment requires sticky sessions or an appropriate Blazor scale-out plan plus shared Data Protection keys.
-- The worker catches scheduler errors, logs them, and retries after the configured delay.
+- Quartz retries transient job-store connectivity and persists scheduler/cluster state in SQL Server.
 - EF Core SQL Server retry-on-failure is enabled for transient database faults.
-- The current serializable scheduling transaction is appropriate for the foundation, but run execution needs leases before multiple workers are enabled.
+- Scheduler instances can cluster safely, but queued-run execution still needs leases before multiple workers execute workflows.
 - File connectors are constrained by worker-local or service-accessible paths; moving workers changes file locality and permissions.
 
 ## 12. Observability and operations
 
 Implemented:
 
-- structured `ILogger` messages from the worker;
+- Serilog-backed structured `ILogger` messages from both hosts, including rolling JSON files;
+- ASP.NET Core request completion logging;
+- Quartz persistence, cluster, reconciliation, and scheduled-run events;
 - a basic unauthenticated `/healthz` process health endpoint;
 - an authorized `/api/v1/runtime/status` endpoint.
 
@@ -250,7 +254,7 @@ The exact topology, Kerberos/SPN requirements, and service-account model remain 
 ## 14. Testing strategy
 
 - Domain tests cover aggregate behavior and invariants.
-- Application tests cover graph validation and cron calculation.
+- Application tests cover graph validation and cron calculation; domain tests cover scheduled occurrence identity.
 - Add SQL integration tests for EF mappings, transactions, scheduling concurrency, and future run leasing.
 - Add `WebApplicationFactory` tests for auth/policy/endpoint wiring.
 - Keep Playwright checks for critical designer and management flows, using the loopback development identity only.

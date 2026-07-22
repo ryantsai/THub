@@ -9,7 +9,7 @@ These choices materially affect security, deployment, execution semantics, or pe
 | PD-003 | What Windows identity runs the worker, and do file connections include UNC shares? | Dedicated least-privilege service identity; local roots only | File connector, Kerberos/delegation, ACL deployment |
 | PD-004 | Do online-editor changes write directly to source tables or use staging and approval? | Staged, audited writes | ADR-0007 and editor persistence/runtime |
 | PD-005 | Who consumes generated REST APIs, from which networks, and with Windows, Entra/JWT, or managed API-key authentication? | Internal-only, read-only, no runtime yet | ADR-0007 and publication host/auth model |
-| PD-006 | Required run concurrency, retry/backoff, missed-schedule, cancellation, and recovery semantics? | One scheduler; at-least-once effects; no automatic execution retry yet | Run claim/lease and execution engine |
+| PD-006 | Required run concurrency, retry/backoff, cancellation, and recovery semantics? | Quartz schedules are clustered and missed occurrences fire once; execution remains at-least-once with no automatic execution retry | Run claim/lease and execution engine |
 | PD-007 | Is `.xlsx`/`.xlsm` sufficient, or is legacy `.xls` mandatory? | Modern workbook formats only | Excel connector/library scope |
 | PD-008 | Which approved secret provider should web and worker use? | Secret references in metadata; provider undecided | Production connection creation and execution |
 | PD-009 | Required run/log/audit retention and data classification/masking policy? | Store bounded metadata; no row payload in logs | Telemetry schema, cleanup jobs, previews, publications |

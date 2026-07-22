@@ -6,12 +6,17 @@ public sealed class WorkflowRun
 {
     private WorkflowRun() { }
 
-    public WorkflowRun(Guid workflowId, int workflowVersion, string triggeredBy)
+    public WorkflowRun(
+        Guid workflowId,
+        int workflowVersion,
+        string triggeredBy,
+        DateTimeOffset? scheduledForUtc = null)
     {
         Id = Guid.NewGuid();
         WorkflowId = workflowId;
         WorkflowVersion = workflowVersion;
         TriggeredBy = triggeredBy;
+        ScheduledForUtc = scheduledForUtc;
         QueuedAtUtc = DateTimeOffset.UtcNow;
     }
 
@@ -20,9 +25,9 @@ public sealed class WorkflowRun
     public int WorkflowVersion { get; private set; }
     public WorkflowRunStatus Status { get; private set; } = WorkflowRunStatus.Queued;
     public string TriggeredBy { get; private set; } = string.Empty;
+    public DateTimeOffset? ScheduledForUtc { get; private set; }
     public DateTimeOffset QueuedAtUtc { get; private set; }
     public DateTimeOffset? StartedAtUtc { get; private set; }
     public DateTimeOffset? CompletedAtUtc { get; private set; }
     public string? ErrorMessage { get; private set; }
 }
-

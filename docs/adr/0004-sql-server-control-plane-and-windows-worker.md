@@ -1,6 +1,6 @@
 # ADR-0004: Use SQL Server as the control plane and a Windows Service worker
 
-- Status: Accepted
+- Status: Superseded by [ADR-0009](0009-quartz-scheduling-and-serilog-observability.md)
 - Date: 2026-07-22
 - Deciders: Project maintainers
 
@@ -45,3 +45,6 @@ Support only one active scheduler instance until an explicit atomic claim/lease 
 - Add readiness and queue-lag metrics.
 - Revisit broker use when measured throughput/latency requires it.
 
+## Superseded by
+
+[ADR-0009](0009-quartz-scheduling-and-serilog-observability.md) retains the SQL Server control plane and Windows Service boundary while replacing the polling scheduler with Quartz.NET and establishing Serilog as the host logging provider.

@@ -2,7 +2,7 @@
 
 THub is an intranet-first data workflow orchestration and visual-design platform inspired by SSIS, n8n, DolphinScheduler, Kestra, and Azure Data Factory. The v1 product boundary is Microsoft SQL Server plus local CSV and Excel files.
 
-> **Repository status:** executable foundation. Authentication, authorization, the Blazor shell, in-memory graph designer, graph validation, SQL Server metadata model, migrations, cron calculation, and scheduled-run enqueueing are implemented. Workflow persistence from the designer, schema discovery/mapping, node execution, run leasing, publications, and the online editor are not implemented yet.
+> **Repository status:** executable foundation. Authentication, authorization, the Blazor shell, in-memory graph designer, graph validation, SQL Server metadata model, migrations, Quartz scheduling, structured Serilog output, and scheduled-run enqueueing are implemented. Workflow persistence from the designer, schema discovery/mapping, node execution, run leasing, publications, and the online editor are not implemented yet.
 
 ## Architecture at a glance
 
@@ -16,7 +16,7 @@ THub.Web (Blazor Interactive Server + Radzen)
 SQL Server control plane
     ^
     |
-THub.Worker (Windows Service scheduler; execution host in later slices)
+THub.Worker (Windows Service + persistent Quartz scheduler; execution host in later slices)
 ```
 
 The web application owns management and design interactions. The worker owns durable background work. SQL Server is their coordination boundary. See the full [architecture description](docs/architecture.md) and [architecture decision records](docs/adr/README.md).
@@ -31,7 +31,7 @@ The web application owns management and design interactions. The worker owns dur
 | Visual workflow designer | Foundation | Add/select/configure/remove nodes and validate an in-memory graph |
 | Workflow graph validation | Implemented | IDs, endpoints, self-edges, and cycle detection |
 | SQL Server metadata schema | Implemented | EF Core model and initial migration for workflows, runs, and connections |
-| Cron/time-zone scheduling | Implemented | Worker transactionally enqueues due published workflows |
+| Cron/time-zone scheduling | Implemented | Quartz persists one trigger per published schedule; THub transactionally owns queued runs |
 | Designer save/load/publish | Planned | UI actions are placeholders until the repository slice is built |
 | SQL/CSV/XLSX execution | Planned | Libraries and node contracts exist; executors do not |
 | Schema mapping and transforms | Planned | Node types exist; execution and mapping UI remain |
@@ -45,7 +45,9 @@ The web application owns management and design interactions. The worker owns dur
 - Radzen Blazor 11
 - .NET Worker hosted as a Windows Service
 - EF Core 10 with Microsoft SQL Server
-- Cronos for cron calculation
+- Quartz.NET 3.18 with a clustered SQL Server job store
+- Cronos for the product's five-field cron calculation
+- Serilog structured console and rolling JSON file logging
 - CsvHelper and ClosedXML reserved for v1 connector implementation
 - xUnit for unit tests
 
@@ -54,12 +56,13 @@ The web application owns management and design interactions. The worker owns dur
 | Path | Responsibility |
 | --- | --- |
 | `src/THub.Web` | Blazor UI, Negotiate authentication, permission policies, internal endpoints |
-| `src/THub.Worker` | Windows Service host and scheduler polling loop |
+| `src/THub.Worker` | Windows Service host, Quartz reconciliation, and scheduled-run dispatch |
 | `src/THub.Application` | Use-case contracts, graph validation, schedule calculation |
 | `src/THub.Domain` | Workflow, run, and connection domain model |
 | `src/THub.Infrastructure` | EF Core persistence, migrations, SQL-backed scheduler coordination |
 | `tests/THub.Domain.Tests` | Domain behavior tests |
 | `tests/THub.Application.Tests` | Application service tests |
+| `tests/THub.Worker.Tests` | Quartz schedule mapping and worker integration unit tests |
 | `docs` | Architecture, ADRs, product decisions, and documentation index |
 | `scripts` | Operational helper scripts |
 
@@ -124,7 +127,7 @@ The compound profile runs one preparation task, then starts the web/frontend/bac
 - builds the Debug solution;
 - applies EF Core migrations to `THub.Debug`.
 
-The web application opens automatically at its HTTPS development URL. Stopping either debugger stops the complete compound session. Web-only and Worker-only profiles are also available.
+The web application opens automatically at its HTTPS development URL. Stopping either debugger stops the complete compound session. Web-only and Worker-only profiles are also available. Development logs are written beneath `src/THub.Web/logs` and `src/THub.Worker/logs`; those directories are ignored by Git.
 
 ### Automated browser testing
 
@@ -169,10 +172,13 @@ dotnet publish src/THub.Worker -c Release -r win-x64 --self-contained false -o a
 
 The service identity needs only the SQL Server and file-system permissions required by its configured workflows.
 
+The migration creates both THub metadata in the `thub` schema and Quartz operational tables in the `quartz` schema. Runtime identities require data access to both schemas but do not require schema modification rights.
+
 ## Configuration and security
 
 - LocalDB is for Development/debugging only. Never use `(localdb)\MSSQLLocalDB` in a published environment.
 - Published web and worker environments must supply a real SQL Server `ConnectionStrings:THub`; startup fails fast when it is missing.
+- Production logs default to `%PROGRAMDATA%\THub\Logs`. Grant each host identity write access or override `Serilog:FilePath` through deployment configuration.
 - Replace the placeholder `CONTOSO\THub ...` groups under `Authorization:RoleMappings`.
 - Production currently gives an authenticated unmapped account the configured default role (`Viewer`). Use an invalid/empty default when explicit group membership must be mandatory.
 - Never put source-system passwords or tokens in `DataConnection.ConfigurationJson`; store a protected secret reference.
