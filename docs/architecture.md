@@ -2,7 +2,7 @@
 
 ## 1. Purpose and scope
 
-THub is a Windows/intranet-oriented data workflow orchestration platform. Users design and manage directed workflows in a Blazor application; an out-of-process worker schedules and, in the target architecture, executes them. Microsoft SQL Server is both a supported v1 data connector and the durable THub control-plane store.
+THub is a Windows/intranet-oriented data workflow orchestration platform. Users persist and manage directed workflows in a Blazor application; an out-of-process Worker schedules and executes their immutable published versions. Microsoft SQL Server is both a supported v1 data connector and the durable THub control-plane store.
 
 The v1 connector boundary is:
 
@@ -10,17 +10,19 @@ The v1 connector boundary is:
 - local or service-accessible CSV files;
 - local or service-accessible `.xlsx`/`.xlsm` workbooks.
 
-Webhook calls, external executables, generated REST APIs, and permissioned online table editors are product requirements, but their execution/publication runtimes are intentionally gated until the security decisions in [product-decisions.md](product-decisions.md) are resolved.
+Webhook calls and external executables remain gated. Durable Email profiles, workflow-event rules, canvas actions, SQL outbox persistence, leased dispatch, MailKit SMTP delivery, and the management UI implement [ADR-0012](adr/0012-durable-email-alert-delivery.md). The initial internal, single-host publication and staged-editor slice implements [ADR-0011](adr/0011-isolated-governed-data-publications.md): it includes durable publication metadata, a separate managed-bearer REST host, bounded SQL reads, role-granted Spreadsheet editing, and worker-applied approved change sets. Immutable versioning and leased workflow execution implement [ADR-0010](adr/0010-durable-leased-workflow-execution.md), with the current node/runtime limits described below.
 
 ## 2. Current, foundation, and target state
 
 | Area | Current implementation | Target direction |
 | --- | --- | --- |
-| Web | Global Interactive Server Blazor app, Radzen shell, Windows auth/RBAC, in-memory designer | Persisted designer, schema mapping, management APIs, live run views |
-| Worker | Windows Service host, persistent Quartz scheduling, durable THub run enqueue | Run leasing, graph execution, retries, cancellation, telemetry |
-| Database | `thub` control-plane schema plus `quartz` operational scheduler schema | Immutable workflow versions, step runs, leases, audit, publications, secrets references |
-| Connectors | Node kinds and library dependencies | Streaming SQL/CSV/XLSX readers and writers |
-| Publications | UI/graph concepts only | Governed REST endpoints and audited editor surfaces |
+| Web | Global Interactive Server Blazor app, Radzen shell, Windows auth/RBAC, persisted workflow catalog/designer, run controls/history, publication administration, and bounded staged Spreadsheet editor | Richer visual schema mapping, complete audit/retention, and deeper live-run telemetry |
+| Publications host | Separate managed-bearer ASP.NET Core host with bounded read-only `/schema` and `/rows` routes, atomic accepted-use metering, process-local admission, Problem Details, logging, and `/healthz` | SQL readiness/metrics and a gateway or distributed limiter before scale-out |
+| Worker | Windows Service host, persistent Quartz scheduling, atomic run claims/heartbeats/recovery, bounded graph execution, durable step attempts, Email-outbox dispatch, and claimed approved editor apply | Checkpoint/resume decisions, optional bounded spill, and expanded telemetry |
+| Database | `thub` control-plane schema including immutable workflow versions, leased runs/step attempts, Email, and publication versions/tokens/grants/change sets plus `quartz` operational scheduler schema | Expanded audit/retention |
+| Connectors | Bounded SQL/CSV/Excel sources and targets, select/filter/join transforms, and Email action | Richer mapping, additional explicitly governed operations, and optional pushdown/spill |
+| Publications | Governed immutable REST versions, managed tokens/counters, SQL discovery/readers, role grants, Spreadsheet staging/review, and leased apply | Production readiness, live relational/browser coverage, retention, and multi-host admission decision |
+| Email alerts | Durable workflow-event and canvas-action outbox delivery through governed SMTP profiles, with administrator management, a redacted delivery monitor, and MailKit sender | Approved production secret-provider integration and a reviewed dead-letter recovery operation |
 
 “Target” entries are not claims of implemented functionality.
 
@@ -30,8 +32,8 @@ Webhook calls, external executables, generated REST APIs, and permissioned onlin
 - **Windows integration:** authentication and service execution must fit AD-backed intranet deployments.
 - **Least privilege:** users, web hosts, workers, source databases, file locations, and published APIs have distinct trust boundaries.
 - **Extensibility:** new node types and connectors should not force framework dependencies into the domain.
-- **Operability:** runs need stable identities, structured logs, health information, and eventual step-level telemetry.
-- **Large-data safety:** execution should stream bounded batches instead of loading complete datasets into Blazor circuits or process memory.
+- **Operability:** runs have stable identities and durable step attempts; production still needs richer metrics, readiness, correlation, and retention.
+- **Large-data safety:** connectors use bounded batches, while replayable intermediate outputs are materialized only within explicit Worker row/byte/memory limits and never in Blazor circuits.
 - **Honest versioning:** a run must execute a stable published workflow version, not a mutable draft.
 
 ## 4. System context and containers
@@ -40,11 +42,14 @@ Webhook calls, external executables, generated REST APIs, and permissioned onlin
 flowchart LR
     User[Windows user] -->|HTTPS / Negotiate| Web[THub.Web\nBlazor Interactive Server]
     Web -->|EF Core metadata| Sql[(SQL Server\nTHub control plane)]
-    Worker[THub.Worker\nWindows Service + Quartz] -->|schedule and queue runs| Sql
-    Worker -->|read/write data| SourceSql[(Connected SQL Server)]
+    Consumer[Internal API consumer] -->|HTTPS / opaque bearer| Publications[THub.Publications\nseparate host]
+    Publications -->|metadata and accepted-use metering| Sql
+    Publications -->|approved bounded read-only object| SourceSql
+    Worker[THub.Worker\nWindows Service + Quartz] -->|schedule, claim, heartbeat, and record runs/steps| Sql
+    Worker -->|read/write data and approved editor changes| SourceSql[(Connected SQL Server)]
     Worker -->|read/write approved paths| Files[CSV / XLSX files]
+    Worker -->|durable SMTP outbox| Relay[Approved SMTP relay]
     Worker -. future, allow-listed .-> External[Webhooks / executables]
-    Consumer -. future, governed API .-> Web
 ```
 
 ### THub.Web
@@ -56,9 +61,24 @@ Responsibilities:
 - render the Blazor/Radzen management experience;
 - accept and validate workflow-management commands;
 - persist metadata through application/infrastructure services;
-- expose internal health/runtime endpoints and, later, governed publication endpoints.
+- manage publication definitions, immutable versions, tokens, grants, staged edits, and approvals;
+- host the bounded Radzen Spreadsheet editor and governed foreign-key lookups;
+- expose internal health/runtime endpoints.
 
-The web host must not execute long-running workflows or own durable schedules. Interactive Server circuits are a presentation mechanism, not a job queue.
+The web host must not expose bearer publication routes, apply source writes, execute long-running workflows, or own durable schedules. Interactive Server circuits are a presentation mechanism, not a job queue.
+
+### THub.Publications
+
+Responsibilities:
+
+- run as a separate ASP.NET Core process and accept only internal-network publication traffic through its dedicated HTTPS hostname;
+- require exactly one managed opaque bearer credential on each `/api/v1/publications/{slug}/schema` or `/rows` request and bind it to the immutable active REST version;
+- apply process-local request/concurrency admission, then atomically record an accepted token use before any source query;
+- enforce typed allow-listed filters/sorts, deterministic keyset pagination, schema-fingerprint checks, SQL/request timeouts, cancellation, cell/row/response limits, and Problem Details;
+- query only the configured SQL Server table or view through Windows-integrated, read-only connections;
+- provide structured request logging, HTTPS/HSTS behavior, and a basic `/healthz` process-liveness endpoint.
+
+The admission partition is one token plus one active version and is process-local. The initial topology therefore remains one publication-host instance; it does not yet provide an aggregate limit across every token for a publication. `/healthz` does not prove control-plane or source SQL readiness, and internet exposure, alternate JWT/Entra authentication, and multi-host scale require a new decision.
 
 ### THub.Worker
 
@@ -68,18 +88,19 @@ Responsibilities now:
 - validate scheduler configuration at startup;
 - reconcile published THub schedules into durable Quartz jobs/triggers;
 - enqueue idempotent THub run records when Quartz fires and advance the next occurrence;
+- atomically claim queued or abandoned runs, renew their leases, and prevent overlapping active runs for one workflow;
+- reload and verify the exact immutable version identity/checksum before executing its validated DAG;
+- execute bounded SQL/CSV/Excel sources and targets, select/filter/join transforms, and Email actions with cancellation, timeouts, retry-safety policy, and normalized errors;
+- persist node attempts, progress counters, skips/failures, durable cancellation, and terminal run state;
+- claim and apply approved editor change sets with a least-privilege source-write identity;
+- claim and dispatch durable Email outbox rows through approved SMTP profiles;
 - log structured success and failure information.
 
-Target responsibilities:
-
-- lease queued runs safely across one or more worker instances;
-- execute validated, immutable workflow versions;
-- apply retries, timeouts, cancellation, resource limits, and connector policies;
-- record step/run telemetry and checkpoints.
+Checkpoint/resume-from-step, disk-backed intermediate spill, and richer operational telemetry are not implemented. An expired run lease is recovered by executing the immutable graph again from its beginning, so ambiguous external effects remain at-least-once.
 
 ### SQL Server control plane
 
-The `thub` schema is the durable product boundary shared by the web and worker processes. It stores workflow definitions, workflow runs, and connection metadata. The `quartz` schema stores Quartz jobs, triggers, cluster check-ins, and locks; application code accesses it only through Quartz APIs. SQL retry behavior is configured through EF Core, and `IDbContextFactory<THubDbContext>` is used because Blazor circuits and long-lived scheduling jobs do not share normal request-scoped lifetimes.
+The `thub` schema is the durable product boundary shared by the web, Worker, and publication processes. It stores workflow drafts, immutable workflow versions, leased runs and step attempts, connection metadata, Email delivery profiles/rules/outbox, and publication definitions, immutable versions/columns/foreign keys, role grants, bearer verifier/counter metadata, and staged changes. The `quartz` schema stores Quartz jobs, triggers, cluster check-ins, and locks; application code accesses it only through Quartz APIs. SQL retry behavior is configured through EF Core, and `IDbContextFactory<THubDbContext>` is used because Blazor circuits and long-lived host operations do not share normal request-scoped lifetimes.
 
 Development/debugging uses the `THub.Debug` database on SQL Server LocalDB. Published environments use a separately provisioned SQL Server connection supplied through deployment configuration. Both use the same EF Core SQL Server provider and migrations; Development configuration is excluded from publish output.
 
@@ -91,7 +112,7 @@ Development/debugging uses the `THub.Debug` database on SQL Server LocalDB. Publ
 | Next-fire timing, misfires, scheduler locks, and cluster check-ins | Quartz (`quartz.QRTZ_*`) | Accessed only through Quartz APIs |
 | Logical occurrence identity | THub run plus Quartz trigger metadata | Stored as `ScheduledForUtc` and protected by a THub unique index |
 | Run lifecycle and execution result | THub (`thub.WorkflowRuns`) | Quartz does not represent or update workflow execution state |
-| Step lifecycle, retries, and leases | THub, future model | Must not be moved into Quartz jobs or trigger state |
+| Run lease, cancellation, and step lifecycle/retries | THub (`thub.WorkflowRuns`, `thub.WorkflowStepRuns`) | Must not be moved into Quartz jobs or trigger state |
 
 Quartz job/trigger data are deliberately references, not execution payloads. The firing job calls an Application port, which reloads the workflow, checks that the expected version is still published, and creates the THub-owned run. This prevents persisted Quartz state from bypassing product rules after a workflow is edited or paused.
 
@@ -100,10 +121,10 @@ SQL Server is not used as a generic blob store for file contents or run logs wit
 ## 5. Code boundaries and dependency rules
 
 ```text
-THub.Web ---------+
-                  +--> THub.Infrastructure --> THub.Application --> THub.Domain
-THub.Worker ------+             |                    |
-                                +--------------------+
+THub.Web ----------+
+THub.Publications --+--> THub.Infrastructure --> THub.Application --> THub.Domain
+THub.Worker --------+             |                    |
+                                  +--------------------+
 ```
 
 | Project | Allowed responsibilities | Must not contain |
@@ -112,9 +133,15 @@ THub.Worker ------+             |                    |
 | `THub.Application` | Use cases, ports/interfaces, validation, scheduling calculations | UI components, concrete SQL/file implementations |
 | `THub.Infrastructure` | EF Core, SQL Server, connector and operating-system adapters | Blazor page logic, authorization UI decisions |
 | `THub.Web` | Composition root, components, HTTP endpoints, authentication/authorization | Long-running execution or direct connector logic |
+| `THub.Publications` | Bearer/API composition root and API transport concerns | Management UI, Windows-authenticated operations, direct business rules, source writes |
 | `THub.Worker` | Composition root, hosted-service lifecycle, operational loop | Workflow business rules duplicated from Application/Domain |
 
-Dependency injection is registered through `AddApplication` and `AddInfrastructure`. Keep `Program.cs` focused on host and pipeline composition.
+Dependency injection uses explicit host profiles: `AddWebApplication`/`AddWebInfrastructure`,
+`AddWorkerApplication`/`AddWorkerInfrastructure`, and
+`AddPublicationApiApplication`/`AddPublicationApiInfrastructure`. The publication profile exposes
+only its catalog, bearer validation/metering, schema inspection, and source-read path; SMTP,
+workflow executors, editor staging/apply, and management adapters are not registered there. Keep
+`Program.cs` focused on selecting the host profile and composing its request or worker pipeline.
 
 ## 6. Workflow model
 
@@ -123,11 +150,13 @@ A workflow graph is a directed acyclic graph (DAG):
 - `WorkflowNode` has a stable string ID, node kind, display name, canvas coordinates, and JSON settings;
 - `WorkflowEdge` connects node IDs;
 - `WorkflowGraphValidator` rejects missing/duplicate IDs, missing endpoints, self-edges, and cycles;
-- `WorkflowDefinition` tracks status, version, graph JSON, owner, cron expression, time zone, and next due time;
-- editing a graph increments the version and returns it to Draft;
-- publishing makes a workflow eligible for scheduling.
+- `WorkflowDefinition` stores the mutable draft graph, optimistic `DraftRevision`, lifecycle, owner, schedule, and active published-version pointer;
+- editing a published graph advances the candidate version and returns the workflow to Draft without mutating the prior immutable snapshot;
+- `WorkflowVersion` stores schema-versioned canonical graph JSON, a SHA-256 checksum, publisher, and timestamp;
+- publishing validates structure, port cardinality, typed settings, and policy, then writes the snapshot and published pointer transactionally;
+- every scheduled, manual, or retry run references the exact immutable version it executes.
 
-The current table stores `GraphJson` on the workflow row. Before execution is implemented, define and version a JSON schema and separate mutable workflow identity from immutable published versions. This requirement is captured in [ADR-0005](adr/0005-versioned-dag-workflow-model.md).
+Draft `GraphJson` remains on the workflow row for editing, while `WorkflowVersions` holds immutable snapshots. The Worker verifies the deterministic version identity and checksum, deserializes the supported schema envelope, and reruns structural/cardinality/policy validation before any node starts; each executor reparses its strict typed settings immediately before work. Saved drafts may contain incomplete or gated concepts; only a fully valid operational graph can be published.
 
 ## 7. Scheduling flow
 
@@ -151,32 +180,51 @@ Quartz coordinates schedule firing through its clustered SQL job store. THub ind
 
 THub retains its five-field cron contract. Cronos calculates the next occurrence, represented as a one-shot Quartz trigger. If the worker was unavailable at that time, Quartz fires the missed occurrence once and THub calculates the following occurrence from the recovery time, avoiding an unbounded catch-up burst.
 
-Required before scale-out execution:
-
-- explicit run lease owner and lease expiry;
-- optimistic concurrency token or atomic claim statement;
-- recovery of abandoned leases;
-- idempotency/retry semantics;
-- defined retry behavior for workflow execution failures (schedule misfires already fire once).
+ADR-0010's execution boundary is implemented: SQL claims record lease owner/expiry/heartbeat/attempt, an application lock plus active-lease check permits one running instance per workflow, cancellation is durable, step/terminal writes require the current lease, and an expired running lease is eligible before new queued work. Read-only sources/transforms retry only normalized transient failures with bounded exponential jitter; SQL/file targets and Email actions do not automatically retry within an execution attempt. Recovery still restarts the graph and may replay an external effect whose outcome was ambiguous, so THub remains at-least-once rather than exactly-once.
 
 ## 8. Data execution architecture
 
-The execution engine should use a bounded tabular stream contract. A conceptual contract has:
+The execution engine uses a bounded tabular contract with:
 
 - a schema describing names, logical types, nullability, and source metadata;
 - asynchronous batches or rows with cancellation;
-- explicit ownership/disposal of streams and temporary resources;
-- checkpoint metadata where a connector supports incremental processing.
+- explicit ownership/disposal of batches, streams, workbooks, and temporary files;
+- configurable run, node-attempt, row, column, batch-byte, output-byte, and retained-workflow limits.
 
-Avoid `DataTable` as a cross-layer or whole-workflow contract. Joins, sorts, and aggregations that exceed configured memory require SQL pushdown or controlled staging/spill behavior.
+The current replayable data-set store materializes each bounded node output in Worker memory and releases it after its last consumer. It does not use `DataTable`, spill to disk, checkpoint a partial graph, or resume from a completed step. Configure limits below the service account's memory budget; workflows that require larger joins or global operations need SQL pushdown or a future controlled spill design.
 
-Planned connector policies:
+Implemented v1 node behavior:
 
-- **SQL source/target:** parameterized values, allow-listed object identifiers, bounded reads, bulk-copy batches, and explicit insert/merge/replace semantics;
-- **CSV:** streaming reads, explicit encoding/delimiter/quote/header settings, row/field limits;
-- **Excel:** bounded sheet or named-range reads for `.xlsx`/`.xlsm`; no legacy `.xls` assumption;
-- **Webhook:** `IHttpClientFactory`, allow-listed schemes/hosts, timeouts, response limits, and secret-reference headers;
-- **Executable:** disabled by default; admin allow-list for executable path, argument template, working directory, identity, timeout, and output limits.
+- **SQL source:** validates schema/object/column identifier syntax, discovers the exact object and column types, uses Windows integrated security and configured command/batch bounds, and streams the selected table/view rows into bounded batches. V1 has no arbitrary SQL text or source predicate pushdown.
+- **SQL target:** validates/discovers the target and uses parameters inside one source transaction. V1 supports explicit `insert` only; per-column mappings are optional and merge/update/replace are not implied.
+- **CSV source/target:** resolves a relative `.csv` path beneath an approved root, enforces file/row/column limits, supports explicit header/delimiter/typed-column settings, and writes only `createNew` through a temporary file followed by a move.
+- **Excel source/target:** applies the same approved-root and size/shape bounds to `.xlsx`/`.xlsm`, reads an approved worksheet/range, and writes only a new workbook target.
+- **Transforms:** select projects configured columns; filter applies up to 32 typed scalar predicates; inner/left join binds exactly two named incoming nodes and bounds the buffered right side.
+- **Email action:** enqueues durable delivery intent through the governed Email profile/outbox boundary; recovered graph attempts reuse its stable run/node deduplication identity.
+- **Webhook/executable:** draft concepts exist, but publication validation and execution preflight reject them until ADR-0008 policies and executors exist.
+- **REST/editor publication nodes:** intentionally rejected as workflow operations; their implemented lifecycle is the separately governed Publications surface.
+
+Nodes execute in deterministic topological order. A failed/cancelled dependency causes downstream nodes to be durably skipped. `Execution:MaximumConcurrency` bounds concurrently claimed runs, not parallel nodes inside one run.
+
+### Email alerts and actions
+
+ADR-0012 is implemented for both terminal workflow-event rules and the `EmailAlert` action. Administrators manage enabled delivery profiles and per-workflow rules at `/alerts/email`; profiles constrain the relay, required TLS mode, approved sender, recipient domains, recipient/message/concurrency limits, and an optional credential secret reference. Templates use only the bounded workflow/run/error variable allow-list. SQL claim admission holds the profile row while counting unexpired sending leases, enforcing `MaximumConcurrentSends` admission across Worker instances.
+
+Running-run completion or direct queued-run cancellation and the rule deliveries prepared from the immediately preceding policy snapshot commit in one SQL transaction. The commit rechecks the complete set of matching enabled rules plus each prepared rule/profile revision, so concurrent policy changes cause preparation to restart instead of silently omitting an alert. The `EmailAlert` action uses the same outbox and succeeds when durable intent is queued, not when the relay or recipient accepts it. Its stable run/node deduplication identity makes recovered step attempts idempotent at enqueue. Delivery rows carry stable message/deduplication identities and are claimed with a lease by the Worker. The MailKit adapter revalidates the profile policy, requires STARTTLS or implicit TLS, resolves a referenced SMTP credential only at send time, and otherwise connects without SMTP authentication for an administrator-approved anonymous relay.
+
+Known transient and otherwise-unexpected sender failures use bounded exponential backoff with deterministic jitter; permanent failures and deliveries that exhaust their attempt limit become dead letters. Delivery remains at-least-once: a crash after SMTP acceptance but before the delivered transition commits can produce a duplicate. Attempt count, last-attempt time, current/retry state, an optional provider identity, and the bounded safe last error are kept on `AlertDeliveries`; v1 intentionally has no separate attempt-history table. The MailKit adapter currently supplies the stable THub MIME Message-ID but does not populate `ProviderMessageId`. The default `UnavailableSmtpSecretResolver` rejects every credential reference, so authenticated SMTP fails closed until deployment replaces that registration with an organization-approved `ISecretResolver`.
+
+### REST publications and Spreadsheet editors
+
+ADR-0011 separates REST and editor responsibilities:
+
+- `THub.Publications` exposes only internal read-only REST v1 routes based on stable slugs and approved immutable publication metadata. Multiple named opaque bearer tokens are independently expiring/revocable and maintain `AcceptedRequestCount` plus `LastUsedAtUtc`; plaintext is returned only when a token is created.
+- `THub.Web` hosts role-governed, bounded Radzen Spreadsheet sessions. View, Insert, Update, Delete, and Approve grants are separate from publication-management permission and are checked by application services for load, lookup, staging, review, and list/detail operations.
+- edits are normalized, revalidated, and staged in THub; `THub.Worker` claims only approved sets and applies each set in one source transaction with `rowversion` or explicitly selected original-value concurrency. The Blazor circuit has no source-write identity.
+- SQL catalog inspection discovers tables/views, supported typed columns, a primary or safe unfiltered unique key, rowversion metadata, and foreign keys. Display/search candidates are suggestions only; management defaults every lookup to unapproved and persists it only after explicit administrator selection. The active version freezes that policy and its fingerprint. Loaded labels are batch-resolved with bounded parameterized queries, and the bounded searchable `RadzenDropDownDataGrid` editor commits single or atomic composite referenced keys. Staging rechecks tuple existence against the active schema before persisting a change set.
+- non-generated key values can be supplied for insert, but keys, generated columns, and concurrency tokens are never update targets. Source uniqueness/foreign-key violations and optimistic-concurrency misses become change-set conflicts.
+
+Change-set apply deliberately does not claim exactly-once cross-database effects. If source commit completion is ambiguous, the stale apply is failed for operator reconciliation instead of automatically replaying a potentially duplicated insert. A general audit stream and before/after retention classification remain open under PD-009.
 
 ## 9. Security and trust boundaries
 
@@ -190,11 +238,15 @@ Normal hosting uses ASP.NET Core Negotiate. The application is intended for an i
 
 It is a test aid, never a deployment mode.
 
+The publication API uses a different trust boundary: IIS permits anonymous transport only for the dedicated internal publication hostname, while each ASP.NET Core data endpoint requires exactly one managed opaque bearer credential before admission, metering, or data access. Bearer identities have no management or Spreadsheet authority.
+
 ### Authorization
 
 Authorization is permission-based. Windows groups map to application roles, and roles grant named permissions. A fallback policy requires authentication. Server endpoints and privileged operations must enforce policies even when navigation is hidden with `AuthorizeView`.
 
 Current permissions cover workflow view/edit/execute, schedule management, connection management, publication management, and administration.
+
+Publication-management permission does not itself grant access to editor data. Each editor publication independently maps the four global roles to View, Insert, Update, Delete, and Approve capabilities. Application services enforce those grants for load, lookup, submit, review, and change-set queries. Worker apply accepts only an already approved set and revalidates publication/version/schema state, but the current change set does not retain a role snapshot and the worker does not re-evaluate submitter/reviewer grants after approval.
 
 ### Secrets and untrusted configuration
 
@@ -203,11 +255,14 @@ Current permissions cover workflow view/edit/execute, schedule management, conne
 - Treat all workflow JSON as untrusted, even when authored by an authenticated designer.
 - Never interpolate user-provided SQL identifiers or fragments without validation/allow-listing.
 - Canonicalize and validate file paths against configured roots.
-- Protect generated publication routes with explicit authentication, authorization, row/column policies, rate limits, and audit records.
+- Protect publication routes with explicit authentication, approved object/column policy, bounds, and admission limits. Add a fixed row policy before publishing data that is not safe at the full approved row scope.
+- Treat token counters and change-set actor/status fields as operational metadata, not as a substitute for the still-pending append-only audit stream.
+- Store only a selector, display prefix, algorithm version, and one-way verifier for a managed publication token; return the full token once and never log it.
+- Store SMTP credential references rather than secret values and resolve them only inside the Worker dispatcher. The default resolver supports no referenced credential; production authenticated SMTP requires an organization-approved `ISecretResolver`.
 
 ### Service identities
 
-The web and worker should use different service identities when practical. The worker identity receives least-privilege access to THub metadata, configured source/target databases, approved directories, and no interactive logon.
+Web, Publications, and Worker should use different service identities. Web receives THub management/staging rights and only the source-read rights needed for editor windows/lookups. Publications receives token/metering rights and approved REST source-read rights only. Worker receives least-privilege access to run/outbox/change-set state, configured source/target databases, approved directories/relay, and no interactive logon; it is the only host granted approved editor source-write access.
 
 ## 10. Persistence
 
@@ -216,28 +271,41 @@ Current tables in schema `thub`:
 | Table | Purpose | Important indexes/constraints |
 | --- | --- | --- |
 | `Workflows` | Mutable workflow metadata and current graph JSON | status + next-run, name |
-| `WorkflowRuns` | Queued and eventual execution instances | status + queued time; restricted workflow FK |
+| `WorkflowVersions` | Immutable schema-versioned graph snapshot, checksum, publisher, and timestamp | unique workflow + version; restricted workflow FK |
+| `WorkflowRuns` | Version-bound queued/running/terminal executions, lease/heartbeat/attempt, cancellation, retry origin, and normalized terminal error | status + queued/lease expiry; unique scheduled occurrence; restricted workflow/version/retry FKs |
+| `WorkflowStepRuns` | Durable node attempts, lifecycle, progress counters, and normalized error | unique run + node + attempt; status + queued time |
 | `Connections` | Connector metadata JSON | unique name |
+| `Publications`, `PublicationVersions`, `PublicationColumns`, `PublicationColumnForeignKeys` | Stable publication identity and immutable approved SQL source/column/FK policy | unique slug/version/alias/ordinal; restricted source-connection/version relationships |
+| `PublicationAccessTokens` | Opaque-token selector/verifier, expiry/revocation, accepted count, and last-use metadata | unique binary-collated selector; rowversion concurrency |
+| `PublicationGrants` | Per-publication role capabilities | unique publication + role |
+| `PublicationChangeSets`, `PublicationChanges` | Staged insert/update/delete review and apply state plus bounded row JSON | status/submission indexes, rowversion, restricted publication/version relationships |
 
 Migrations live in `src/THub.Infrastructure/Persistence/Migrations`. Production deployment must apply reviewed migrations as a separate deployment step; web/worker startup should not silently mutate the schema.
+
+Reviewed mappings and migrations now include immutable workflow versions, run claims/cancellation, step attempts, Email delivery profiles/rules/outbox, and the governed publication tables listed above. Email templates are value objects serialized with their rules, and delivery attempt state is summarized on each delivery rather than stored in a separate attempt-history table. Expanded audit events and retention metadata remain future work.
 
 ## 11. Availability, concurrency, and scale
 
 - The web host is stateless for durable data but Interactive Server circuits are process-bound. Multi-instance web deployment requires sticky sessions or an appropriate Blazor scale-out plan plus shared Data Protection keys.
 - Quartz retries transient job-store connectivity and persists scheduler/cluster state in SQL Server.
 - EF Core SQL Server retry-on-failure is enabled for transient database faults.
-- Scheduler instances can cluster safely, but queued-run execution still needs leases before multiple workers execute workflows.
+- Scheduler and workflow-execution instances can share SQL Server: Quartz coordinates schedule fires, while THub's atomic run claim, per-workflow application lock, active-lease check, and lease-checked writes coordinate execution. Production scale-out still needs representative SQL contention and failure-injection validation.
 - File connectors are constrained by worker-local or service-accessible paths; moving workers changes file locality and permissions.
+- Initial REST deployment is one `THub.Publications` instance because the accepted built-in rate-limit counters are process-local. Scale-out requires a gateway or distributed-limiter ADR.
+- REST versions currently govern object and column exposure but do not add a fixed row-level predicate; publish only objects whose full approved row scope is suitable for every token on that publication.
+- Spreadsheet windows are in-memory presentation state, capped at 1,000 rows by ADR-0011; server filtering, deterministic navigation, authorization, and persistence remain authoritative.
 
 ## 12. Observability and operations
 
 Implemented:
 
-- Serilog-backed structured `ILogger` messages from both hosts, including rolling JSON files;
+- Serilog-backed structured `ILogger` messages from all three executable hosts, including rolling JSON files;
 - ASP.NET Core request completion logging;
 - Quartz persistence, cluster, reconciliation, and scheduled-run events;
+- durable run/step lifecycle, retry, cancellation, skip, normalized error, and row/batch/byte progress records;
 - a basic unauthenticated `/healthz` process health endpoint;
-- an authorized `/api/v1/runtime/status` endpoint.
+- an authorized `/api/v1/runtime/status` endpoint;
+- a separate publication host with managed-bearer `/schema` and `/rows` routes, Serilog request output, Problem Details, bounded responses, and basic `/healthz` process liveness.
 
 Required before production:
 
@@ -246,41 +314,47 @@ Required before production:
 - structured step/run logs with redaction;
 - duration, throughput, failure, retry, queue-depth, and schedule-lag metrics;
 - audit records for workflow publication, connection changes, role configuration, generated APIs, and editor writes;
+- publication token accepted-use, rejection, source-query, and schema-drift metrics without token or row payloads;
+- Email outbox depth, attempts, age, dead letters, and safe delivery-error categories;
 - retention policies for logs, runs, staging data, and exports.
 
-The current `/healthz` endpoint proves only that the web process is responding; it does not prove SQL Server or the worker is healthy.
+The current Web and Publications `/healthz` endpoints prove only that their respective processes are responding; they do not prove SQL Server, source data, or the worker is healthy.
 
 ## 13. Deployment
 
 Recommended initial topology:
 
 - `THub.Web` behind IIS with Windows Authentication and HTTPS;
+- one internal-only `THub.Publications` instance behind a separate HTTPS hostname and least-privilege app-pool identity; anonymous IIS transport is enabled only there so ASP.NET Core can validate managed bearer credentials at the data endpoints;
 - `THub.Worker` installed as an automatic Windows Service;
 - SQL Server on a managed internal instance;
 - AD groups for application roles;
 - a dedicated non-interactive domain service account for the worker;
 - connector files beneath configured roots or explicitly approved UNC shares.
 
-The exact topology, Kerberos/SPN requirements, and service-account model remain an open product/deployment decision.
+Internet exposure, additional publication instances, alternate JWT/Entra authentication, and direct editor writes are outside the accepted initial topology and require new ADRs. Kerberos/SPN details, production secret storage, and exact service accounts still require deployment-owner confirmation.
 
 ## 14. Testing strategy
 
 - Domain tests cover aggregate behavior and invariants.
-- Application tests cover graph validation and cron calculation; domain tests cover scheduled occurrence identity.
-- Worker tests cover stable Quartz identities, persisted occurrence metadata, and five-field-cron-to-one-shot-trigger mapping.
-- Add SQL integration tests for EF mappings, transactions, scheduling concurrency, and future run leasing.
+- Application tests cover graph/settings validation, planning, bounded engine behavior, resource limits, cancellation, retry policy, workflow management, run controls/history, and cron calculation; domain tests cover immutable versions and run/step transitions.
+- Worker tests cover stable Quartz identities, persisted occurrence metadata, five-field-cron-to-one-shot-trigger mapping, and execution option bounds.
+- Add live SQL Server contention/recovery tests for workflow run claims and lease loss, plus connector contract tests against representative SQL tables and files.
 - Web integration tests cover loopback Development authentication and status-code handling; expand them for policy and endpoint wiring as those surfaces grow.
+- Current publication-host tests cover generic bearer challenges, query-string rejection, duplicate authorization values, and process-local admission behavior. Application/Infrastructure/Web tests cover token services, query planning, role grants, change validation, natural-key immutability, and Spreadsheet mapping. Live SQL Server integration must still cover cross-publication denial, independent token counts/revocation, fail-closed concurrent metering, schema drift, relational claims/apply, bounds, Problem Details, and rate-limit responses.
+- Worker and SQL integration tests must cover concurrent run/change-set/outbox claims, lease expiry/recovery, cancellation, retry classification, deduplication, and ambiguous external outcomes.
+- Browser tests must cover role-specific read/edit/approve Spreadsheet behavior, bounds, protected-snapshot comparison, foreign-key lookup editors, and authorization rechecks.
 - Keep Playwright checks for critical designer and management flows, using the loopback development identity only.
 - Add connector contract tests with representative encodings, schemas, nulls, large batches, and cancellation.
 
 ## 15. Evolution plan
 
-1. Persist designer graphs; introduce immutable published workflow versions and JSON schema versioning.
-2. Add SQL schema discovery and a source-to-target mapping experience.
-3. Implement run leasing and the execution engine with SQL/CSV/XLSX nodes.
-4. Add step telemetry, retries, cancellation, checkpointing, and live run views.
-5. Implement import/export with format versioning and secret redaction.
-6. Implement governed REST publications.
-7. Implement the audited, permissioned online data editor.
+1. Add richer visual source-to-target schema mapping and connection-backed schema selection to the workflow designer.
+2. Add live SQL/file connector and multi-Worker lease/recovery coverage, failure injection, and operator-facing execution metrics/readiness.
+3. Decide checkpoint/resume and bounded disk-spill semantics before supporting workflows larger than the current in-memory budgets.
+4. Integrate an organization-approved SMTP secret provider and add Email outbox monitoring and operator recovery surfaces.
+5. Add publication-host SQL readiness, centralized metrics, live SQL Server/browser coverage, and operator reconciliation for ambiguous editor applies.
+6. Resolve publication before/after classification and retention under PD-009; require a new ADR before internet exposure, alternate authentication, direct writes, or multi-host admission.
+7. Add complete audit/retention, import/export with secret redaction, readiness, and production monitoring.
 
 Architecture changes must be captured by a new or superseding ADR and reflected here.

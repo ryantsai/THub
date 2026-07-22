@@ -1,8 +1,61 @@
 @page "/settings"
 @attribute [Authorize(Policy = Permissions.Administration)]
+@inject Microsoft.Extensions.Options.IOptions<RoleMappingOptions> RoleMappingOptions
 
 <PageTitle>Settings · THub</PageTitle>
-<div class="page-heading"><div><div class="eyebrow">Administration</div><h1>Platform settings</h1><p>Windows group mappings, worker policy, secrets, and execution guardrails.</p></div></div>
-<section class="panel"><div class="panel-head"><div><h2>Role mapping</h2><p>Application roles are resolved from Windows/AD groups</p></div></div><table class="activity-table"><thead><tr><th>Application role</th><th>Windows group</th><th>Capabilities</th></tr></thead><tbody>
-<tr><td><strong>Administrator</strong></td><td>CONTOSO\THub Admins</td><td class="muted">All platform operations</td></tr><tr><td><strong>Designer</strong></td><td>CONTOSO\THub Designers</td><td class="muted">Connections, workflows, publications</td></tr><tr><td><strong>Operator</strong></td><td>CONTOSO\THub Operators</td><td class="muted">Run, schedule, monitor</td></tr><tr><td><strong>Viewer</strong></td><td>CONTOSO\THub Viewers</td><td class="muted">Read-only access</td></tr>
-</tbody></table></section>
+
+<div class="page-heading">
+    <div>
+        <div class="eyebrow">Administration</div>
+        <h1>Platform settings</h1>
+        <p>Effective Windows-group role mappings loaded by this web host.</p>
+    </div>
+</div>
+
+<section class="panel">
+    <div class="panel-head">
+        <div>
+            <h2>Role mapping</h2>
+            <p>Configure these values under <code>Authorization:RoleMappings</code> in deployment configuration, then restart the web host.</p>
+        </div>
+    </div>
+
+    @if (Mappings.Administrators.Length == 0)
+    {
+        <div class="inline-alert warning"><RadzenIcon Icon="warning_amber" /><span>No administrator group is configured in this host. Set a real Windows or Active Directory group before production use.</span></div>
+    }
+
+    <table class="activity-table">
+        <thead><tr><th>Application role</th><th>Configured Windows groups</th><th>Capabilities</th></tr></thead>
+        <tbody>
+            @foreach (var row in MappingRows)
+            {
+                <tr>
+                    <td><strong>@row.Role</strong></td>
+                    <td>@GroupSummary(row.Groups)</td>
+                    <td class="muted">@row.Capabilities</td>
+                </tr>
+            }
+        </tbody>
+    </table>
+
+    <div class="panel-foot-note">Authenticated users that match no configured group receive the <strong>@Mappings.DefaultAuthenticatedRole</strong> role.</div>
+</section>
+
+@code {
+    private RoleMappingOptions Mappings => RoleMappingOptions.Value;
+
+    private IEnumerable<MappingRow> MappingRows =>
+    [
+        new("Administrator", Mappings.Administrators, "All platform operations"),
+        new("Designer", Mappings.Designers, "Connections, workflows, and publications"),
+        new("Operator", Mappings.Operators, "Run, schedule, and monitor workflows"),
+        new("Viewer", Mappings.Viewers, "Read workflow and run status")
+    ];
+
+    private static string GroupSummary(string[] groups) => groups.Length == 0
+        ? "Not configured"
+        : string.Join(", ", groups);
+
+    private sealed record MappingRow(string Role, string[] Groups, string Capabilities);
+}

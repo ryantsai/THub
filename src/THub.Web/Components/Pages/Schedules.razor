@@ -1,11 +1,170 @@
 @page "/schedules"
-@attribute [Authorize(Policy = Permissions.WorkflowView)]
+@attribute [Authorize(Policy = Permissions.ScheduleManage)]
+@implements IDisposable
+@using THub.Application.Workflows.Management
+@using THub.Domain.Workflows
+@inject WorkflowCatalogService WorkflowCatalog
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject NotificationService Notifications
 
 <PageTitle>Schedules · THub</PageTitle>
-<div class="page-heading"><div><div class="eyebrow">Automation</div><h1>Schedules</h1><p>Cron-based triggers evaluated by the durable Windows worker.</p></div><AuthorizeView Policy="@Permissions.ScheduleManage"><div class="heading-actions"><RadzenButton Text="New schedule" Icon="add_alarm" ButtonStyle="ButtonStyle.Primary" /></div></AuthorizeView></div>
-<section class="panel"><div class="panel-head"><div><h2>Upcoming triggers</h2><p>Displayed in Asia/Taipei</p></div><span class="status-chip">Scheduler healthy</span></div><table class="activity-table"><thead><tr><th>Workflow</th><th>Expression</th><th>Next run</th><th>Time zone</th><th>Status</th></tr></thead><tbody>
-<tr><td><strong>Customer 360 sync</strong></td><td><code>*/15 * * * *</code></td><td>Today, 10:00</td><td class="muted">Asia/Taipei</td><td><span class="status-chip">Active</span></td></tr>
-<tr><td><strong>Inventory snapshot</strong></td><td><code>0 2 * * *</code></td><td>Tomorrow, 02:00</td><td class="muted">Asia/Taipei</td><td><span class="status-chip">Active</span></td></tr>
-<tr><td><strong>Finance export</strong></td><td><code>0 18 * * 1-5</code></td><td>Not scheduled</td><td class="muted">Asia/Taipei</td><td><span class="status-chip draft">Paused</span></td></tr>
-</tbody></table></section>
 
+<div class="page-heading">
+    <div><div class="eyebrow">Automation</div><h1>Schedules</h1><p>Five-field cron schedules use explicit Windows time zones and immutable published versions.</p></div>
+    <div class="heading-actions"><RadzenButton Text="Refresh" Icon="refresh" ButtonStyle="ButtonStyle.Light" Click="@LoadAsync" Disabled="@Busy" /></div>
+</div>
+
+<section class="panel">
+    <div class="panel-head"><div><h2>Workflow schedules</h2><p>@Summary</p></div><a href="/designer">Create workflow →</a></div>
+    @if (Busy && ScheduledWorkflows.Count == 0)
+    {
+        <div class="page-state"><RadzenProgressBar Mode="ProgressBarMode.Indeterminate" /><p>Loading schedules…</p></div>
+    }
+    else if (Error is not null)
+    {
+        <div class="page-state error"><RadzenIcon Icon="error_outline" /><p>@Error</p><button type="button" @onclick="LoadAsync">Try again</button></div>
+    }
+    else if (ScheduledWorkflows.Count == 0)
+    {
+        <div class="page-state"><RadzenIcon Icon="event_busy" /><h3>No schedules configured</h3><p>Add a cron expression and time zone in a workflow designer, then publish it.</p></div>
+    }
+    else
+    {
+        <div class="table-scroll">
+            <table class="activity-table">
+                <thead><tr><th>Workflow</th><th>Cron</th><th>Time zone</th><th>State</th><th>Next occurrence</th><th></th></tr></thead>
+                <tbody>
+                    @foreach (var workflow in ScheduledWorkflows)
+                    {
+                        <tr>
+                            <td><a href="@($"/designer/{workflow.Id}")"><strong>@workflow.Name</strong></a><div class="schedule-version">@(workflow.PublishedVersionNumber is null ? "No published version" : $"Published v{workflow.PublishedVersionNumber}")</div></td>
+                            <td><code>@workflow.CronExpression</code></td>
+                            <td class="muted">@workflow.TimeZoneId</td>
+                            <td><span class="status-chip @StatusCss(workflow.Status)">@workflow.Status</span></td>
+                            <td class="muted">@(workflow.NextRunAtUtc?.ToLocalTime().ToString("G") ?? "Not scheduled")</td>
+                            <td class="schedule-actions">
+                                @if (workflow.Status == WorkflowStatus.Published)
+                                {
+                                    <button type="button" disabled="@Busy" @onclick="() => PauseAsync(workflow)">Pause</button>
+                                }
+                                else if (workflow.Status == WorkflowStatus.Paused)
+                                {
+                                    <button type="button" disabled="@Busy" @onclick="() => ResumeAsync(workflow)">Resume</button>
+                                }
+                                else
+                                {
+                                    <a href="@($"/designer/{workflow.Id}")">Review & publish</a>
+                                }
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+</section>
+
+<div class="schedule-note"><RadzenIcon Icon="info" /><p>Quartz coordinates firing. THub persists the logical occurrence and queues an exact workflow version; the execution worker then claims it under a separate lease.</p></div>
+
+@code {
+    private readonly CancellationTokenSource cancellation = new();
+    private IReadOnlyList<WorkflowListItemDto> ScheduledWorkflows { get; set; } = [];
+    private bool Busy { get; set; }
+    private string? Error { get; set; }
+    private string Summary => $"{ScheduledWorkflows.Count} configured · {ScheduledWorkflows.Count(item => item.Status == WorkflowStatus.Published)} active · {ScheduledWorkflows.Count(item => item.Status == WorkflowStatus.Paused)} paused";
+
+    protected override Task OnInitializedAsync() => LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        Busy = true;
+        Error = null;
+        try
+        {
+            var result = await WorkflowCatalog.ListAsync(
+                new WorkflowListRequest(Limit: 200),
+                cancellation.Token);
+            if (!result.IsSuccess || result.Value is null)
+            {
+                Error = result.Issues.FirstOrDefault()?.Message ?? "Schedules could not be loaded.";
+                return;
+            }
+
+            ScheduledWorkflows = result.Value.Items
+                .Where(workflow => !string.IsNullOrWhiteSpace(workflow.CronExpression))
+                .OrderBy(workflow => workflow.NextRunAtUtc ?? DateTimeOffset.MaxValue)
+                .ThenBy(workflow => workflow.Name)
+                .ToArray();
+        }
+        catch (OperationCanceledException) when (cancellation.IsCancellationRequested)
+        {
+        }
+        catch (Exception)
+        {
+            Error = "Schedules are temporarily unavailable.";
+        }
+        finally
+        {
+            Busy = false;
+        }
+    }
+
+    private async Task PauseAsync(WorkflowListItemDto workflow)
+    {
+        Busy = true;
+        try
+        {
+            var result = await WorkflowCatalog.PauseAsync(
+                new PauseWorkflowCommand(workflow.Id, workflow.DraftRevision),
+                cancellation.Token);
+            Notify(result.IsSuccess, result.Issues.FirstOrDefault()?.Message ?? "The schedule was paused.");
+            await LoadAsync();
+        }
+        finally
+        {
+            Busy = false;
+        }
+    }
+
+    private async Task ResumeAsync(WorkflowListItemDto workflow)
+    {
+        Busy = true;
+        try
+        {
+            var state = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+            var result = await WorkflowCatalog.PublishAsync(
+                new PublishWorkflowCommand(
+                    workflow.Id,
+                    workflow.DraftRevision,
+                    state.User.Identity?.Name ?? "unknown"),
+                cancellation.Token);
+            Notify(result.IsSuccess, result.Issues.FirstOrDefault()?.Message ?? "The schedule was resumed.");
+            await LoadAsync();
+        }
+        finally
+        {
+            Busy = false;
+        }
+    }
+
+    private void Notify(bool success, string detail) => Notifications.Notify(new NotificationMessage
+    {
+        Severity = success ? NotificationSeverity.Success : NotificationSeverity.Error,
+        Summary = success ? "Schedule updated" : "Schedule operation failed",
+        Detail = detail,
+        Duration = 5_000
+    });
+
+    private static string StatusCss(WorkflowStatus status) => status switch
+    {
+        WorkflowStatus.Published => string.Empty,
+        WorkflowStatus.Paused => "draft",
+        _ => "draft"
+    };
+
+    public void Dispose()
+    {
+        cancellation.Cancel();
+        cancellation.Dispose();
+    }
+}

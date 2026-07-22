@@ -11,6 +11,7 @@ public static class AuthorizationExtensions
         services.AddOptions<RoleMappingOptions>()
             .Bind(configuration.GetSection(RoleMappingOptions.SectionName));
         services.AddSingleton<IAuthorizationHandler, PermissionAuthorizationHandler>();
+        services.AddSingleton<PublicationRoleResolver>();
         services.AddAuthorization(options =>
         {
             options.FallbackPolicy = new AuthorizationPolicyBuilder()
@@ -27,4 +28,3 @@ public static class AuthorizationExtensions
         return services;
     }
 }
-

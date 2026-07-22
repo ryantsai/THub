@@ -1,4 +1,5 @@
 @inherits LayoutComponentBase
+@inject IHostEnvironment HostEnvironment
 
 <div class="app-shell">
     <aside class="sidebar">
@@ -10,26 +11,29 @@
         <nav class="primary-nav" aria-label="Primary navigation">
             <span class="nav-section">Workspace</span>
             <NavLink href="/" Match="NavLinkMatch.All"><RadzenIcon Icon="space_dashboard" />Overview</NavLink>
-            <NavLink href="/workflows"><RadzenIcon Icon="account_tree" />Workflows <span class="nav-count">12</span></NavLink>
-            <NavLink href="/designer"><RadzenIcon Icon="polyline" />Designer</NavLink>
-            <NavLink href="/runs"><RadzenIcon Icon="play_circle" />Runs <span class="status-dot"></span></NavLink>
+            <NavLink href="/workflows"><RadzenIcon Icon="account_tree" />Workflows</NavLink>
+            <AuthorizeView Policy="@Permissions.WorkflowEdit">
+                <NavLink href="/designer"><RadzenIcon Icon="polyline" />Designer</NavLink>
+            </AuthorizeView>
+            <NavLink href="/runs"><RadzenIcon Icon="play_circle" />Runs</NavLink>
 
             <span class="nav-section">Data plane</span>
             <AuthorizeView Policy="@Permissions.ConnectionManage">
                 <NavLink href="/connections"><RadzenIcon Icon="database" />Connections</NavLink>
             </AuthorizeView>
-            <NavLink href="/schedules"><RadzenIcon Icon="schedule" />Schedules</NavLink>
+            <AuthorizeView Policy="@Permissions.ScheduleManage">
+                <NavLink href="/schedules"><RadzenIcon Icon="schedule" />Schedules</NavLink>
+            </AuthorizeView>
+            <NavLink href="/published-data"><RadzenIcon Icon="table_view" />Published data</NavLink>
             <AuthorizeView Policy="@Permissions.PublicationManage">
                 <NavLink href="/publications"><RadzenIcon Icon="api" />Publications</NavLink>
+            </AuthorizeView>
+            <AuthorizeView Policy="@Permissions.Administration">
+                <NavLink href="/alerts/email"><RadzenIcon Icon="notifications_active" />Email alerts</NavLink>
             </AuthorizeView>
         </nav>
 
         <div class="sidebar-foot">
-            <div class="worker-status">
-                <span class="pulse"></span>
-                <div><strong>Worker online</strong><small>Heartbeat 8s ago</small></div>
-                <span class="worker-version">v0.1</span>
-            </div>
             <AuthorizeView Policy="@Permissions.Administration">
                 <NavLink class="settings-link" href="/settings"><RadzenIcon Icon="settings" />Settings</NavLink>
             </AuthorizeView>
@@ -38,10 +42,8 @@
 
     <main class="main-area">
         <header class="topbar">
-            <div class="environment-pill"><span></span>Development</div>
+            <div class="environment-pill"><span></span>@HostEnvironment.EnvironmentName</div>
             <div class="topbar-actions">
-                <button class="command-search" type="button"><RadzenIcon Icon="search" />Search anything <kbd>Ctrl K</kbd></button>
-                <button class="icon-action" type="button" aria-label="Notifications"><RadzenIcon Icon="notifications_none" /><span></span></button>
                 <AuthorizeView>
                     <Authorized Context="authentication">
                         <div class="identity">
@@ -80,4 +82,3 @@
         return string.Concat(parts.Take(2).Select(part => char.ToUpperInvariant(part[0])));
     }
 }
-

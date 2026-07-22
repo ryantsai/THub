@@ -1,0 +1,8 @@
+.table-scroll { overflow-x: auto; }
+.schedule-version { margin-top: 3px; color: #8c9895; font-size: 9px; }
+.schedule-actions { white-space: nowrap; }
+.schedule-actions button, .schedule-actions a { padding: 0; border: 0; background: none; color: #17775f; font-size: 10px; font-weight: 700; cursor: pointer; text-decoration: none; }
+.schedule-actions button:disabled { color: #a2adaa; cursor: not-allowed; }
+.schedule-note { margin-top: 16px; padding: 12px 14px; display: flex; gap: 9px; align-items: flex-start; border: 1px solid #d9e6e2; border-radius: 8px; background: #f7fbf9; color: #62716d; }
+.schedule-note p { margin: 1px 0 0; font-size: 10px; line-height: 1.5; }
+.schedule-note ::deep .rzi { color: #3b8a73; font-size: 16px; }

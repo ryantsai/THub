@@ -35,8 +35,8 @@ try
     }
     builder.Services.AddTHubAuthorization(builder.Configuration);
     builder.Services.AddRadzenComponents();
-    builder.Services.AddApplication();
-    builder.Services.AddInfrastructure(builder.Configuration);
+    builder.Services.AddWebApplication();
+    builder.Services.AddWebInfrastructure(builder.Configuration);
     builder.Services.AddHealthChecks();
 
     var app = builder.Build();

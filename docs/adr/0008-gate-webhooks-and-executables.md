@@ -8,7 +8,7 @@
 
 THub requirements include calling webhooks and running external executables. These actions cross major network and operating-system trust boundaries. Arbitrary user-configurable URLs, command lines, paths, or environment settings could enable SSRF, credential exposure, remote-code execution, persistence, or data exfiltration under the worker service identity.
 
-The designer already exposes webhook and executable node concepts, but the execution engine is not implemented.
+The designer exposes webhook and executable node concepts, and the general workflow engine now executes lower-risk, bounded node kinds. Webhook and executable settings are still rejected by publish validation and execution preflight because no administrator policy model or runtime executor has been approved for either trust boundary.
 
 ## Decision
 
@@ -44,7 +44,7 @@ UI presence, Designer role membership, or a node stored in workflow JSON does no
 
 ### Negative
 
-- Visible action nodes remain non-executable during the foundation phase.
+- Visible action concepts remain draft-only and non-executable until the required administrator policies and executors are implemented.
 - Administrators must configure and maintain policies.
 - Some integrations require additional infrastructure/network coordination.
 

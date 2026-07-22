@@ -1,3 +1,4 @@
+using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
 using THub.Application.Scheduling;
 using THub.Domain.Runs;
@@ -25,6 +26,8 @@ public sealed class SqlScheduledWorkflowRunEnqueuer(
         if (workflow is null
             || workflow.Status != WorkflowStatus.Published
             || workflow.Version != expectedWorkflowVersion
+            || workflow.PublishedVersionId is null
+            || workflow.PublishedVersionNumber != expectedWorkflowVersion
             || string.IsNullOrWhiteSpace(workflow.CronExpression))
         {
             return new ScheduledRunEnqueueResult(
@@ -56,8 +59,10 @@ public sealed class SqlScheduledWorkflowRunEnqueuer(
 
         var run = new WorkflowRun(
             workflowId,
+            workflow.PublishedVersionId.Value,
             expectedWorkflowVersion,
             "quartz",
+            evaluatedAtUtc,
             scheduledForUtc);
         db.WorkflowRuns.Add(run);
 
@@ -65,7 +70,7 @@ public sealed class SqlScheduledWorkflowRunEnqueuer(
         {
             await db.SaveChangesAsync(cancellationToken);
         }
-        catch (DbUpdateException)
+        catch (DbUpdateException exception) when (IsUniqueConstraintViolation(exception))
         {
             db.Entry(run).State = EntityState.Detached;
             if (!await db.WorkflowRuns.AnyAsync(
@@ -88,4 +93,7 @@ public sealed class SqlScheduledWorkflowRunEnqueuer(
             run.Id,
             nextRunAtUtc);
     }
+
+    private static bool IsUniqueConstraintViolation(DbUpdateException exception) =>
+        exception.InnerException is SqlException { Number: 2601 or 2627 };
 }

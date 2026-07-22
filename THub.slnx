@@ -3,12 +3,15 @@
     <Project Path="src/THub.Application/THub.Application.csproj" />
     <Project Path="src/THub.Domain/THub.Domain.csproj" />
     <Project Path="src/THub.Infrastructure/THub.Infrastructure.csproj" />
+    <Project Path="src/THub.Publications/THub.Publications.csproj" />
     <Project Path="src/THub.Web/THub.Web.csproj" />
     <Project Path="src/THub.Worker/THub.Worker.csproj" />
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/THub.Application.Tests/THub.Application.Tests.csproj" />
     <Project Path="tests/THub.Domain.Tests/THub.Domain.Tests.csproj" />
+    <Project Path="tests/THub.Infrastructure.Tests/THub.Infrastructure.Tests.csproj" />
+    <Project Path="tests/THub.Publications.Tests/THub.Publications.Tests.csproj" />
     <Project Path="tests/THub.Web.Tests/THub.Web.Tests.csproj" />
     <Project Path="tests/THub.Worker.Tests/THub.Worker.Tests.csproj" />
   </Folder>

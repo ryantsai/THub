@@ -23,6 +23,248 @@ namespace THub.Infrastructure.Persistence.Migrations
 
             SqlServerModelBuilderExtensions.UseIdentityColumns(modelBuilder);
 
+            modelBuilder.Entity("THub.Domain.Alerts.AlertDelivery", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<int>("AttemptCount")
+                        .HasColumnType("int");
+
+                    b.Property<DateTimeOffset?>("CompletedAtUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<DateTimeOffset>("CreatedAtUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("DeduplicationKey")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<Guid>("EmailDeliveryProfileId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Event")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("nvarchar(32)");
+
+                    b.Property<DateTimeOffset?>("LastAttemptAtUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("LastError")
+                        .HasColumnType("nvarchar(2048)")
+                        .HasColumnName("LastErrorJson");
+
+                    b.Property<DateTimeOffset?>("LastHeartbeatAtUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<DateTimeOffset?>("LeaseExpiresAtUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("LeaseOwner")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<int>("MaximumAttempts")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Message")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)")
+                        .HasColumnName("MessageJson");
+
+                    b.Property<DateTimeOffset>("NextAttemptAtUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("ProviderMessageId")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("rowversion");
+
+                    b.Property<string>("Source")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("nvarchar(32)");
+
+                    b.Property<string>("StableMessageId")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("nvarchar(32)");
+
+                    b.Property<Guid?>("WorkflowAlertRuleId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("WorkflowNodeId")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<Guid>("WorkflowRunId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid?>("WorkflowStepRunId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("DeduplicationKey")
+                        .IsUnique();
+
+                    b.HasIndex("EmailDeliveryProfileId");
+
+                    b.HasIndex("WorkflowAlertRuleId");
+
+                    b.HasIndex("WorkflowRunId");
+
+                    b.HasIndex("WorkflowStepRunId");
+
+                    b.HasIndex("Status", "NextAttemptAtUtc", "LeaseExpiresAtUtc");
+
+                    b.ToTable("AlertDeliveries", "thub");
+                });
+
+            modelBuilder.Entity("THub.Domain.Alerts.EmailDeliveryProfile", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("AllowedRecipientDomains")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)")
+                        .HasColumnName("AllowedRecipientDomainsJson");
+
+                    b.Property<DateTimeOffset>("CreatedAtUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("CreatedBy")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)");
+
+                    b.Property<string>("CredentialSecretReference")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<bool>("IsEnabled")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("Limits")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(1000)")
+                        .HasColumnName("LimitsJson");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("rowversion");
+
+                    b.Property<string>("SenderAddress")
+                        .IsRequired()
+                        .HasMaxLength(320)
+                        .HasColumnType("nvarchar(320)");
+
+                    b.Property<string>("SmtpHost")
+                        .IsRequired()
+                        .HasMaxLength(253)
+                        .HasColumnType("nvarchar(253)");
+
+                    b.Property<int>("SmtpPort")
+                        .HasColumnType("int");
+
+                    b.Property<string>("TransportSecurity")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("nvarchar(32)");
+
+                    b.Property<DateTimeOffset>("UpdatedAtUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Name")
+                        .IsUnique();
+
+                    b.ToTable("EmailDeliveryProfiles", "thub");
+                });
+
+            modelBuilder.Entity("THub.Domain.Alerts.WorkflowAlertRule", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset>("CreatedAtUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("CreatedBy")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)");
+
+                    b.Property<Guid>("EmailDeliveryProfileId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<bool>("IsEnabled")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<string>("Recipients")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)")
+                        .HasColumnName("RecipientsJson");
+
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("rowversion");
+
+                    b.Property<string>("Template")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)")
+                        .HasColumnName("TemplateJson");
+
+                    b.Property<int>("Triggers")
+                        .HasColumnType("int");
+
+                    b.Property<DateTimeOffset>("UpdatedAtUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<Guid>("WorkflowId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("EmailDeliveryProfileId");
+
+                    b.HasIndex("WorkflowId", "IsEnabled");
+
+                    b.HasIndex("WorkflowId", "Name")
+                        .IsUnique();
+
+                    b.ToTable("WorkflowAlertRules", "thub");
+                });
+
             modelBuilder.Entity("THub.Domain.Connections.DataConnection", b =>
                 {
                     b.Property<Guid>("Id")
@@ -32,6 +274,54 @@ namespace THub.Infrastructure.Persistence.Migrations
                     b.Property<string>("ConfigurationJson")
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTimeOffset>("CreatedAtUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("CreatedBy")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)");
+
+                    b.Property<bool>("IsEnabled")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("nvarchar(32)");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("rowversion");
+
+                    b.Property<DateTimeOffset>("UpdatedAtUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Name")
+                        .IsUnique();
+
+                    b.HasIndex("Kind", "IsEnabled");
+
+                    b.ToTable("Connections", "thub");
+                });
+
+            modelBuilder.Entity("THub.Domain.Publications.Publication", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid?>("ActiveVersionId")
+                        .HasColumnType("uniqueidentifier");
 
                     b.Property<DateTimeOffset>("CreatedAtUtc")
                         .HasColumnType("datetimeoffset");
@@ -51,12 +341,397 @@ namespace THub.Infrastructure.Persistence.Migrations
                         .HasMaxLength(200)
                         .HasColumnType("nvarchar(200)");
 
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("rowversion");
+
+                    b.Property<string>("Slug")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<string>("State")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("nvarchar(32)");
+
+                    b.Property<DateTimeOffset>("UpdatedAtUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("UpdatedBy")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)");
+
                     b.HasKey("Id");
 
-                    b.HasIndex("Name")
+                    b.HasIndex("ActiveVersionId");
+
+                    b.HasIndex("Slug")
                         .IsUnique();
 
-                    b.ToTable("Connections", "thub");
+                    b.HasIndex("Kind", "State");
+
+                    b.ToTable("Publications", "thub");
+                });
+
+            modelBuilder.Entity("THub.Domain.Publications.PublicationAccessToken", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<long>("AcceptedRequestCount")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasDefaultValue(0L);
+
+                    b.Property<int>("AlgorithmVersion")
+                        .HasColumnType("int");
+
+                    b.Property<DateTimeOffset>("CreatedAtUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("CreatedBy")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)");
+
+                    b.Property<string>("DisplayPrefix")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("nvarchar(32)");
+
+                    b.Property<DateTimeOffset>("ExpiresAtUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<DateTimeOffset?>("LastUsedAtUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<Guid>("PublicationId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset?>("RevokedAtUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("RevokedBy")
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)");
+
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("rowversion");
+
+                    b.Property<string>("Selector")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("nvarchar(128)")
+                        .UseCollation("Latin1_General_100_BIN2");
+
+                    b.Property<string>("Verifier")
+                        .IsRequired()
+                        .HasMaxLength(512)
+                        .HasColumnType("nvarchar(512)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Selector")
+                        .IsUnique();
+
+                    b.HasIndex("PublicationId", "Name");
+
+                    b.HasIndex("PublicationId", "RevokedAtUtc", "ExpiresAtUtc");
+
+                    b.ToTable("PublicationAccessTokens", "thub");
+                });
+
+            modelBuilder.Entity("THub.Domain.Publications.PublicationChange", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("AfterJson")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("BeforeJson")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<Guid>("ChangeSetId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("KeyJson")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("Operation")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("nvarchar(32)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ChangeSetId", "Operation");
+
+                    b.ToTable("PublicationChanges", "thub");
+                });
+
+            modelBuilder.Entity("THub.Domain.Publications.PublicationChangeSet", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset?>("ApplyStartedAtUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("ApplyStartedBy")
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)");
+
+                    b.Property<DateTimeOffset?>("CompletedAtUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("OutcomeDetail")
+                        .HasMaxLength(2000)
+                        .HasColumnType("nvarchar(2000)");
+
+                    b.Property<Guid>("PublicationId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("PublicationVersionId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("ReviewComment")
+                        .HasMaxLength(2000)
+                        .HasColumnType("nvarchar(2000)");
+
+                    b.Property<DateTimeOffset?>("ReviewedAtUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("ReviewedBy")
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)");
+
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("rowversion");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("nvarchar(32)");
+
+                    b.Property<DateTimeOffset>("SubmittedAtUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("SubmittedBy")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)");
+
+                    b.Property<DateTimeOffset>("UpdatedAtUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("PublicationId");
+
+                    b.HasIndex("PublicationVersionId");
+
+                    b.HasIndex("Status", "UpdatedAtUtc");
+
+                    b.ToTable("PublicationChangeSets", "thub");
+                });
+
+            modelBuilder.Entity("THub.Domain.Publications.PublicationColumn", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("DataType")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("nvarchar(32)");
+
+                    b.Property<bool>("IsConcurrencyToken")
+                        .HasColumnType("bit");
+
+                    b.Property<bool>("IsFilterable")
+                        .HasColumnType("bit");
+
+                    b.Property<bool>("IsGenerated")
+                        .HasColumnType("bit");
+
+                    b.Property<bool>("IsKey")
+                        .HasColumnType("bit");
+
+                    b.Property<bool>("IsNullable")
+                        .HasColumnType("bit");
+
+                    b.Property<bool>("IsReadable")
+                        .HasColumnType("bit");
+
+                    b.Property<bool>("IsSortable")
+                        .HasColumnType("bit");
+
+                    b.Property<bool>("IsWritable")
+                        .HasColumnType("bit");
+
+                    b.Property<int?>("KeyOrdinal")
+                        .HasColumnType("int");
+
+                    b.Property<int?>("MaximumLength")
+                        .HasColumnType("int");
+
+                    b.Property<byte?>("NumericPrecision")
+                        .HasColumnType("tinyint");
+
+                    b.Property<byte?>("NumericScale")
+                        .HasColumnType("tinyint");
+
+                    b.Property<int>("Ordinal")
+                        .HasColumnType("int");
+
+                    b.Property<string>("PublicAlias")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<Guid>("PublicationVersionId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("SourceName")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("nvarchar(128)");
+
+                    b.Property<string>("SourceTypeName")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("nvarchar(128)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("PublicationVersionId", "KeyOrdinal")
+                        .IsUnique()
+                        .HasFilter("[KeyOrdinal] IS NOT NULL");
+
+                    b.HasIndex("PublicationVersionId", "Ordinal")
+                        .IsUnique();
+
+                    b.HasIndex("PublicationVersionId", "PublicAlias")
+                        .IsUnique();
+
+                    b.HasIndex("PublicationVersionId", "SourceName")
+                        .IsUnique();
+
+                    b.ToTable("PublicationColumns", "thub");
+                });
+
+            modelBuilder.Entity("THub.Domain.Publications.PublicationGrant", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<bool>("CanApprove")
+                        .HasColumnType("bit");
+
+                    b.Property<bool>("CanDelete")
+                        .HasColumnType("bit");
+
+                    b.Property<bool>("CanInsert")
+                        .HasColumnType("bit");
+
+                    b.Property<bool>("CanUpdate")
+                        .HasColumnType("bit");
+
+                    b.Property<bool>("CanView")
+                        .HasColumnType("bit");
+
+                    b.Property<Guid>("PublicationId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Role")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("nvarchar(32)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("PublicationId", "Role")
+                        .IsUnique();
+
+                    b.ToTable("PublicationGrants", "thub");
+                });
+
+            modelBuilder.Entity("THub.Domain.Publications.PublicationVersion", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("ConcurrencyMode")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("nvarchar(32)");
+
+                    b.Property<Guid>("ConnectionId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset>("CreatedAtUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("CreatedBy")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)");
+
+                    b.Property<Guid>("PublicationId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("SchemaFingerprint")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)");
+
+                    b.Property<string>("SourceObject")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("nvarchar(128)");
+
+                    b.Property<string>("SourceObjectKind")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("nvarchar(32)");
+
+                    b.Property<string>("SourceSchema")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("nvarchar(128)");
+
+                    b.Property<int>("VersionNumber")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ConnectionId");
+
+                    b.HasIndex("PublicationId", "VersionNumber")
+                        .IsUnique();
+
+                    b.HasIndex("ConnectionId", "SourceSchema", "SourceObject");
+
+                    b.ToTable("PublicationVersions", "thub");
                 });
 
             modelBuilder.Entity("THub.Domain.Runs.WorkflowRun", b =>
@@ -65,15 +740,47 @@ namespace THub.Infrastructure.Persistence.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uniqueidentifier");
 
+                    b.Property<int>("AttemptCount")
+                        .HasColumnType("int");
+
+                    b.Property<DateTimeOffset?>("CancellationRequestedAtUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("CancellationRequestedBy")
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)");
+
                     b.Property<DateTimeOffset?>("CompletedAtUtc")
                         .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("Error")
+                        .HasColumnType("nvarchar(2048)")
+                        .HasColumnName("ErrorJson");
 
                     b.Property<string>("ErrorMessage")
                         .HasMaxLength(4000)
                         .HasColumnType("nvarchar(4000)");
 
+                    b.Property<DateTimeOffset?>("LastHeartbeatAtUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<DateTimeOffset?>("LeaseExpiresAtUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("LeaseOwner")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
                     b.Property<DateTimeOffset>("QueuedAtUtc")
                         .HasColumnType("datetimeoffset");
+
+                    b.Property<Guid?>("RetryOfRunId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("rowversion");
 
                     b.Property<DateTimeOffset?>("ScheduledForUtc")
                         .HasColumnType("datetimeoffset");
@@ -97,7 +804,16 @@ namespace THub.Infrastructure.Persistence.Migrations
                     b.Property<int>("WorkflowVersion")
                         .HasColumnType("int");
 
+                    b.Property<Guid>("WorkflowVersionId")
+                        .HasColumnType("uniqueidentifier");
+
                     b.HasKey("Id");
+
+                    b.HasIndex("RetryOfRunId");
+
+                    b.HasIndex("WorkflowVersionId");
+
+                    b.HasIndex("Status", "LeaseExpiresAtUtc");
 
                     b.HasIndex("Status", "QueuedAtUtc");
 
@@ -108,23 +824,94 @@ namespace THub.Infrastructure.Persistence.Migrations
                     b.ToTable("WorkflowRuns", "thub");
                 });
 
+            modelBuilder.Entity("THub.Domain.Runs.WorkflowStepRun", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<int>("Attempt")
+                        .HasColumnType("int");
+
+                    b.Property<long>("BatchesProcessed")
+                        .HasColumnType("bigint");
+
+                    b.Property<long>("BytesRead")
+                        .HasColumnType("bigint");
+
+                    b.Property<long>("BytesWritten")
+                        .HasColumnType("bigint");
+
+                    b.Property<DateTimeOffset?>("CompletedAtUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("Error")
+                        .HasColumnType("nvarchar(2048)")
+                        .HasColumnName("ErrorJson");
+
+                    b.Property<string>("NodeId")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<DateTimeOffset>("QueuedAtUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("rowversion");
+
+                    b.Property<long>("RowsRead")
+                        .HasColumnType("bigint");
+
+                    b.Property<long>("RowsWritten")
+                        .HasColumnType("bigint");
+
+                    b.Property<DateTimeOffset?>("StartedAtUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("nvarchar(32)");
+
+                    b.Property<Guid>("WorkflowRunId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Status", "QueuedAtUtc");
+
+                    b.HasIndex("WorkflowRunId", "NodeId", "Attempt")
+                        .IsUnique();
+
+                    b.ToTable("WorkflowStepRuns", "thub");
+                });
+
             modelBuilder.Entity("THub.Domain.Workflows.WorkflowDefinition", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uniqueidentifier");
 
+                    b.Property<DateTimeOffset?>("ArchivedAtUtc")
+                        .HasColumnType("datetimeoffset");
+
                     b.Property<DateTimeOffset>("CreatedAtUtc")
                         .HasColumnType("datetimeoffset");
 
                     b.Property<string>("CronExpression")
-                        .HasMaxLength(100)
-                        .HasColumnType("nvarchar(100)");
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
 
                     b.Property<string>("Description")
                         .IsRequired()
                         .HasMaxLength(2000)
                         .HasColumnType("nvarchar(2000)");
+
+                    b.Property<int>("DraftRevision")
+                        .HasColumnType("int");
 
                     b.Property<string>("GraphJson")
                         .IsRequired()
@@ -142,6 +929,17 @@ namespace THub.Infrastructure.Persistence.Migrations
                         .IsRequired()
                         .HasMaxLength(256)
                         .HasColumnType("nvarchar(256)");
+
+                    b.Property<Guid?>("PublishedVersionId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<int?>("PublishedVersionNumber")
+                        .HasColumnType("int");
+
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("rowversion");
 
                     b.Property<string>("Status")
                         .IsRequired()
@@ -163,18 +961,338 @@ namespace THub.Infrastructure.Persistence.Migrations
 
                     b.HasIndex("Name");
 
+                    b.HasIndex("PublishedVersionId");
+
                     b.HasIndex("Status", "NextRunAtUtc");
 
                     b.ToTable("Workflows", "thub");
                 });
 
+            modelBuilder.Entity("THub.Domain.Workflows.WorkflowVersion", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Checksum")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("nchar(64)")
+                        .IsFixedLength();
+
+                    b.Property<string>("GraphJson")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTimeOffset>("PublishedAtUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("PublishedBy")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)");
+
+                    b.Property<int>("SchemaVersion")
+                        .HasColumnType("int");
+
+                    b.Property<int>("Version")
+                        .HasColumnType("int");
+
+                    b.Property<Guid>("WorkflowId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("WorkflowId", "Version")
+                        .IsUnique();
+
+                    b.ToTable("WorkflowVersions", "thub");
+                });
+
+            modelBuilder.Entity("THub.Domain.Alerts.AlertDelivery", b =>
+                {
+                    b.HasOne("THub.Domain.Alerts.EmailDeliveryProfile", null)
+                        .WithMany()
+                        .HasForeignKey("EmailDeliveryProfileId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("THub.Domain.Alerts.WorkflowAlertRule", null)
+                        .WithMany()
+                        .HasForeignKey("WorkflowAlertRuleId")
+                        .OnDelete(DeleteBehavior.NoAction);
+
+                    b.HasOne("THub.Domain.Runs.WorkflowRun", null)
+                        .WithMany()
+                        .HasForeignKey("WorkflowRunId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("THub.Domain.Runs.WorkflowStepRun", null)
+                        .WithMany()
+                        .HasForeignKey("WorkflowStepRunId")
+                        .OnDelete(DeleteBehavior.NoAction);
+                });
+
+            modelBuilder.Entity("THub.Domain.Alerts.WorkflowAlertRule", b =>
+                {
+                    b.HasOne("THub.Domain.Alerts.EmailDeliveryProfile", null)
+                        .WithMany()
+                        .HasForeignKey("EmailDeliveryProfileId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("THub.Domain.Workflows.WorkflowDefinition", null)
+                        .WithMany()
+                        .HasForeignKey("WorkflowId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("THub.Domain.Publications.Publication", b =>
+                {
+                    b.HasOne("THub.Domain.Publications.PublicationVersion", null)
+                        .WithMany()
+                        .HasForeignKey("ActiveVersionId")
+                        .OnDelete(DeleteBehavior.Restrict);
+                });
+
+            modelBuilder.Entity("THub.Domain.Publications.PublicationAccessToken", b =>
+                {
+                    b.HasOne("THub.Domain.Publications.Publication", null)
+                        .WithMany()
+                        .HasForeignKey("PublicationId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("THub.Domain.Publications.PublicationChange", b =>
+                {
+                    b.HasOne("THub.Domain.Publications.PublicationChangeSet", null)
+                        .WithMany("_changes")
+                        .HasForeignKey("ChangeSetId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("THub.Domain.Publications.PublicationChangeSet", b =>
+                {
+                    b.HasOne("THub.Domain.Publications.Publication", null)
+                        .WithMany()
+                        .HasForeignKey("PublicationId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("THub.Domain.Publications.PublicationVersion", null)
+                        .WithMany()
+                        .HasForeignKey("PublicationVersionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("THub.Domain.Publications.PublicationColumn", b =>
+                {
+                    b.HasOne("THub.Domain.Publications.PublicationVersion", null)
+                        .WithMany("_columns")
+                        .HasForeignKey("PublicationVersionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.OwnsOne("THub.Domain.Publications.PublicationForeignKey", "ForeignKey", b1 =>
+                        {
+                            b1.Property<Guid>("PublicationColumnId")
+                                .HasColumnType("uniqueidentifier");
+
+                            b1.Property<int>("ColumnCount")
+                                .HasColumnType("int")
+                                .HasColumnName("ForeignKeyColumnCount");
+
+                            b1.Property<string>("ConstraintName")
+                                .IsRequired()
+                                .HasMaxLength(128)
+                                .HasColumnType("nvarchar(128)")
+                                .HasColumnName("ForeignKeyConstraintName");
+
+                            b1.Property<string>("DisplayColumn")
+                                .IsRequired()
+                                .HasMaxLength(128)
+                                .HasColumnType("nvarchar(128)")
+                                .HasColumnName("ForeignKeyDisplayColumn");
+
+                            b1.Property<string>("LookupMode")
+                                .IsRequired()
+                                .HasMaxLength(32)
+                                .HasColumnType("nvarchar(32)")
+                                .HasColumnName("ForeignKeyLookupMode");
+
+                            b1.Property<int>("Ordinal")
+                                .HasColumnType("int")
+                                .HasColumnName("ForeignKeyOrdinal");
+
+                            b1.Property<string>("ReferencedColumn")
+                                .IsRequired()
+                                .HasMaxLength(128)
+                                .HasColumnType("nvarchar(128)")
+                                .HasColumnName("ForeignKeyReferencedColumn");
+
+                            b1.Property<string>("ReferencedObject")
+                                .IsRequired()
+                                .HasMaxLength(128)
+                                .HasColumnType("nvarchar(128)")
+                                .HasColumnName("ForeignKeyReferencedObject");
+
+                            b1.Property<string>("ReferencedSchema")
+                                .IsRequired()
+                                .HasMaxLength(128)
+                                .HasColumnType("nvarchar(128)")
+                                .HasColumnName("ForeignKeyReferencedSchema");
+
+                            b1.Property<string>("_searchColumns")
+                                .IsRequired()
+                                .HasColumnType("nvarchar(4000)")
+                                .HasColumnName("ForeignKeySearchColumnsJson");
+
+                            b1.HasKey("PublicationColumnId");
+
+                            b1.ToTable("PublicationColumnForeignKeys", "thub");
+
+                            b1.WithOwner()
+                                .HasForeignKey("PublicationColumnId");
+                        });
+
+                    b.Navigation("ForeignKey");
+                });
+
+            modelBuilder.Entity("THub.Domain.Publications.PublicationGrant", b =>
+                {
+                    b.HasOne("THub.Domain.Publications.Publication", null)
+                        .WithMany()
+                        .HasForeignKey("PublicationId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("THub.Domain.Publications.PublicationVersion", b =>
+                {
+                    b.HasOne("THub.Domain.Connections.DataConnection", null)
+                        .WithMany()
+                        .HasForeignKey("ConnectionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("THub.Domain.Publications.Publication", null)
+                        .WithMany()
+                        .HasForeignKey("PublicationId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.OwnsOne("THub.Domain.Publications.PublicationVersionSettings", "Settings", b1 =>
+                        {
+                            b1.Property<Guid>("PublicationVersionId")
+                                .HasColumnType("uniqueidentifier");
+
+                            b1.Property<int>("CommandTimeoutSeconds")
+                                .HasColumnType("int")
+                                .HasColumnName("CommandTimeoutSeconds");
+
+                            b1.Property<int>("DefaultPageSize")
+                                .HasColumnType("int")
+                                .HasColumnName("DefaultPageSize");
+
+                            b1.Property<int>("EditorWindowSize")
+                                .HasColumnType("int")
+                                .HasColumnName("EditorWindowSize");
+
+                            b1.Property<int>("MaximumConcurrentRequests")
+                                .HasColumnType("int")
+                                .HasColumnName("MaximumConcurrentRequests");
+
+                            b1.Property<int>("MaximumPageSize")
+                                .HasColumnType("int")
+                                .HasColumnName("MaximumPageSize");
+
+                            b1.Property<int>("MaximumResponseBytes")
+                                .HasColumnType("int")
+                                .HasColumnName("MaximumResponseBytes");
+
+                            b1.Property<int>("RateLimitWindowSeconds")
+                                .HasColumnType("int")
+                                .HasColumnName("RateLimitWindowSeconds");
+
+                            b1.Property<int>("RequestTimeoutSeconds")
+                                .HasColumnType("int")
+                                .HasColumnName("RequestTimeoutSeconds");
+
+                            b1.Property<int>("RequestsPerWindow")
+                                .HasColumnType("int")
+                                .HasColumnName("RequestsPerWindow");
+
+                            b1.HasKey("PublicationVersionId");
+
+                            b1.ToTable("PublicationVersions", "thub");
+
+                            b1.WithOwner()
+                                .HasForeignKey("PublicationVersionId");
+                        });
+
+                    b.Navigation("Settings")
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("THub.Domain.Runs.WorkflowRun", b =>
+                {
+                    b.HasOne("THub.Domain.Runs.WorkflowRun", null)
+                        .WithMany()
+                        .HasForeignKey("RetryOfRunId")
+                        .OnDelete(DeleteBehavior.NoAction);
+
+                    b.HasOne("THub.Domain.Workflows.WorkflowDefinition", null)
+                        .WithMany()
+                        .HasForeignKey("WorkflowId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("THub.Domain.Workflows.WorkflowVersion", null)
+                        .WithMany()
+                        .HasForeignKey("WorkflowVersionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("THub.Domain.Runs.WorkflowStepRun", b =>
+                {
+                    b.HasOne("THub.Domain.Runs.WorkflowRun", null)
+                        .WithMany()
+                        .HasForeignKey("WorkflowRunId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("THub.Domain.Workflows.WorkflowDefinition", b =>
+                {
+                    b.HasOne("THub.Domain.Workflows.WorkflowVersion", null)
+                        .WithMany()
+                        .HasForeignKey("PublishedVersionId")
+                        .OnDelete(DeleteBehavior.NoAction);
+                });
+
+            modelBuilder.Entity("THub.Domain.Workflows.WorkflowVersion", b =>
                 {
                     b.HasOne("THub.Domain.Workflows.WorkflowDefinition", null)
                         .WithMany()
                         .HasForeignKey("WorkflowId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
+                });
+
+            modelBuilder.Entity("THub.Domain.Publications.PublicationChangeSet", b =>
+                {
+                    b.Navigation("_changes");
+                });
+
+            modelBuilder.Entity("THub.Domain.Publications.PublicationVersion", b =>
+                {
+                    b.Navigation("_columns");
                 });
 #pragma warning restore 612, 618
         }

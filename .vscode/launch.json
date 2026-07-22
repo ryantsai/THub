@@ -46,6 +46,27 @@
       }
     },
     {
+      "name": "THub: Debug Publications Only",
+      "type": "coreclr",
+      "request": "launch",
+      "preLaunchTask": "THub: Prepare Debug",
+      "program": "${workspaceFolder}/src/THub.Publications/bin/Debug/net10.0/THub.Publications.dll",
+      "cwd": "${workspaceFolder}/src/THub.Publications",
+      "stopAtEntry": false,
+      "justMyCode": true,
+      "console": "internalConsole",
+      "internalConsoleOptions": "openOnSessionStart",
+      "checkForDevCert": true,
+      "env": {
+        "ASPNETCORE_ENVIRONMENT": "Development",
+        "ASPNETCORE_URLS": "https://localhost:7042;http://localhost:5263"
+      },
+      "presentation": {
+        "group": "THub",
+        "order": 4
+      }
+    },
+    {
       "name": "THub.Internal.Web",
       "type": "coreclr",
       "request": "launch",
@@ -84,6 +105,25 @@
       "presentation": {
         "hidden": true
       }
+    },
+    {
+      "name": "THub.Internal.Publications",
+      "type": "coreclr",
+      "request": "launch",
+      "program": "${workspaceFolder}/src/THub.Publications/bin/Debug/net10.0/THub.Publications.dll",
+      "cwd": "${workspaceFolder}/src/THub.Publications",
+      "stopAtEntry": false,
+      "justMyCode": true,
+      "console": "internalConsole",
+      "internalConsoleOptions": "openOnSessionStart",
+      "checkForDevCert": true,
+      "env": {
+        "ASPNETCORE_ENVIRONMENT": "Development",
+        "ASPNETCORE_URLS": "https://localhost:7042;http://localhost:5263"
+      },
+      "presentation": {
+        "hidden": true
+      }
     }
   ],
   "compounds": [
@@ -91,7 +131,8 @@
       "name": "THub: Debug All",
       "configurations": [
         "THub.Internal.Web",
-        "THub.Internal.Worker"
+        "THub.Internal.Worker",
+        "THub.Internal.Publications"
       ],
       "preLaunchTask": "THub: Prepare Debug",
       "stopAll": true,

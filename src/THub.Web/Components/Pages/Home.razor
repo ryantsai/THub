@@ -1,91 +1,206 @@
 @page "/"
 @attribute [Authorize(Policy = Permissions.WorkflowView)]
+@implements IDisposable
+@using THub.Application.Workflows.Management
+@using THub.Domain.Runs
+@using THub.Domain.Workflows
+@inject WorkflowCatalogService WorkflowCatalog
+@inject WorkflowRunHistoryService RunHistory
+@inject NavigationManager Navigation
+@inject TimeProvider TimeProvider
 
 <PageTitle>Overview · THub</PageTitle>
 
 <div class="page-heading">
     <div>
-        <div class="eyebrow">Wednesday · 22 July</div>
+        <div class="eyebrow">@TimeProvider.GetLocalNow().ToString("dddd · d MMMM")</div>
         <h1>Data operations overview</h1>
-        <p>A quiet control room for every pipeline, schedule, and published dataset.</p>
+        <p>Current control-plane state from durable workflow and run records.</p>
     </div>
     <div class="heading-actions">
-        <RadzenButton Text="Import workflow" Icon="upload_file" ButtonStyle="ButtonStyle.Light" />
-        <RadzenButton Text="New workflow" Icon="add" ButtonStyle="ButtonStyle.Primary" Click="@GoToDesigner" />
+        <RadzenButton Text="View runs" Icon="history" ButtonStyle="ButtonStyle.Light" Click="@(() => Navigation.NavigateTo("/runs"))" />
+        <AuthorizeView Policy="@Permissions.WorkflowEdit">
+            <RadzenButton Text="New workflow" Icon="add" ButtonStyle="ButtonStyle.Primary" Click="@(() => Navigation.NavigateTo("/designer"))" />
+        </AuthorizeView>
     </div>
 </div>
 
-<section class="metric-grid" aria-label="Workflow metrics">
-    <article class="metric-card">
-        <div class="metric-label"><span>Active workflows</span><span class="metric-icon"><RadzenIcon Icon="account_tree" /></span></div>
-        <div class="metric-value">12</div><div class="metric-foot"><strong>+2</strong> since last month</div>
-    </article>
-    <article class="metric-card">
-        <div class="metric-label"><span>Runs today</span><span class="metric-icon"><RadzenIcon Icon="play_circle" /></span></div>
-        <div class="metric-value">1,284</div><div class="metric-foot"><strong>99.4%</strong> successful</div>
-    </article>
-    <article class="metric-card">
-        <div class="metric-label"><span>Rows processed</span><span class="metric-icon"><RadzenIcon Icon="data_usage" /></span></div>
-        <div class="metric-value">8.7M</div><div class="metric-foot">Across 6 connected sources</div>
-    </article>
-    <article class="metric-card alert">
-        <div class="metric-label"><span>Needs attention</span><span class="metric-icon"><RadzenIcon Icon="warning_amber" /></span></div>
-        <div class="metric-value">3</div><div class="metric-foot">2 failed · 1 paused</div>
-    </article>
-</section>
-
-<div class="dashboard-grid">
-    <section class="panel">
-        <div class="panel-head"><div><h2>Recent workflow runs</h2><p>Live activity from the orchestration worker</p></div><a href="/runs">View all runs →</a></div>
-        <div class="table-scroll">
-            <table class="activity-table">
-                <thead><tr><th>Workflow</th><th>Status</th><th>Triggered</th><th>Duration</th><th>Rows</th></tr></thead>
-                <tbody>
-                    @foreach (var run in Runs)
-                    {
-                        <tr>
-                            <td><div class="workflow-name"><span class="mini-flow-icon"><RadzenIcon Icon="@run.Icon" /></span>@run.Name</div></td>
-                            <td><span class="status-chip @run.Status.ToLowerInvariant()">@run.Status</span></td>
-                            <td class="muted">@run.Triggered</td><td class="duration">@run.Duration</td><td class="duration">@run.Rows</td>
-                        </tr>
-                    }
-                </tbody>
-            </table>
-        </div>
+@if (Loading)
+{
+    <div class="page-state"><RadzenProgressBar Mode="ProgressBarMode.Indeterminate" /><p>Loading operational state…</p></div>
+}
+else if (Error is not null)
+{
+    <div class="page-state error"><RadzenIcon Icon="error_outline" /><p>@Error</p><button type="button" @onclick="LoadAsync">Try again</button></div>
+}
+else
+{
+    <section class="metric-grid" aria-label="Workflow metrics">
+        <article class="metric-card">
+            <div class="metric-label"><span>Published workflows</span><span class="metric-icon"><RadzenIcon Icon="account_tree" /></span></div>
+            <div class="metric-value">@PublishedWorkflowCount</div><div class="metric-foot">@WorkflowCount total workflow records</div>
+        </article>
+        <article class="metric-card">
+            <div class="metric-label"><span>Runs today</span><span class="metric-icon"><RadzenIcon Icon="play_circle" /></span></div>
+            <div class="metric-value">@RunsToday</div><div class="metric-foot"><strong>@SuccessRate</strong> succeeded in the loaded window</div>
+        </article>
+        <article class="metric-card">
+            <div class="metric-label"><span>Active schedules</span><span class="metric-icon"><RadzenIcon Icon="event_repeat" /></span></div>
+            <div class="metric-value">@ActiveScheduleCount</div><div class="metric-foot">@NextScheduleText</div>
+        </article>
+        <article class="metric-card alert">
+            <div class="metric-label"><span>Needs attention</span><span class="metric-icon"><RadzenIcon Icon="warning_amber" /></span></div>
+            <div class="metric-value">@AttentionCount</div><div class="metric-foot">@FailedRunCount recent failures · @PausedWorkflowCount paused</div>
+        </article>
     </section>
 
-    <div class="dashboard-stack">
+    <div class="dashboard-grid">
         <section class="panel">
-            <div class="panel-head"><div><h2>System health</h2><p>Runtime and dependency status</p></div><span class="status-chip">Healthy</span></div>
-            <div class="health-list">
-                <div class="health-item"><span class="health-icon"><RadzenIcon Icon="dns" /></span><div><strong>SQL Server</strong><small>THub metadata store</small></div><span class="health-value">14 ms</span></div>
-                <div class="health-item"><span class="health-icon"><RadzenIcon Icon="memory" /></span><div><strong>Worker service</strong><small>NODE-DATA-01</small></div><span class="health-value">Online</span></div>
-                <div class="health-item"><span class="health-icon"><RadzenIcon Icon="folder_open" /></span><div><strong>Local file agent</strong><small>3 watched locations</small></div><span class="health-value">Ready</span></div>
-            </div>
+            <div class="panel-head"><div><h2>Recent workflow runs</h2><p>Persisted execution activity</p></div><a href="/runs">View all runs →</a></div>
+            @if (RecentRuns.Count == 0)
+            {
+                <div class="page-state compact"><p>No runs have been queued.</p></div>
+            }
+            else
+            {
+                <div class="table-scroll">
+                    <table class="activity-table">
+                        <thead><tr><th>Workflow</th><th>Status</th><th>Triggered</th><th>Duration</th><th>Version</th></tr></thead>
+                        <tbody>
+                            @foreach (var run in RecentRuns)
+                            {
+                                <tr>
+                                    <td><div class="workflow-name"><span class="mini-flow-icon"><RadzenIcon Icon="account_tree" /></span>@run.WorkflowName</div></td>
+                                    <td><span class="status-chip @StatusCss(run.Status)">@run.Status</span></td>
+                                    <td class="muted">@TriggerText(run)</td>
+                                    <td class="duration">@DurationText(run)</td>
+                                    <td class="duration">v@(run.WorkflowVersion)</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            }
         </section>
-        <section class="panel">
-            <div class="panel-head"><div><h2>Quick actions</h2><p>Common operations</p></div></div>
-            <div class="quick-list">
-                <a href="/connections"><RadzenIcon Icon="add_circle_outline" /><span>Add a data connection</span><small>→</small></a>
-                <a href="/designer"><RadzenIcon Icon="schema" /><span>Design a workflow</span><small>→</small></a>
-                <a href="/schedules"><RadzenIcon Icon="more_time" /><span>Create a schedule</span><small>→</small></a>
-            </div>
-        </section>
+
+        <div class="dashboard-stack">
+            <section class="panel">
+                <div class="panel-head"><div><h2>Control-plane health</h2><p>Observed while loading this page</p></div><span class="status-chip">Connected</span></div>
+                <div class="health-list">
+                    <div class="health-item"><span class="health-icon"><RadzenIcon Icon="storage" /></span><div><strong>Metadata store</strong><small>Workflow and run queries completed</small></div><span class="health-value">Ready</span></div>
+                    <div class="health-item"><span class="health-icon"><RadzenIcon Icon="memory" /></span><div><strong>Execution queue</strong><small>Durable queued and running records</small></div><span class="health-value">@ActiveRunCount active</span></div>
+                    <div class="health-item"><span class="health-icon"><RadzenIcon Icon="schedule" /></span><div><strong>Schedule state</strong><small>Published five-field cron schedules</small></div><span class="health-value">@ActiveScheduleCount active</span></div>
+                </div>
+            </section>
+            <section class="panel">
+                <div class="panel-head"><div><h2>Quick actions</h2><p>Common operations</p></div></div>
+                <div class="quick-list">
+                    <AuthorizeView Policy="@Permissions.ConnectionManage"><a href="/connections"><RadzenIcon Icon="add_circle_outline" /><span>Add a data connection</span><small>→</small></a></AuthorizeView>
+                    <AuthorizeView Policy="@Permissions.WorkflowEdit"><a href="/designer"><RadzenIcon Icon="schema" /><span>Design a workflow</span><small>→</small></a></AuthorizeView>
+                    <AuthorizeView Policy="@Permissions.ScheduleManage"><a href="/schedules"><RadzenIcon Icon="more_time" /><span>Manage schedules</span><small>→</small></a></AuthorizeView>
+                </div>
+            </section>
+        </div>
     </div>
-</div>
+}
 
 @code {
-    [Inject] private NavigationManager Navigation { get; set; } = default!;
-    private void GoToDesigner() => Navigation.NavigateTo("/designer");
+    private readonly CancellationTokenSource cancellation = new();
+    private IReadOnlyList<WorkflowListItemDto> Workflows { get; set; } = [];
+    private IReadOnlyList<WorkflowRunListRecord> RecentRuns { get; set; } = [];
+    private int WorkflowCount { get; set; }
+    private bool Loading { get; set; }
+    private string? Error { get; set; }
 
-    private static readonly RunRow[] Runs =
-    [
-        new("Daily customer sync", "Succeeded", "Schedule · 4 min ago", "01:42", "124,892", "sync_alt"),
-        new("Order enrichment", "Running", "Schedule · 8 min ago", "00:38", "47,201", "hub"),
-        new("Finance export", "Failed", "Ryan · 22 min ago", "00:11", "—", "table_view"),
-        new("Inventory snapshot", "Succeeded", "Webhook · 37 min ago", "02:08", "803,443", "inventory_2"),
-        new("Partner CSV intake", "Succeeded", "File watch · 1 hr ago", "00:54", "18,604", "description")
-    ];
+    private int PublishedWorkflowCount => Workflows.Count(workflow => workflow.Status == WorkflowStatus.Published);
+    private int PausedWorkflowCount => Workflows.Count(workflow => workflow.Status == WorkflowStatus.Paused);
+    private int ActiveScheduleCount => Workflows.Count(workflow => workflow.Status == WorkflowStatus.Published && workflow.CronExpression is not null);
+    private int ActiveRunCount => RecentRuns.Count(run => run.Status is WorkflowRunStatus.Queued or WorkflowRunStatus.Running);
+    private int FailedRunCount => RecentRuns.Count(run => run.Status == WorkflowRunStatus.Failed);
+    private int AttentionCount => FailedRunCount + PausedWorkflowCount;
+    private int RunsToday => RecentRuns.Count(run => run.QueuedAtUtc >= TimeProvider.GetUtcNow().Date);
+    private string SuccessRate
+    {
+        get
+        {
+            var completedToday = RecentRuns.Where(run => run.QueuedAtUtc >= TimeProvider.GetUtcNow().Date && run.Status is WorkflowRunStatus.Succeeded or WorkflowRunStatus.Failed or WorkflowRunStatus.Cancelled).ToArray();
+            return completedToday.Length == 0
+                ? "No completed runs"
+                : $"{completedToday.Count(run => run.Status == WorkflowRunStatus.Succeeded) * 100d / completedToday.Length:0.#}%";
+        }
+    }
+    private string NextScheduleText
+    {
+        get
+        {
+            var next = Workflows.Where(workflow => workflow.NextRunAtUtc is not null).MinBy(workflow => workflow.NextRunAtUtc)?.NextRunAtUtc;
+            return next is null ? "No next occurrence" : $"Next {next.Value.ToLocalTime():g}";
+        }
+    }
 
-    private sealed record RunRow(string Name, string Status, string Triggered, string Duration, string Rows, string Icon);
+    protected override Task OnInitializedAsync() => LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        Loading = true;
+        Error = null;
+        try
+        {
+            var workflowsTask = WorkflowCatalog.ListAsync(
+                new WorkflowListRequest(Limit: WorkflowCatalogService.MaximumPageSize),
+                cancellation.Token);
+            var runsTask = RunHistory.ListAsync(new WorkflowRunListRequest(Limit: 50), cancellation.Token);
+            await Task.WhenAll(workflowsTask, runsTask);
+
+            var workflows = await workflowsTask;
+            var runs = await runsTask;
+            if (!workflows.IsSuccess || workflows.Value is null || !runs.IsSuccess || runs.Value is null)
+            {
+                Error = workflows.Issues.Concat(runs.Issues).FirstOrDefault()?.Message ?? "Operational data could not be loaded.";
+                return;
+            }
+
+            Workflows = workflows.Value.Items;
+            WorkflowCount = workflows.Value.TotalCount;
+            RecentRuns = runs.Value.Items.Take(8).ToArray();
+        }
+        catch (OperationCanceledException) when (cancellation.IsCancellationRequested)
+        {
+        }
+        catch (Exception)
+        {
+            Error = "Operational data is temporarily unavailable.";
+        }
+        finally
+        {
+            Loading = false;
+        }
+    }
+
+    private static string StatusCss(WorkflowRunStatus status) => status switch
+    {
+        WorkflowRunStatus.Queued or WorkflowRunStatus.Running => "running",
+        WorkflowRunStatus.Failed => "failed",
+        WorkflowRunStatus.Cancelled => "draft",
+        _ => string.Empty
+    };
+
+    private static string TriggerText(WorkflowRunListRecord run) =>
+        run.ScheduledForUtc is not null ? $"Schedule · {run.QueuedAtUtc.ToLocalTime():g}" : $"{run.TriggeredBy} · {run.QueuedAtUtc.ToLocalTime():g}";
+
+    private static string DurationText(WorkflowRunListRecord run)
+    {
+        if (run.StartedAtUtc is null)
+        {
+            return "—";
+        }
+        var duration = (run.CompletedAtUtc ?? DateTimeOffset.UtcNow) - run.StartedAtUtc.Value;
+        return duration.TotalHours >= 1 ? duration.ToString(@"hh\:mm\:ss") : duration.ToString(@"mm\:ss");
+    }
+
+    public void Dispose()
+    {
+        cancellation.Cancel();
+        cancellation.Dispose();
+    }
 }

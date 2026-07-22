@@ -1,12 +1,309 @@
 @page "/runs"
 @attribute [Authorize(Policy = Permissions.WorkflowView)]
+@implements IDisposable
+@using THub.Application.Workflows.Management
+@using THub.Domain.Runs
+@inject WorkflowRunHistoryService RunHistory
+@inject WorkflowRunService RunCommands
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject IAuthorizationService AuthorizationService
+@inject NotificationService Notifications
 
 <PageTitle>Runs · THub</PageTitle>
-<div class="page-heading"><div><div class="eyebrow">Operations</div><h1>Run history</h1><p>Execution traces, row counts, timings, and errors from every worker.</p></div><div class="heading-actions"><RadzenButton Text="Refresh" Icon="refresh" ButtonStyle="ButtonStyle.Light" /></div></div>
-<section class="panel"><div class="panel-head"><div><h2>Latest executions</h2><p>Auto-refreshing every 15 seconds</p></div><span class="status-chip running">Live</span></div>
-<table class="activity-table"><thead><tr><th>Run ID</th><th>Workflow</th><th>Status</th><th>Started</th><th>Worker</th><th>Duration</th></tr></thead><tbody>
-<tr><td class="muted">74F2…98A1</td><td><strong>Order enrichment</strong></td><td><span class="status-chip running">Running</span></td><td>09:42:10</td><td class="muted">NODE-DATA-01</td><td>00:38</td></tr>
-<tr><td class="muted">AA83…107C</td><td><strong>Daily customer sync</strong></td><td><span class="status-chip">Succeeded</span></td><td>09:38:00</td><td class="muted">NODE-DATA-01</td><td>01:42</td></tr>
-<tr><td class="muted">C120…4D2B</td><td><strong>Finance export</strong></td><td><span class="status-chip failed">Failed</span></td><td>09:20:14</td><td class="muted">NODE-DATA-02</td><td>00:11</td></tr>
-</tbody></table></section>
 
+<div class="page-heading">
+    <div>
+        <div class="eyebrow">Operations</div>
+        <h1>Run history</h1>
+        <p>Durable attempts, step progress, retries, cancellations, and normalized errors.</p>
+    </div>
+    <div class="heading-actions">
+        <RadzenDropDown TValue="WorkflowRunStatus?" Data="@StatusOptions" TextProperty="Label" ValueProperty="Value"
+                        @bind-Value="StatusFilter" Change="@(_ => LoadAsync())" Placeholder="All statuses" AllowClear="true" />
+        <RadzenButton Text="Refresh" Icon="refresh" ButtonStyle="ButtonStyle.Light" Click="@LoadAsync" Disabled="@Busy" />
+    </div>
+</div>
+
+<section class="panel">
+    <div class="panel-head">
+        <div><h2>Latest executions</h2><p>@Summary</p></div>
+        @if (Items.Any(run => run.Status is WorkflowRunStatus.Queued or WorkflowRunStatus.Running))
+        {
+            <span class="status-chip running">Active work</span>
+        }
+    </div>
+
+    @if (Busy && Items.Count == 0)
+    {
+        <div class="page-state"><RadzenProgressBar Mode="ProgressBarMode.Indeterminate" /><p>Loading runs…</p></div>
+    }
+    else if (Error is not null)
+    {
+        <div class="page-state error"><RadzenIcon Icon="error_outline" /><p>@Error</p><button type="button" @onclick="LoadAsync">Try again</button></div>
+    }
+    else if (Items.Count == 0)
+    {
+        <div class="page-state"><RadzenIcon Icon="history" /><h3>No runs yet</h3><p>Publish a workflow and queue it from the designer to create a durable run.</p></div>
+    }
+    else
+    {
+        <div class="table-scroll">
+            <table class="activity-table run-table">
+                <thead><tr><th>Workflow</th><th>Status</th><th>Version</th><th>Queued</th><th>Duration</th><th>Trigger</th><th></th></tr></thead>
+                <tbody>
+                    @foreach (var run in Items)
+                    {
+                        <tr class="@(Selected?.Id == run.Id ? "selected" : null)">
+                            <td><button class="run-link" type="button" @onclick="() => SelectAsync(run.Id)"><strong>@run.WorkflowName</strong><small>@ShortId(run.Id)</small></button></td>
+                            <td><span class="status-chip @StatusCss(run.Status)">@run.Status</span></td>
+                            <td class="muted">v@(run.WorkflowVersion) · attempt @run.AttemptCount</td>
+                            <td class="muted">@run.QueuedAtUtc.ToLocalTime().ToString("g")</td>
+                            <td class="duration">@FormatDuration(run.StartedAtUtc, run.CompletedAtUtc)</td>
+                            <td class="muted">@run.TriggeredBy</td>
+                            <td class="run-actions">
+                                <button type="button" @onclick="() => SelectAsync(run.Id)">Details</button>
+                                <AuthorizeView Policy="@Permissions.WorkflowExecute">
+                                    @if (run.Status is WorkflowRunStatus.Queued or WorkflowRunStatus.Running)
+                                    {
+                                        <button type="button" disabled="@(Busy || run.CancellationRequested)" @onclick="() => CancelAsync(run.Id)">@(run.CancellationRequested ? "Cancelling" : "Cancel")</button>
+                                    }
+                                    else if (run.Status == WorkflowRunStatus.Failed)
+                                    {
+                                        <button type="button" disabled="@Busy" @onclick="() => RetryAsync(run.Id)">Retry exact version</button>
+                                    }
+                                </AuthorizeView>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+</section>
+
+@if (Selected is not null)
+{
+    <section class="panel run-detail" aria-label="Run details">
+        <div class="panel-head">
+            <div><h2>@Selected.WorkflowName · v@(Selected.WorkflowVersion)</h2><p>@Selected.Id</p></div>
+            <span class="status-chip @StatusCss(Selected.Status)">@Selected.Status</span>
+        </div>
+        <div class="detail-grid">
+            <dl><dt>Queued</dt><dd>@Selected.QueuedAtUtc.ToLocalTime().ToString("G")</dd></dl>
+            <dl><dt>Started</dt><dd>@(Selected.StartedAtUtc?.ToLocalTime().ToString("G") ?? "—")</dd></dl>
+            <dl><dt>Completed</dt><dd>@(Selected.CompletedAtUtc?.ToLocalTime().ToString("G") ?? "—")</dd></dl>
+            <dl><dt>Worker lease</dt><dd>@(Selected.LeaseOwner ?? "—")</dd></dl>
+        </div>
+        @if (Selected.Error is not null)
+        {
+            <div class="run-error"><strong>@Selected.Error.Code</strong><span>@Selected.Error.Category</span><p>@Selected.Error.Summary</p></div>
+        }
+        <div class="table-scroll">
+            <table class="activity-table">
+                <thead><tr><th>Step</th><th>Attempt</th><th>Status</th><th>Rows read</th><th>Rows written</th><th>Batches</th><th>Error</th></tr></thead>
+                <tbody>
+                    @if (Selected.Steps.Count == 0)
+                    {
+                        <tr><td colspan="7" class="muted">No step attempts have been recorded.</td></tr>
+                    }
+                    else
+                    {
+                        @foreach (var step in Selected.Steps)
+                        {
+                            <tr><td><strong>@step.NodeId</strong></td><td>@step.Attempt</td><td><span class="status-chip @step.Status.ToString().ToLowerInvariant()">@step.Status</span></td><td>@step.RowsRead</td><td>@step.RowsWritten</td><td>@step.BatchesProcessed</td><td class="error-cell">@(step.Error?.Summary ?? "—")</td></tr>
+                        }
+                    }
+                </tbody>
+            </table>
+        </div>
+    </section>
+}
+
+@code {
+    private readonly CancellationTokenSource cancellation = new();
+    private IReadOnlyList<WorkflowRunListRecord> Items { get; set; } = [];
+    private WorkflowRunDetailsDto? Selected { get; set; }
+    private WorkflowRunStatus? StatusFilter { get; set; }
+    private bool Busy { get; set; }
+    private string? Error { get; set; }
+
+    private static IReadOnlyList<StatusOption> StatusOptions { get; } = Enum
+        .GetValues<WorkflowRunStatus>()
+        .Select(status => new StatusOption(status, status.ToString()))
+        .ToArray();
+
+    private string Summary => $"{Items.Count} of the latest {Items.Count} shown";
+
+    protected override Task OnInitializedAsync() => LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        Busy = true;
+        Error = null;
+        try
+        {
+            var result = await RunHistory.ListAsync(
+                new WorkflowRunListRequest(Limit: 100, Status: StatusFilter),
+                cancellation.Token);
+            if (!result.IsSuccess || result.Value is null)
+            {
+                Error = result.Issues.FirstOrDefault()?.Message ?? "Run history could not be loaded.";
+                return;
+            }
+
+            Items = result.Value.Items;
+            if (Selected is not null && Items.All(run => run.Id != Selected.Id))
+            {
+                Selected = null;
+            }
+        }
+        catch (OperationCanceledException) when (cancellation.IsCancellationRequested)
+        {
+        }
+        catch (Exception)
+        {
+            Error = "Run history is temporarily unavailable.";
+        }
+        finally
+        {
+            Busy = false;
+        }
+    }
+
+    private async Task SelectAsync(Guid runId)
+    {
+        var result = await RunHistory.LoadAsync(runId, cancellation.Token);
+        if (result.IsSuccess)
+        {
+            Selected = result.Value;
+        }
+        else
+        {
+            Notify(NotificationSeverity.Error, result.Issues.FirstOrDefault()?.Message ?? "Run details could not be loaded.");
+        }
+    }
+
+    private async Task CancelAsync(Guid runId)
+    {
+        var actor = await GetAuthorizedExecutionActorAsync();
+        if (actor is null)
+        {
+            return;
+        }
+
+        Busy = true;
+        try
+        {
+            var result = await RunCommands.CancelAsync(
+                new CancelWorkflowRunCommand(runId, actor),
+                cancellation.Token);
+            Notify(
+                result.IsSuccess ? NotificationSeverity.Info : NotificationSeverity.Error,
+                result.IsSuccess ? "Cancellation was requested." : result.Issues.FirstOrDefault()?.Message ?? "The run could not be cancelled.");
+            await LoadAsync();
+            await SelectAsync(runId);
+        }
+        catch (OperationCanceledException) when (cancellation.IsCancellationRequested)
+        {
+        }
+        catch (Exception)
+        {
+            Notify(NotificationSeverity.Error, "Cancellation could not be confirmed. Reload the run before retrying.");
+        }
+        finally
+        {
+            Busy = false;
+        }
+    }
+
+    private async Task RetryAsync(Guid runId)
+    {
+        var actor = await GetAuthorizedExecutionActorAsync();
+        if (actor is null)
+        {
+            return;
+        }
+
+        Busy = true;
+        try
+        {
+            var result = await RunHistory.RetryAsync(
+                new RetryWorkflowRunCommand(runId, actor),
+                cancellation.Token);
+            Notify(
+                result.IsSuccess ? NotificationSeverity.Success : NotificationSeverity.Error,
+                result.IsSuccess ? "An exact-version retry was queued." : result.Issues.FirstOrDefault()?.Message ?? "The retry could not be queued.");
+            await LoadAsync();
+        }
+        catch (OperationCanceledException) when (cancellation.IsCancellationRequested)
+        {
+        }
+        catch (Exception)
+        {
+            Notify(NotificationSeverity.Error, "The exact-version retry could not be confirmed. Reload before retrying.");
+        }
+        finally
+        {
+            Busy = false;
+        }
+    }
+
+    private async Task<string?> GetAuthorizedExecutionActorAsync()
+    {
+        var state = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        if (!(await AuthorizationService.AuthorizeAsync(
+                state.User,
+                Permissions.WorkflowExecute)).Succeeded)
+        {
+            Notify(NotificationSeverity.Error, "Workflow execution permission is required.");
+            return null;
+        }
+
+        if (string.IsNullOrWhiteSpace(state.User.Identity?.Name))
+        {
+            Notify(NotificationSeverity.Error, "An authenticated actor identity is required.");
+            return null;
+        }
+
+        return state.User.Identity.Name;
+    }
+
+    private void Notify(NotificationSeverity severity, string detail) => Notifications.Notify(new NotificationMessage
+    {
+        Severity = severity,
+        Summary = severity == NotificationSeverity.Error ? "Run operation failed" : "Run updated",
+        Detail = detail,
+        Duration = 5_000
+    });
+
+    private static string ShortId(Guid id) => id.ToString("N")[..8].ToUpperInvariant();
+
+    private static string StatusCss(WorkflowRunStatus status) => status switch
+    {
+        WorkflowRunStatus.Running or WorkflowRunStatus.Queued => "running",
+        WorkflowRunStatus.Failed => "failed",
+        WorkflowRunStatus.Cancelled => "draft",
+        _ => string.Empty
+    };
+
+    private static string FormatDuration(DateTimeOffset? start, DateTimeOffset? end)
+    {
+        if (start is null)
+        {
+            return "—";
+        }
+
+        var duration = (end ?? DateTimeOffset.UtcNow) - start.Value;
+        return duration.TotalHours >= 1
+            ? duration.ToString(@"hh\:mm\:ss")
+            : duration.ToString(@"mm\:ss");
+    }
+
+    public void Dispose()
+    {
+        cancellation.Cancel();
+        cancellation.Dispose();
+    }
+
+    private sealed record StatusOption(WorkflowRunStatus Value, string Label);
+}

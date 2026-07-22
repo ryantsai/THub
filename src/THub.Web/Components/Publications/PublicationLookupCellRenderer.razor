@@ -1,0 +1,28 @@
+@using Radzen.Blazor.Spreadsheet
+@using THub.Web.Publications
+
+<span class="publication-lookup-value" title="Foreign-key value">
+    <RadzenIcon Icon="arrow_drop_down" />@DisplayText
+</span>
+
+@code {
+    [Parameter]
+    public SpreadsheetCellRenderContext Context { get; set; } = null!;
+
+    [CascadingParameter]
+    public PublicationSpreadsheetContext? SpreadsheetContext { get; set; }
+
+    private string DisplayText
+    {
+        get
+        {
+            var formattedValue = Context.FormattedValue?.ToString() ?? string.Empty;
+            return SpreadsheetContext?.GetDisplayText(
+                new SpreadsheetCellRenderContextAdapter(
+                    Context.Worksheet,
+                    Context.Cell.Address.Row,
+                    Context.Cell.Address.Column,
+                    formattedValue)) ?? formattedValue;
+        }
+    }
+}

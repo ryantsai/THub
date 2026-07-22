@@ -11,25 +11,34 @@ public sealed class EnqueueScheduledWorkflowJob(
 {
     public async Task Execute(IJobExecutionContext context)
     {
-        var workflowId = Guid.Parse(
-            context.MergedJobDataMap.GetString(QuartzWorkflowScheduleFactory.WorkflowIdKey)
-                ?? throw new InvalidOperationException("Quartz workflow ID is missing."));
-        var workflowVersion = int.Parse(
-            context.MergedJobDataMap.GetString(QuartzWorkflowScheduleFactory.WorkflowVersionKey)
-                ?? throw new InvalidOperationException("Quartz workflow version is missing."),
-            CultureInfo.InvariantCulture);
-        var scheduledForUtc = DateTimeOffset.Parse(
-            context.MergedJobDataMap.GetString(QuartzWorkflowScheduleFactory.ScheduledForUtcKey)
-                ?? throw new InvalidOperationException("Quartz scheduled occurrence is missing."),
-            CultureInfo.InvariantCulture,
-            DateTimeStyles.RoundtripKind).ToUniversalTime();
+        var workflowId = ReadWorkflowId(context.MergedJobDataMap);
+        var workflowVersion = ReadWorkflowVersion(context.MergedJobDataMap);
+        var scheduledForUtc = ReadScheduledOccurrence(context.MergedJobDataMap);
 
-        var result = await enqueuer.EnqueueAsync(
-            workflowId,
-            workflowVersion,
-            scheduledForUtc,
-            DateTimeOffset.UtcNow,
-            context.CancellationToken);
+        ScheduledRunEnqueueResult result;
+        try
+        {
+            result = await enqueuer.EnqueueAsync(
+                workflowId,
+                workflowVersion,
+                scheduledForUtc,
+                DateTimeOffset.UtcNow,
+                context.CancellationToken);
+        }
+        catch (OperationCanceledException) when (context.CancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception exception)
+        {
+            logger.LogError(
+                exception,
+                "Could not enqueue workflow {WorkflowId} version {WorkflowVersion} for scheduled occurrence {ScheduledForUtc}.",
+                workflowId,
+                workflowVersion,
+                scheduledForUtc);
+            throw new JobExecutionException(exception, refireImmediately: false);
+        }
 
         switch (result.Status)
         {
@@ -58,4 +67,49 @@ public sealed class EnqueueScheduledWorkflowJob(
                 throw new InvalidOperationException($"Unsupported enqueue status '{result.Status}'.");
         }
     }
+
+    internal static Guid ReadWorkflowId(JobDataMap data)
+    {
+        var value = data.GetString(QuartzWorkflowScheduleFactory.WorkflowIdKey);
+        if (!Guid.TryParse(value, out var workflowId))
+        {
+            throw InvalidMetadata("workflow ID");
+        }
+
+        return workflowId;
+    }
+
+    internal static int ReadWorkflowVersion(JobDataMap data)
+    {
+        var value = data.GetString(QuartzWorkflowScheduleFactory.WorkflowVersionKey);
+        if (!int.TryParse(value, NumberStyles.None, CultureInfo.InvariantCulture, out var version)
+            || version < 1)
+        {
+            throw InvalidMetadata("workflow version");
+        }
+
+        return version;
+    }
+
+    internal static DateTimeOffset ReadScheduledOccurrence(JobDataMap data)
+    {
+        var value = data.GetString(QuartzWorkflowScheduleFactory.ScheduledForUtcKey);
+        if (!DateTimeOffset.TryParseExact(
+                value,
+                "O",
+                CultureInfo.InvariantCulture,
+                DateTimeStyles.RoundtripKind,
+                out var occurrence))
+        {
+            throw InvalidMetadata("scheduled occurrence");
+        }
+
+        return occurrence.ToUniversalTime();
+    }
+
+    private static JobExecutionException InvalidMetadata(string field) =>
+        new($"Quartz {field} is missing or malformed.")
+        {
+            UnscheduleFiringTrigger = true
+        };
 }

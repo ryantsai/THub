@@ -2,7 +2,11 @@ using Quartz;
 using Serilog;
 using THub.Application;
 using THub.Infrastructure;
+using THub.Infrastructure.Alerts;
 using THub.Worker;
+using THub.Worker.Alerts;
+using THub.Worker.Execution;
+using THub.Worker.Publications;
 using THub.Worker.Scheduling;
 
 Log.Logger = new LoggerConfiguration()
@@ -14,12 +18,71 @@ try
     var builder = Host.CreateApplicationBuilder(args);
     builder.Services.AddWindowsService(options => options.ServiceName = "THub Orchestration Worker");
     SerilogConfiguration.Configure(builder);
-    builder.Services.AddApplication();
-    builder.Services.AddInfrastructure(builder.Configuration);
+    builder.Services.AddWorkerApplication();
+    builder.Services.AddWorkerInfrastructure(builder.Configuration);
     builder.Services.AddOptions<SchedulerOptions>()
         .Bind(builder.Configuration.GetSection(SchedulerOptions.SectionName))
         .ValidateDataAnnotations()
         .ValidateOnStart();
+    builder.Services.AddOptions<WorkflowExecutionWorkerOptions>()
+        .Bind(builder.Configuration.GetSection(WorkflowExecutionWorkerOptions.SectionName))
+        .ValidateDataAnnotations()
+        .Validate(
+            options =>
+            {
+                try
+                {
+                    options.ValidateCrossFieldBounds();
+                    return true;
+                }
+                catch (InvalidOperationException)
+                {
+                    return false;
+                }
+                catch (ArgumentException)
+                {
+                    return false;
+                }
+            },
+            "Execution options contain inconsistent resource, lease, or timeout bounds.")
+        .ValidateOnStart();
+    builder.Services.AddScoped<WorkflowExecutionEngineFactory>();
+    builder.Services.AddHostedService<WorkflowExecutionWorker>();
+    builder.Services.AddOptions<PublicationChangeSetWorkerOptions>()
+        .Bind(builder.Configuration.GetSection(PublicationChangeSetWorkerOptions.SectionName))
+        .ValidateDataAnnotations()
+        .ValidateOnStart();
+    builder.Services.AddHostedService<PublicationChangeSetWorker>();
+    builder.Services.AddOptions<EmailAlertDispatchWorkerOptions>()
+        .Bind(builder.Configuration.GetSection(EmailAlertDispatchWorkerOptions.SectionName))
+        .ValidateDataAnnotations()
+        .Validate(
+            options =>
+            {
+                try
+                {
+                    var smtpTimeoutSeconds = builder.Configuration.GetValue<int?>(
+                        "EmailDelivery:Smtp:OperationTimeoutSeconds")
+                        ?? new SmtpAlertSenderOptions().OperationTimeoutSeconds;
+                    options.ValidateCrossFieldBounds(smtpTimeoutSeconds);
+                    return true;
+                }
+                catch (InvalidOperationException)
+                {
+                    return false;
+                }
+                catch (ArgumentException)
+                {
+                    return false;
+                }
+                catch (OverflowException)
+                {
+                    return false;
+                }
+            },
+            "Email dispatcher options contain inconsistent retry, lease, or timeout bounds.")
+        .ValidateOnStart();
+    builder.Services.AddHostedService<EmailAlertDispatchWorker>();
 
     var schedulerOptions = builder.Configuration
         .GetSection(SchedulerOptions.SectionName)

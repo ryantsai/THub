@@ -1,0 +1,919 @@
+@page "/editor/{PublicationId:guid}"
+@attribute [Authorize]
+@implements IDisposable
+@using System.Globalization
+@using Radzen.Blazor.Spreadsheet
+@using Radzen.Documents.Spreadsheet
+@using THub.Application.Publications
+@using THub.Domain.Publications
+@using THub.Web.Components.Publications
+@using THub.Web.Publications
+@inject PublicationCatalogService Catalog
+@inject PublicationAuthorizationService AuthorizationService
+@inject PublicationDataService DataService
+@inject PublicationEditorService EditorService
+@inject PublicationChangeSetManagementService ChangeSetService
+@inject PublicationRoleResolver RoleResolver
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject NotificationService Notifications
+
+<PageTitle>@(Publication?.Name ?? "Publication editor") · THub</PageTitle>
+
+<div class="page-heading editor-heading">
+    <div>
+        <div class="eyebrow">Governed editing</div>
+        <h1>@(Publication?.Name ?? "Publication editor")</h1>
+        <p>Edits are validated and staged against the active immutable schema. They are never written directly from this browser.</p>
+    </div>
+    <div class="heading-actions">
+        <AuthorizeView Policy="@Permissions.PublicationManage"><a class="button-link secondary" href="/publications">Manage publication</a></AuthorizeView>
+        <RadzenButton Text="Refresh status" Icon="refresh" ButtonStyle="ButtonStyle.Light" Click="@RefreshAsync" Disabled="@Busy" />
+    </div>
+</div>
+
+@if (Loading)
+{
+    <section class="panel page-state"><RadzenProgressBar Mode="ProgressBarMode.Indeterminate" /><p>Authorizing and loading the governed window…</p></section>
+}
+else if (Error is not null)
+{
+    <section class="panel page-state error"><RadzenIcon Icon="lock" /><h2>Publication unavailable</h2><p>@Error</p><button type="button" @onclick="RefreshAsync">Try again</button></section>
+}
+else if (Publication is not null && Version is not null && Workbook is not null && SpreadsheetContext is not null)
+{
+    <section class="editor-control-strip" aria-label="Editor permissions and controls">
+        <div class="editor-facts">
+            <span><small>Source</small><strong>@Version.SourceSchema.@Version.SourceObject</strong></span>
+            <span><small>Schema</small><strong>v@(Version.VersionNumber) · @Version.ConcurrencyMode</strong></span>
+            <span><small>Window</small><strong>@Rows.Count rows</strong></span>
+            <span><small>Access</small><strong>@PermissionSummary</strong></span>
+        </div>
+        <div class="editor-actions">
+            @if (CanInsert && Columns.Any(PublicationSpreadsheetChangeMapper.CanSupplyOnInsert))
+            {
+                <RadzenButton Text="Add staged row" Icon="add_row" Size="ButtonSize.Small" ButtonStyle="ButtonStyle.Light" Click="@AddRowAsync" Disabled="@Busy" />
+            }
+            @if (CanDelete)
+            {
+                <RadzenButton Text="Toggle selected-row delete" Icon="delete_outline" Size="ButtonSize.Small" ButtonStyle="ButtonStyle.Light" Click="@ToggleDeleteAsync" Disabled="@Busy" />
+            }
+            @if (CanUpdate || CanInsert || CanDelete)
+            {
+                <RadzenButton Text="Stage changes" Icon="save" Size="ButtonSize.Small" ButtonStyle="ButtonStyle.Primary" Click="@StageAsync" Disabled="@Busy" />
+            }
+        </div>
+    </section>
+
+    @if (Rows.Any(row => row.IsNew || row.IsDeleted))
+    {
+        <div class="editor-notice"><RadzenIcon Icon="pending_actions" /><span>@Rows.Count(row => row.IsNew) new and @Rows.Count(row => row.IsDeleted && !row.IsNew) deleted rows are marked in this window. Stage them to create a reviewable change set.</span></div>
+    }
+
+    <section class="editor-query-strip" aria-label="Server-side data search and sort">
+        <div class="editor-query-controls">
+            <label>
+                <span>Filter column</span>
+                <select @bind="FilterColumnAlias" @bind:after="FilterColumnChanged" disabled="@Busy">
+                    <option value="">Select a column…</option>
+                    @foreach (var column in Columns.Where(column => column.IsFilterable))
+                    {
+                        <option value="@column.PublicAlias">@column.PublicAlias</option>
+                    }
+                </select>
+            </label>
+            <label>
+                <span>Operator</span>
+                <select @bind="FilterOperator" disabled="@Busy">
+                    @foreach (var operation in AvailableFilterOperators)
+                    {
+                        <option value="@operation">@FilterOperatorLabel(operation)</option>
+                    }
+                </select>
+            </label>
+            <label class="query-value">
+                <span>Value</span>
+                <input maxlength="4096" @bind="FilterValue" disabled="@(Busy || FilterOperator is PublicationFilterOperator.IsNull or PublicationFilterOperator.IsNotNull)" />
+            </label>
+            <RadzenButton Text="Add filter" Icon="filter_alt" Size="ButtonSize.Small" ButtonStyle="ButtonStyle.Light" Click="@AddFilterAsync" Disabled="@(Busy || string.IsNullOrWhiteSpace(FilterColumnAlias))" />
+            <label>
+                <span>Sort column</span>
+                <select @bind="SortColumnAlias" disabled="@Busy">
+                    <option value="">Stable key order</option>
+                    @foreach (var column in Columns.Where(column => column.IsSortable))
+                    {
+                        <option value="@column.PublicAlias">@column.PublicAlias</option>
+                    }
+                </select>
+            </label>
+            <label class="sort-direction">
+                <input type="checkbox" @bind="SortDescending" disabled="@(Busy || string.IsNullOrWhiteSpace(SortColumnAlias))" />
+                <span>Descending</span>
+            </label>
+            <RadzenButton Text="Apply sort" Icon="sort" Size="ButtonSize.Small" ButtonStyle="ButtonStyle.Light" Click="@ApplyQueryAsync" Disabled="@Busy" />
+        </div>
+        @if (ActiveFilters.Count > 0)
+        {
+            <div class="active-filter-list" aria-label="Active server filters">
+                @for (var index = 0; index < ActiveFilters.Count; index++)
+                {
+                    var filterIndex = index;
+                    var filter = ActiveFilters[index];
+                    <button type="button" @onclick="() => RemoveFilterAsync(filterIndex)" disabled="@Busy" title="Remove filter">
+                        @filter.ColumnAlias @FilterOperatorLabel(filter.Operator) @(filter.Value ?? string.Empty) <span aria-hidden="true">×</span>
+                    </button>
+                }
+                <button class="clear-filters" type="button" @onclick="ClearFiltersAsync" disabled="@Busy">Clear filters</button>
+            </div>
+        }
+    </section>
+
+    <section class="spreadsheet-shell" aria-label="Publication data spreadsheet">
+        <CascadingValue Value="SpreadsheetContext">
+            <RadzenSpreadsheet @ref="Spreadsheet"
+                               Workbook="Workbook"
+                               CellTypes="CellTypes"
+                               ReadOnly="@(!(CanUpdate || CanInsert))"
+                               ShowToolbar="false"
+                               ShowFormulaBar="false"
+                               ShowSheetTabs="false"
+                               AllowEditing="@(CanUpdate || CanInsert)"
+                               AllowFiltering="false"
+                               AllowSorting="false"
+                               AllowAutofill="false"
+                               AllowMerge="false"
+                               AllowResizing="false"
+                               AllowCellFormatting="false"
+                               AllowHyperlinks="false"
+                               AllowImages="false"
+                               AllowCharts="false"
+                               AllowTables="false"
+                               AllowDataValidation="false"
+                               AllowConditionalFormatting="false"
+                               AllowClipboard="false"
+                               AllowUndoRedo="true"
+                               AriaLabel="Governed publication data" />
+        </CascadingValue>
+    </section>
+
+    <div class="editor-window-nav">
+        <span>Window @(CursorHistory.Count) · deterministic keyset paging</span>
+        <div>
+            <RadzenButton Text="Previous window" Icon="chevron_left" Size="ButtonSize.Small" ButtonStyle="ButtonStyle.Light" Click="@PreviousWindowAsync" Disabled="@(Busy || CursorHistory.Count <= 1)" />
+            <RadzenButton Text="Next window" Icon="chevron_right" IconPosition="IconPosition.Right" Size="ButtonSize.Small" ButtonStyle="ButtonStyle.Light" Click="@NextWindowAsync" Disabled="@(Busy || NextCursor is null)" />
+            <RadzenButton Text="Discard and reload" Icon="restart_alt" Size="ButtonSize.Small" ButtonStyle="ButtonStyle.Light" Click="@ReloadWindowAsync" Disabled="@Busy" />
+        </div>
+    </div>
+
+    <section class="panel change-set-panel">
+        <div class="panel-head">
+            <div><h2>Staged change sets</h2><p>Approval and durable application are separate operations. Conflicts do not overwrite newer source data.</p></div>
+            <span class="status-chip draft">@ChangeSets.Count recent</span>
+        </div>
+        @if (ChangeSets.Count == 0)
+        {
+            <div class="page-state compact"><p>No change sets have been staged for this publication.</p></div>
+        }
+        else
+        {
+            <div class="table-scroll">
+                <table class="activity-table">
+                    <thead><tr><th>Submitted</th><th>By</th><th>Changes</th><th>Status</th><th>Review / outcome</th><th>Inspection</th></tr></thead>
+                    <tbody>
+                    @foreach (var changeSet in ChangeSets)
+                    {
+                        <tr>
+                            <td class="muted">@changeSet.SubmittedAtUtc.ToLocalTime().ToString("g")</td>
+                            <td>@changeSet.SubmittedBy</td>
+                            <td>@changeSet.ChangeCount</td>
+                            <td><span class="status-chip @ChangeSetCss(changeSet.Status)">@changeSet.Status</span></td>
+                            <td class="muted">@(changeSet.OutcomeDetail ?? changeSet.ReviewComment ?? (changeSet.ReviewedBy is null ? "Awaiting review" : $"Reviewed by {changeSet.ReviewedBy}"))</td>
+                            <td>
+                                <button type="button" @onclick="() => LoadChangeSetDetailAsync(changeSet.Id)" disabled="@Busy">@(InspectedChangeSet?.Id == changeSet.Id ? "Refresh details" : "Inspect changes")</button>
+                            </td>
+                        </tr>
+                    }
+                    </tbody>
+                </table>
+            </div>
+
+            @if (InspectedChangeSet is not null)
+            {
+                <section class="change-set-detail" aria-labelledby="change-set-detail-title">
+                    <div class="change-set-detail-head">
+                        <div>
+                            <h3 id="change-set-detail-title">Inspected change set @InspectedChangeSet.Id.ToString("N")[..8]</h3>
+                            <p>@InspectedChangeSet.Changes.Count bounded change(s) submitted by @InspectedChangeSet.SubmittedBy on @InspectedChangeSet.SubmittedAtUtc.ToLocalTime().ToString("g"). Review the keys and before/after values before deciding.</p>
+                        </div>
+                        <span class="status-chip @ChangeSetCss(InspectedChangeSet.Status)">@InspectedChangeSet.Status</span>
+                    </div>
+                    <div class="table-scroll">
+                        <table class="activity-table change-detail-table">
+                            <thead><tr><th>Operation</th><th>Key</th><th>Before</th><th>After</th></tr></thead>
+                            <tbody>
+                            @foreach (var change in InspectedChangeSet.Changes)
+                            {
+                                <tr>
+                                    <td><strong>@change.Operation</strong></td>
+                                    <td><pre>@(change.KeyJson ?? "—")</pre></td>
+                                    <td><pre>@(change.BeforeJson ?? "—")</pre></td>
+                                    <td><pre>@(change.AfterJson ?? "—")</pre></td>
+                                </tr>
+                            }
+                            </tbody>
+                        </table>
+                    </div>
+                    @if (CanApprove && InspectedChangeSet.Status == PublicationChangeSetStatus.Pending)
+                    {
+                        <div class="review-actions inspected-review-actions">
+                            <input aria-label="Review comment" maxlength="2000" placeholder="Comment (required to reject)" @bind="ReviewComments[InspectedChangeSet.Id]" />
+                            <button type="button" @onclick="() => ReviewAsync(InspectedChangeSet.Id, PublicationChangeReviewDecision.Approve)" disabled="@Busy">Approve inspected changes</button>
+                            <button class="danger" type="button" @onclick="() => ReviewAsync(InspectedChangeSet.Id, PublicationChangeReviewDecision.Reject)" disabled="@Busy">Reject inspected changes</button>
+                        </div>
+                    }
+                </section>
+            }
+        }
+    </section>
+}
+
+@code {
+    private const string LookupCellType = "thub-publication-foreign-key";
+    private readonly CancellationTokenSource cancellation = new();
+    private readonly Dictionary<Guid, string?> ReviewComments = [];
+    private readonly List<string?> CursorHistory = [null];
+    private readonly List<PublicationFilter> ActiveFilters = [];
+    private static readonly PublicationFilterOperator[] AllFilterOperators =
+    [
+        PublicationFilterOperator.Equal,
+        PublicationFilterOperator.NotEqual,
+        PublicationFilterOperator.GreaterThan,
+        PublicationFilterOperator.GreaterThanOrEqual,
+        PublicationFilterOperator.LessThan,
+        PublicationFilterOperator.LessThanOrEqual,
+        PublicationFilterOperator.StartsWith,
+        PublicationFilterOperator.Contains,
+        PublicationFilterOperator.IsNull,
+        PublicationFilterOperator.IsNotNull,
+    ];
+    private static readonly Dictionary<string, SpreadsheetCellType> CellTypes =
+        new Dictionary<string, SpreadsheetCellType>(StringComparer.Ordinal)
+        {
+            [LookupCellType] = SpreadsheetCellType.Create<PublicationLookupCellRenderer, PublicationLookupCellEditor>(),
+        };
+
+    [Parameter]
+    public Guid PublicationId { get; set; }
+
+    private PublicationDetailDto? Publication { get; set; }
+    private PublicationVersionDto? Version { get; set; }
+    private PublicationSpreadsheetContext? SpreadsheetContext { get; set; }
+    private Workbook? Workbook { get; set; }
+    private RadzenSpreadsheet? Spreadsheet { get; set; }
+    private List<EditorRowModel> Rows { get; set; } = [];
+    private IReadOnlyList<PublicationColumnDto> Columns { get; set; } = [];
+    private IReadOnlyList<PublicationChangeSetDto> ChangeSets { get; set; } = [];
+    private PublicationChangeSetDetailDto? InspectedChangeSet { get; set; }
+    private IReadOnlyList<PublicationRole> Roles { get; set; } = [];
+    private string? NextCursor { get; set; }
+    private string? Error { get; set; }
+    private bool Loading { get; set; }
+    private bool Busy { get; set; }
+    private bool CanInsert { get; set; }
+    private bool CanUpdate { get; set; }
+    private bool CanDelete { get; set; }
+    private bool CanApprove { get; set; }
+    private string? FilterColumnAlias { get; set; }
+    private PublicationFilterOperator FilterOperator { get; set; } = PublicationFilterOperator.Equal;
+    private string FilterValue { get; set; } = string.Empty;
+    private string? SortColumnAlias { get; set; }
+    private bool SortDescending { get; set; }
+
+    private IReadOnlyList<PublicationFilterOperator> AvailableFilterOperators
+    {
+        get
+        {
+            var selected = Columns.FirstOrDefault(column => string.Equals(
+                column.PublicAlias,
+                FilterColumnAlias,
+                StringComparison.OrdinalIgnoreCase));
+            return selected?.DataType == PublicationDataType.String
+                ? AllFilterOperators
+                : AllFilterOperators.Where(operation => operation is not PublicationFilterOperator.StartsWith and not PublicationFilterOperator.Contains).ToArray();
+        }
+    }
+
+    private string PermissionSummary => string.Join(
+        " · ",
+        new[]
+        {
+            "View",
+            CanInsert ? "Insert" : null,
+            CanUpdate ? "Update" : null,
+            CanDelete ? "Delete" : null,
+            CanApprove ? "Approve" : null,
+        }.Where(value => value is not null));
+
+    protected override async Task OnParametersSetAsync()
+    {
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        Loading = true;
+        Error = null;
+        try
+        {
+            var authentication = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+            Roles = RoleResolver.Resolve(authentication.User);
+            var view = await AuthorizationService.AuthorizeAsync(
+                PublicationId,
+                Roles,
+                PublicationOperation.View,
+                cancellation.Token);
+            if (!view.IsSuccess)
+            {
+                Error = view.Problem?.Message ?? "Your roles do not grant access to this publication.";
+                return;
+            }
+
+            var detail = await Catalog.GetAsync(PublicationId, cancellation.Token);
+            if (!detail.IsSuccess || detail.Value is null)
+            {
+                Error = detail.Problem?.Message ?? "The publication was not found.";
+                return;
+            }
+
+            Publication = detail.Value;
+            if (Publication.Kind != PublicationKind.Editor ||
+                Publication.State != PublicationState.Active ||
+                Publication.ActiveVersionId is not Guid versionId)
+            {
+                Error = "This route requires an active spreadsheet-editor publication.";
+                return;
+            }
+
+            var version = await Catalog.GetVersionAsync(PublicationId, versionId, cancellation.Token);
+            if (!version.IsSuccess || version.Value is null)
+            {
+                Error = version.Problem?.Message ?? "The active schema version is unavailable.";
+                return;
+            }
+
+            Version = version.Value;
+            Columns = Version.Columns.Where(column => column.IsReadable).OrderBy(column => column.Ordinal).ToArray();
+            SpreadsheetContext = new PublicationSpreadsheetContext(DataService, PublicationId, Roles, Columns);
+            CanInsert = await IsAllowedAsync(PublicationOperation.Insert);
+            CanUpdate = await IsAllowedAsync(PublicationOperation.Update);
+            CanDelete = await IsAllowedAsync(PublicationOperation.Delete);
+            CanApprove = await IsAllowedAsync(PublicationOperation.Approve);
+            CursorHistory.Clear();
+            CursorHistory.Add(null);
+            await LoadWindowAsync(null);
+            await LoadChangeSetsAsync();
+        }
+        catch (OperationCanceledException) when (cancellation.IsCancellationRequested)
+        {
+        }
+        catch (Exception)
+        {
+            Error = "The governed editor is temporarily unavailable.";
+        }
+        finally
+        {
+            Loading = false;
+        }
+    }
+
+    private async Task<bool> IsAllowedAsync(PublicationOperation operation)
+    {
+        var authorization = await AuthorizationService.AuthorizeAsync(
+            PublicationId,
+            Roles,
+            operation,
+            cancellation.Token);
+        return authorization.IsSuccess;
+    }
+
+    private async Task LoadWindowAsync(string? cursor)
+    {
+        if (Version is null)
+        {
+            return;
+        }
+
+        var result = await DataService.ReadEditorRowsAsync(
+            PublicationId,
+            Roles,
+            new PublicationEditorRowsQuery(
+                Version.Settings.EditorWindowSize,
+                cursor,
+                ActiveFilters.ToArray(),
+                string.IsNullOrWhiteSpace(SortColumnAlias)
+                    ? []
+                    : [new PublicationSort(SortColumnAlias, SortDescending)]),
+            cancellation.Token);
+        if (!result.IsSuccess || result.Value is null)
+        {
+            Error = result.Problem?.Message ?? "The data window could not be loaded.";
+            return;
+        }
+
+        Rows = result.Value.Rows.Select(row =>
+        {
+            var original = row.Values.ToDictionary(item => item.Key, item => item.Value, StringComparer.Ordinal);
+            return new EditorRowModel(original, new Dictionary<string, object?>(original, StringComparer.Ordinal), false);
+        }).ToList();
+        NextCursor = result.Value.NextCursor;
+        if (SpreadsheetContext is not null)
+        {
+            var labelError = await SpreadsheetContext.ResolveLoadedLabelsAsync(
+                Rows.Select(row => (IReadOnlyDictionary<string, object?>)row.CurrentValues).ToArray(),
+                cancellation.Token);
+            if (labelError is not null)
+            {
+                Error = labelError;
+                Workbook = null;
+                return;
+            }
+        }
+        await BuildWorkbookAsync();
+    }
+
+    private async Task BuildWorkbookAsync()
+    {
+        if (Version is null || Columns.Count == 0)
+        {
+            Workbook = null;
+            return;
+        }
+
+        var workbook = new Workbook
+        {
+            Culture = CultureInfo.InvariantCulture,
+            Protection = new WorkbookProtection { LockStructure = true },
+        };
+        var sheet = workbook.AddSheet(
+            CreateSheetName(Publication?.Name),
+            Math.Max(2, Rows.Count + 1),
+            Columns.Count);
+        sheet.Rows.Frozen = 1;
+        sheet.Protection = new SheetProtection
+        {
+            IsProtected = true,
+            AllowSelectLockedCells = true,
+            AllowSelectUnlockedCells = true,
+        };
+
+        for (var columnIndex = 0; columnIndex < Columns.Count; columnIndex++)
+        {
+            var column = Columns[columnIndex];
+            sheet.Columns[columnIndex] = Math.Clamp(column.PublicAlias.Length * 9d + 48d, 120d, 260d);
+            var header = sheet.Cells[0, columnIndex];
+            header.Value = column.ForeignKey is null ? column.PublicAlias : $"{column.PublicAlias} ▾";
+            header.Format = new Radzen.Documents.Spreadsheet.Format
+            {
+                Bold = true,
+                Locked = true,
+                BackgroundColor = "#E8EEF8",
+                Color = "#172033",
+            };
+        }
+
+        for (var rowIndex = 0; rowIndex < Rows.Count; rowIndex++)
+        {
+            var model = Rows[rowIndex];
+            for (var columnIndex = 0; columnIndex < Columns.Count; columnIndex++)
+            {
+                var column = Columns[columnIndex];
+                model.CurrentValues.TryGetValue(column.PublicAlias, out var value);
+                var cell = sheet.Cells[rowIndex + 1, columnIndex];
+                cell.Value = PublicationSpreadsheetChangeMapper.ToSpreadsheetValue(value, column);
+                var editable = !model.IsDeleted &&
+                    (model.IsNew
+                        ? CanInsert && PublicationSpreadsheetChangeMapper.CanSupplyOnInsert(column)
+                        : CanUpdate && PublicationSpreadsheetChangeMapper.CanSetOnUpdate(column));
+                cell.Format = new Radzen.Documents.Spreadsheet.Format
+                {
+                    Locked = !editable,
+                    BackgroundColor = model.IsDeleted
+                        ? "#FDECEC"
+                        : model.IsNew
+                            ? "#ECF8F2"
+                            : editable ? "#FFFFFF" : "#F5F7FA",
+                    Color = model.IsDeleted ? "#8D2635" : null,
+                };
+                if (column.ForeignKey is not null)
+                {
+                    sheet.Cells.SetCustomType(new CellRef(rowIndex + 1, columnIndex), LookupCellType);
+                }
+            }
+        }
+
+        Workbook = workbook;
+        if (Spreadsheet is not null)
+        {
+            await Spreadsheet.LoadWorkbookAsync(workbook);
+        }
+    }
+
+    private async Task AddRowAsync()
+    {
+        if (!CanInsert)
+        {
+            return;
+        }
+
+        if (!await CaptureWorkbookAsync())
+        {
+            return;
+        }
+
+        var values = Columns.ToDictionary(column => column.PublicAlias, _ => (object?)null, StringComparer.Ordinal);
+        Rows.Add(new EditorRowModel(null, values, true));
+        await BuildWorkbookAsync();
+        Workbook?.Sheets[0].Selection.Select(new CellRef(Rows.Count, 0));
+    }
+
+    private async Task ToggleDeleteAsync()
+    {
+        if (Workbook is null || !await CaptureWorkbookAsync())
+        {
+            return;
+        }
+
+        var selectedRow = Workbook.Sheets[0].Selection.Cell.Row;
+        if (selectedRow < 1 || selectedRow > Rows.Count)
+        {
+            Notify(false, "Select a data row before toggling deletion.");
+            return;
+        }
+
+        var model = Rows[selectedRow - 1];
+        if (model.IsNew)
+        {
+            if (!CanInsert)
+            {
+                return;
+            }
+            Rows.RemoveAt(selectedRow - 1);
+        }
+        else
+        {
+            if (!CanDelete)
+            {
+                return;
+            }
+            model.IsDeleted = !model.IsDeleted;
+        }
+
+        await BuildWorkbookAsync();
+    }
+
+    private async Task StageAsync()
+    {
+        if (Version is null || !await CaptureWorkbookAsync())
+        {
+            return;
+        }
+
+        var mapped = PublicationSpreadsheetChangeMapper.Build(
+            Version,
+            Rows.Select(row => new PublicationSpreadsheetRow(
+                row.OriginalValues,
+                row.CurrentValues,
+                row.IsNew,
+                row.IsDeleted)).ToArray());
+        if (!mapped.IsSuccess)
+        {
+            Notify(false, mapped.Error!);
+            return;
+        }
+
+        if (mapped.Changes.Count == 0)
+        {
+            Notify(false, "This window has no changes to stage.");
+            return;
+        }
+
+        Busy = true;
+        try
+        {
+            var actor = (await AuthenticationStateProvider.GetAuthenticationStateAsync()).User.Identity?.Name ?? "unknown";
+            var result = await EditorService.StageAsync(
+                new StagePublicationChangeSetCommand(PublicationId, Roles, mapped.Changes, actor),
+                cancellation.Token);
+            if (!result.IsSuccess || result.Value is null)
+            {
+                Notify(false, result.Problem?.Message ?? "The changes could not be staged.");
+                return;
+            }
+
+            Notify(true, $"Change set {result.Value.Id:N} was staged with {result.Value.ChangeCount} changes.");
+            await LoadWindowAsync(CursorHistory[^1]);
+            await LoadChangeSetsAsync();
+        }
+        finally
+        {
+            Busy = false;
+        }
+    }
+
+    private async Task<bool> CaptureWorkbookAsync()
+    {
+        if (Spreadsheet is not null)
+        {
+            await Spreadsheet.AcceptAsync();
+        }
+        if (Workbook is null)
+        {
+            return false;
+        }
+
+        var sheet = Workbook.Sheets[0];
+        for (var rowIndex = 0; rowIndex < Rows.Count; rowIndex++)
+        {
+            for (var columnIndex = 0; columnIndex < Columns.Count; columnIndex++)
+            {
+                var cell = sheet.Cells[rowIndex + 1, columnIndex];
+                if (!string.IsNullOrEmpty(cell.Formula))
+                {
+                    Notify(false, $"Formulas are not accepted in governed data (row {rowIndex + 1}, column {Columns[columnIndex].PublicAlias}).");
+                    return false;
+                }
+                Rows[rowIndex].CurrentValues[Columns[columnIndex].PublicAlias] = cell.Value;
+            }
+        }
+
+        return true;
+    }
+
+    private async Task NextWindowAsync()
+    {
+        if (NextCursor is null || !await EnsureCleanWindowAsync())
+        {
+            return;
+        }
+
+        CursorHistory.Add(NextCursor);
+        await RunBusyAsync(() => LoadWindowAsync(CursorHistory[^1]));
+    }
+
+    private async Task PreviousWindowAsync()
+    {
+        if (CursorHistory.Count <= 1 || !await EnsureCleanWindowAsync())
+        {
+            return;
+        }
+
+        CursorHistory.RemoveAt(CursorHistory.Count - 1);
+        await RunBusyAsync(() => LoadWindowAsync(CursorHistory[^1]));
+    }
+
+    private Task ReloadWindowAsync() => RunBusyAsync(() => LoadWindowAsync(CursorHistory[^1]));
+
+    private async Task AddFilterAsync()
+    {
+        if (string.IsNullOrWhiteSpace(FilterColumnAlias) ||
+            Columns.All(column => !string.Equals(
+                column.PublicAlias,
+                FilterColumnAlias,
+                StringComparison.OrdinalIgnoreCase) || !column.IsFilterable))
+        {
+            Notify(false, "Select an approved filter column.");
+            return;
+        }
+
+        var value = FilterOperator is PublicationFilterOperator.IsNull or PublicationFilterOperator.IsNotNull
+            ? null
+            : FilterValue;
+        if (value is not null && string.IsNullOrWhiteSpace(value))
+        {
+            Notify(false, "Enter a filter value or select a null operator.");
+            return;
+        }
+
+        if (ActiveFilters.Count >= 16)
+        {
+            Notify(false, "At most 16 server-side filters can be active.");
+            return;
+        }
+
+        if (!await EnsureCleanWindowAsync())
+        {
+            return;
+        }
+
+        ActiveFilters.Add(new PublicationFilter(FilterColumnAlias, FilterOperator, value));
+        FilterValue = string.Empty;
+        await ResetQueryWindowAsync();
+    }
+
+    private void FilterColumnChanged()
+    {
+        if (!AvailableFilterOperators.Contains(FilterOperator))
+        {
+            FilterOperator = PublicationFilterOperator.Equal;
+        }
+    }
+
+    private async Task RemoveFilterAsync(int index)
+    {
+        if (index < 0 || index >= ActiveFilters.Count || !await EnsureCleanWindowAsync())
+        {
+            return;
+        }
+
+        ActiveFilters.RemoveAt(index);
+        await ResetQueryWindowAsync();
+    }
+
+    private async Task ClearFiltersAsync()
+    {
+        if (ActiveFilters.Count == 0 || !await EnsureCleanWindowAsync())
+        {
+            return;
+        }
+
+        ActiveFilters.Clear();
+        await ResetQueryWindowAsync();
+    }
+
+    private async Task ApplyQueryAsync()
+    {
+        if (!await EnsureCleanWindowAsync())
+        {
+            return;
+        }
+
+        await ResetQueryWindowAsync();
+    }
+
+    private async Task ResetQueryWindowAsync()
+    {
+        CursorHistory.Clear();
+        CursorHistory.Add(null);
+        await RunBusyAsync(() => LoadWindowAsync(null));
+    }
+
+    private async Task<bool> EnsureCleanWindowAsync()
+    {
+        if (Version is null || !await CaptureWorkbookAsync())
+        {
+            return false;
+        }
+        var mapped = PublicationSpreadsheetChangeMapper.Build(
+            Version,
+            Rows.Select(row => new PublicationSpreadsheetRow(row.OriginalValues, row.CurrentValues, row.IsNew, row.IsDeleted)).ToArray());
+        if (!mapped.IsSuccess || mapped.Changes.Count > 0)
+        {
+            Notify(false, mapped.Error ?? "Stage or discard this window's changes before paging.");
+            return false;
+        }
+        return true;
+    }
+
+    private async Task LoadChangeSetsAsync()
+    {
+        var result = await ChangeSetService.ListAsync(
+            new PublicationChangeSetListQuery(PublicationId, Roles, Take: 50),
+            cancellation.Token);
+        if (result.IsSuccess && result.Value is not null)
+        {
+            ChangeSets = result.Value.Items;
+            foreach (var changeSet in ChangeSets)
+            {
+                ReviewComments.TryAdd(changeSet.Id, null);
+            }
+
+            if (InspectedChangeSet is not null &&
+                ChangeSets.All(changeSet => changeSet.Id != InspectedChangeSet.Id))
+            {
+                InspectedChangeSet = null;
+            }
+        }
+    }
+
+    private async Task LoadChangeSetDetailAsync(Guid changeSetId)
+    {
+        Busy = true;
+        try
+        {
+            var result = await ChangeSetService.GetAsync(
+                PublicationId,
+                changeSetId,
+                Roles,
+                cancellation.Token);
+            if (!result.IsSuccess || result.Value is null)
+            {
+                InspectedChangeSet = null;
+                Notify(false, result.Problem?.Message ?? "The change-set details could not be loaded.");
+                return;
+            }
+
+            InspectedChangeSet = result.Value;
+            ReviewComments.TryAdd(changeSetId, null);
+        }
+        finally
+        {
+            Busy = false;
+        }
+    }
+
+    private async Task ReviewAsync(Guid changeSetId, PublicationChangeReviewDecision decision)
+    {
+        if (InspectedChangeSet?.Id != changeSetId)
+        {
+            Notify(false, "Inspect the current keys and before/after values before reviewing this change set.");
+            return;
+        }
+
+        ReviewComments.TryGetValue(changeSetId, out var comment);
+        if (decision == PublicationChangeReviewDecision.Reject && string.IsNullOrWhiteSpace(comment))
+        {
+            Notify(false, "A rejection reason is required.");
+            return;
+        }
+
+        Busy = true;
+        try
+        {
+            var actor = (await AuthenticationStateProvider.GetAuthenticationStateAsync()).User.Identity?.Name ?? "unknown";
+            var result = await EditorService.ReviewAsync(
+                new ReviewPublicationChangeSetCommand(PublicationId, changeSetId, Roles, decision, comment, actor),
+                cancellation.Token);
+            Notify(result.IsSuccess, result.Problem?.Message ?? $"Change set {decision.ToString().ToLowerInvariant()}d.");
+            InspectedChangeSet = null;
+            await LoadChangeSetsAsync();
+        }
+        finally
+        {
+            Busy = false;
+        }
+    }
+
+    private Task RefreshAsync() => LoadAsync();
+
+    private async Task RunBusyAsync(Func<Task> action)
+    {
+        Busy = true;
+        try { await action(); }
+        finally { Busy = false; }
+    }
+
+    private void Notify(bool success, string detail) => Notifications.Notify(new NotificationMessage
+    {
+        Severity = success ? NotificationSeverity.Success : NotificationSeverity.Error,
+        Summary = success ? "Publication editor" : "Editor operation failed",
+        Detail = detail,
+        Duration = 6_000,
+    });
+
+    private static string ChangeSetCss(PublicationChangeSetStatus status) => status switch
+    {
+        PublicationChangeSetStatus.Applied => string.Empty,
+        PublicationChangeSetStatus.Rejected or PublicationChangeSetStatus.Conflict or PublicationChangeSetStatus.Failed => "failed",
+        _ => "draft",
+    };
+
+    private static string FilterOperatorLabel(PublicationFilterOperator operation) => operation switch
+    {
+        PublicationFilterOperator.Equal => "equals",
+        PublicationFilterOperator.NotEqual => "does not equal",
+        PublicationFilterOperator.GreaterThan => "is greater than",
+        PublicationFilterOperator.GreaterThanOrEqual => "is at least",
+        PublicationFilterOperator.LessThan => "is less than",
+        PublicationFilterOperator.LessThanOrEqual => "is at most",
+        PublicationFilterOperator.StartsWith => "starts with",
+        PublicationFilterOperator.Contains => "contains",
+        PublicationFilterOperator.IsNull => "is null",
+        PublicationFilterOperator.IsNotNull => "is not null",
+        _ => operation.ToString(),
+    };
+
+    private static string CreateSheetName(string? name)
+    {
+        var source = string.IsNullOrWhiteSpace(name) ? "Published data" : name.Trim();
+        var safe = new string(source.Select(character => character is ':' or '\\' or '/' or '?' or '*' or '[' or ']'
+            ? '_'
+            : character).ToArray()).Trim('\'');
+        return string.IsNullOrWhiteSpace(safe) ? "Published data" : safe[..Math.Min(31, safe.Length)];
+    }
+
+    public void Dispose()
+    {
+        cancellation.Cancel();
+        cancellation.Dispose();
+    }
+
+    private sealed class EditorRowModel(
+        IReadOnlyDictionary<string, object?>? originalValues,
+        Dictionary<string, object?> currentValues,
+        bool isNew)
+    {
+        public IReadOnlyDictionary<string, object?>? OriginalValues { get; } = originalValues;
+        public Dictionary<string, object?> CurrentValues { get; } = currentValues;
+        public bool IsNew { get; } = isNew;
+        public bool IsDeleted { get; set; }
+    }
+}

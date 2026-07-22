@@ -16,11 +16,13 @@ public sealed class SqlWorkflowScheduleSource(
         return await db.Workflows
             .AsNoTracking()
             .Where(workflow => workflow.Status == WorkflowStatus.Published
+                && workflow.PublishedVersionId != null
+                && workflow.PublishedVersionNumber != null
                 && workflow.CronExpression != null)
             .OrderBy(workflow => workflow.Id)
             .Select(workflow => new WorkflowSchedule(
                 workflow.Id,
-                workflow.Version,
+                workflow.PublishedVersionNumber!.Value,
                 workflow.CronExpression!,
                 workflow.TimeZoneId,
                 workflow.NextRunAtUtc))

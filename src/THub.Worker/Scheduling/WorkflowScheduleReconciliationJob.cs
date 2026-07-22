@@ -33,10 +33,9 @@ public sealed class WorkflowScheduleReconciliationJob(
             {
                 logger.LogError(
                     exception,
-                    "Could not reconcile the Quartz schedule for workflow {WorkflowId} version {WorkflowVersion}.",
+                    "Could not reconcile the Quartz schedule for workflow {WorkflowId} version {WorkflowVersion}. The last known Quartz schedule was preserved.",
                     schedule.WorkflowId,
                     schedule.WorkflowVersion);
-                await context.Scheduler.DeleteJob(jobKey, cancellationToken);
             }
         }
 

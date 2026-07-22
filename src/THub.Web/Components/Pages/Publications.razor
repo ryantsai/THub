@@ -1,10 +1,744 @@
 @page "/publications"
 @attribute [Authorize(Policy = Permissions.PublicationManage)]
+@implements IDisposable
+@using THub.Application.Connections
+@using THub.Application.Publications
+@using THub.Domain.Connections
+@using THub.Domain.Publications
+@inject PublicationCatalogService Catalog
+@inject PublicationTokenService TokenService
+@inject PublicationGrantManagementService GrantService
+@inject PublicationSourceInspectionService SourceInspection
+@inject ConnectionManagementService ConnectionService
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject NotificationService Notifications
+@inject TimeProvider TimeProvider
 
 <PageTitle>Publications · THub</PageTitle>
-<div class="page-heading"><div><div class="eyebrow">Controlled access</div><h1>Data publications</h1><p>Expose approved tables through governed REST endpoints or browser editors.</p></div><div class="heading-actions"><RadzenButton Text="New publication" Icon="add" ButtonStyle="ButtonStyle.Primary" /></div></div>
-<section class="panel"><div class="panel-head"><div><h2>Published surfaces</h2><p>Every route enforces an explicit read/write policy</p></div><span class="status-chip draft">Design contract</span></div><table class="activity-table"><thead><tr><th>Name</th><th>Source</th><th>Mode</th><th>Access</th><th>State</th></tr></thead><tbody>
-<tr><td><strong>Customer lookup</strong></td><td>SalesWarehouse.dbo.Customers</td><td>REST · read only</td><td class="muted">API key + policy</td><td><span class="status-chip draft">Proposed</span></td></tr>
-<tr><td><strong>Product stewardship</strong></td><td>SalesWarehouse.dbo.Products</td><td>Editor · read/write</td><td class="muted">Windows role</td><td><span class="status-chip draft">Proposed</span></td></tr>
-</tbody></table></section>
 
+<div class="page-heading">
+    <div><div class="eyebrow">Controlled access</div><h1>Data publications</h1><p>Versioned, bounded SQL surfaces for read-only REST clients and governed spreadsheet edits.</p></div>
+    <div class="heading-actions">
+        <RadzenButton Text="New publication" Icon="add" ButtonStyle="ButtonStyle.Primary" Click="@StartCreate" Disabled="@Busy" />
+        <RadzenButton Text="Refresh" Icon="refresh" ButtonStyle="ButtonStyle.Light" Click="@LoadAsync" Disabled="@Busy" />
+    </div>
+</div>
+
+@if (CreateVisible)
+{
+    <section class="panel publication-create">
+        <div class="panel-head"><div><h2>Create governed surface</h2><p>The route kind cannot change after creation.</p></div><button class="icon-close" type="button" @onclick="() => CreateVisible = false">×</button></div>
+        <div class="inline-form three">
+            <label><span>Name</span><input maxlength="200" @bind="CreateName" /></label>
+            <label><span>Route slug</span><input maxlength="100" placeholder="customer-lookup" @bind="CreateSlug" /></label>
+            <label><span>Kind</span><select @bind="CreateKind"><option value="@PublicationKind.RestApi">REST API · read only</option><option value="@PublicationKind.Editor">Spreadsheet editor · staged</option></select></label>
+        </div>
+        <div class="form-actions"><RadzenButton Text="Cancel" ButtonStyle="ButtonStyle.Light" Click="@(() => CreateVisible = false)" /><RadzenButton Text="Create" Icon="add" ButtonStyle="ButtonStyle.Primary" Click="@CreateAsync" Disabled="@Busy" /></div>
+    </section>
+}
+
+<section class="panel">
+    <div class="panel-head"><div><h2>Published surfaces</h2><p>@Items.Count resources · routes expose no caller-selected database identifiers</p></div></div>
+    @if (Loading)
+    {
+        <div class="page-state"><RadzenProgressBar Mode="ProgressBarMode.Indeterminate" /><p>Loading publications…</p></div>
+    }
+    else if (Error is not null)
+    {
+        <div class="page-state error"><RadzenIcon Icon="error_outline" /><p>@Error</p><button type="button" @onclick="LoadAsync">Try again</button></div>
+    }
+    else if (Items.Count == 0)
+    {
+        <div class="page-state"><RadzenIcon Icon="dataset" /><h3>No publications yet</h3><p>Create a resource, discover an approved SQL object, review its columns and foreign keys, then activate an immutable version.</p></div>
+    }
+    else
+    {
+        <div class="table-scroll">
+            <table class="activity-table">
+                <thead><tr><th>Name</th><th>Route</th><th>Mode</th><th>State</th><th>Updated</th><th></th></tr></thead>
+                <tbody>
+                    @foreach (var publication in Items)
+                    {
+                        <tr class="@(Selected?.Id == publication.Id ? "selected" : null)">
+                            <td><strong>@publication.Name</strong></td>
+                            <td><code>@publication.Slug</code></td>
+                            <td>@(publication.Kind == PublicationKind.RestApi ? "REST · read only" : "Spreadsheet · staged writes")</td>
+                            <td><span class="status-chip @StateCss(publication.State)">@publication.State</span></td>
+                            <td class="muted">@publication.UpdatedAtUtc.ToLocalTime().ToString("g")</td>
+                            <td class="publication-actions"><button type="button" @onclick="() => SelectAsync(publication.Id)">Manage</button>@if (publication.Kind == PublicationKind.Editor && publication.State == PublicationState.Active){<a href="@($"/editor/{publication.Id}")">Open editor</a>}</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+</section>
+
+@if (Selected is not null)
+{
+    <section class="panel publication-detail">
+        <div class="panel-head"><div><h2>@Selected.Name</h2><p>@Selected.Kind · @Selected.Slug · created by @Selected.CreatedBy</p></div><div class="detail-head-actions">@if (Selected.State == PublicationState.Active){<RadzenButton Text="Disable" Icon="pause_circle" Size="ButtonSize.Small" ButtonStyle="ButtonStyle.Light" Click="@DisableAsync" Disabled="@Busy" />}@if (Selected.Kind == PublicationKind.Editor && Selected.State == PublicationState.Active){<a class="button-link" href="@($"/editor/{Selected.Id}")">Open spreadsheet</a>}</div></div>
+        <div class="publication-facts">
+            <div><span>State</span><strong>@Selected.State</strong></div>
+            <div><span>Active version</span><strong>@(Selected.ActiveVersionId is null ? "None" : Selected.Versions.FirstOrDefault(version => version.Id == Selected.ActiveVersionId)?.VersionNumber.ToString() ?? "Unknown")</strong></div>
+            <div><span>Versions</span><strong>@Selected.Versions.Count</strong></div>
+            <div><span>Public route</span><code>@RouteText(Selected)</code></div>
+        </div>
+
+        <div class="detail-tabs">
+            <button class="@(SelectedTab == DetailTab.Source ? "active" : null)" type="button" @onclick="() => SelectedTab = DetailTab.Source">Source & versions</button>
+            @if (Selected.Kind == PublicationKind.RestApi)
+            {
+                <button class="@(SelectedTab == DetailTab.Tokens ? "active" : null)" type="button" @onclick="OpenTokensAsync">Bearer tokens</button>
+            }
+            else
+            {
+                <button class="@(SelectedTab == DetailTab.Grants ? "active" : null)" type="button" @onclick="OpenGrantsAsync">Role grants</button>
+            }
+        </div>
+
+        @if (SelectedTab == DetailTab.Source)
+        {
+            <div class="detail-section">
+                <div class="section-heading"><div><h3>Immutable source versions</h3><p>Schema and column policy are rediscovered and reviewed for every version.</p></div><RadzenButton Text="Discover source" Icon="travel_explore" Size="ButtonSize.Small" ButtonStyle="ButtonStyle.Primary" Click="@StartVersion" Disabled="@Busy" /></div>
+                @if (VersionVisible)
+                {
+                    <div class="version-wizard">
+                        <div class="inline-form source-select">
+                            <label><span>Approved SQL connection</span><select @bind="VersionConnectionId"><option value="@Guid.Empty">Select connection…</option>@foreach (var connection in SqlConnections){<option value="@connection.Id">@connection.Name</option>}</select></label>
+                            <div class="field-button"><RadzenButton Text="List tables and views" Icon="search" ButtonStyle="ButtonStyle.Light" Click="@DiscoverObjectsAsync" Disabled="@(Busy || VersionConnectionId == Guid.Empty)" /></div>
+                            @if (SourceObjects.Count > 0)
+                            {
+                                <label><span>Source object</span><select @bind="SelectedObjectKey"><option value="">Select object…</option>@foreach (var source in SourceObjects){<option value="@ObjectKey(source)">@source.Schema.@source.Name (@source.Kind)</option>}</select></label>
+                                <div class="field-button"><RadzenButton Text="Inspect schema" Icon="fact_check" ButtonStyle="ButtonStyle.Light" Click="@InspectObjectAsync" Disabled="@(Busy || string.IsNullOrEmpty(SelectedObjectKey))" /></div>
+                            }
+                        </div>
+
+                        @if (Inspection is not null)
+                        {
+                            <div class="inspection-summary"><RadzenIcon Icon="verified" /><span><strong>@Inspection.Schema.@Inspection.Name</strong> · @Inspection.Columns.Count columns · @Inspection.ForeignKeys.Count foreign keys · fingerprint @Inspection.SchemaFingerprint[..Math.Min(12, Inspection.SchemaFingerprint.Length)]…</span></div>
+                            @if (!Inspection.Columns.Any(column => column.IsKey))
+                            {
+                                <div class="form-warning"><RadzenIcon Icon="warning" />A stable primary key is required for bounded paging; this object cannot be published.</div>
+                            }
+                            <div class="table-scroll policy-table-wrap">
+                                <table class="policy-table"><thead><tr><th>Include</th><th>Source column</th><th>Public alias</th><th>Type</th><th>Read</th><th>Filter</th><th>Sort</th><th>Write</th><th>Detected policy</th></tr></thead><tbody>
+                                @foreach (var column in ColumnPolicies)
+                                {
+                                    <tr class="@(!column.IsSupported ? "unsupported" : null)">
+                                        <td><input type="checkbox" @bind="column.Include" disabled="@(!column.IsSupported || column.IsKey)" /></td>
+                                        <td><strong>@column.SourceName</strong></td>
+                                        <td><input class="alias-input" maxlength="100" @bind="column.PublicAlias" disabled="@(!column.Include)" /></td>
+                                        <td>@column.SourceTypeName</td>
+                                        <td><input type="checkbox" @bind="column.IsReadable" disabled="@(!column.Include || column.IsKey)" /></td>
+                                        <td><input type="checkbox" @bind="column.IsFilterable" disabled="@(!column.Include || !column.IsReadable)" /></td>
+                                        <td><input type="checkbox" @bind="column.IsSortable" disabled="@(!column.Include || !column.IsReadable || column.IsKey)" /></td>
+                                        <td><input type="checkbox" @bind="column.IsWritable" disabled="@(!CanWriteColumn(column))" /></td>
+                                        <td><span class="policy-flags">@(column.IsKey ? $"Key {column.KeyOrdinal}" : null) @(column.IsRowVersion ? "RowVersion" : null) @(column.IsGenerated ? "Generated" : null) @(column.ForeignKey is null ? null : $"FK → {column.ForeignKey.ReferencedSchema}.{column.ForeignKey.ReferencedObject}") @(!column.IsSupported ? "Unsupported" : null)</span></td>
+                                    </tr>
+                                }
+                                </tbody></table>
+                            </div>
+                            @if (ForeignKeyPolicies.Count > 0)
+                            {
+                                <section class="foreign-key-policy" aria-label="Foreign-key lookup approvals">
+                                    <div class="foreign-key-policy-head">
+                                        <div><h4>Foreign-key lookup policy</h4><p>Detected display and search suggestions are not saved. An administrator must approve each lookup and select every exposed column explicitly.</p></div>
+                                        <span>@ForeignKeyPolicies.Count detected</span>
+                                    </div>
+                                    @foreach (var foreignKey in ForeignKeyPolicies)
+                                    {
+                                        <fieldset>
+                                            <legend>
+                                                <label><input type="checkbox" @bind="foreignKey.IsApproved" /> Approve lookup</label>
+                                                <span>@foreignKey.ConstraintName · @foreignKey.LocalMapping</span>
+                                            </legend>
+                                            <p class="lookup-suggestion">Inspector suggestion only: display <strong>@foreignKey.RecommendedDisplayColumn</strong>, mode <strong>@foreignKey.RecommendedLookupMode</strong>.</p>
+                                            <div class="foreign-key-controls">
+                                                <label><span>Approved display column</span><select @bind="foreignKey.DisplayColumn" disabled="@(!foreignKey.IsApproved)"><option value="">Select explicitly…</option>@foreach (var candidate in foreignKey.DisplayCandidates){<option value="@candidate">@candidate</option>}</select></label>
+                                                <label><span>Lookup mode</span><select @bind="foreignKey.LookupMode" disabled="@(!foreignKey.IsApproved)"><option value="@PublicationLookupMode.DropDown">Bounded dropdown</option><option value="@PublicationLookupMode.ServerFiltered">Server filtered</option></select></label>
+                                            </div>
+                                            <div class="search-column-choices" aria-label="Approved search columns">
+                                                <span>Approved search columns</span>
+                                                @foreach (var candidate in foreignKey.SearchCandidates)
+                                                {
+                                                    <label><input type="checkbox" checked="@foreignKey.IsSearchColumnApproved(candidate)" @onchange="args => foreignKey.SetSearchColumn(candidate, args.Value is true)" disabled="@(!foreignKey.IsApproved)" /> @candidate</label>
+                                                }
+                                            </div>
+                                        </fieldset>
+                                    }
+                                </section>
+                            }
+                            <div class="inline-form settings-grid">
+                                <label><span>Default page rows</span><input type="number" min="1" max="1000" @bind="VersionSettings.DefaultPageSize" /></label>
+                                <label><span>Maximum page rows</span><input type="number" min="1" max="1000" @bind="VersionSettings.MaximumPageSize" /></label>
+                                <label><span>Requests / window</span><input type="number" min="1" max="100000" @bind="VersionSettings.RequestsPerWindow" /></label>
+                                <label><span>Window seconds</span><input type="number" min="1" max="3600" @bind="VersionSettings.RateLimitWindowSeconds" /></label>
+                                <label><span>Concurrent requests</span><input type="number" min="1" max="100" @bind="VersionSettings.MaximumConcurrentRequests" /></label>
+                                <label><span>Editor window rows</span><input type="number" min="1" max="1000" @bind="VersionSettings.EditorWindowSize" disabled="@(Selected.Kind != PublicationKind.Editor)" /></label>
+                                <label><span>Request timeout seconds</span><input type="number" min="1" max="300" @bind="VersionSettings.RequestTimeoutSeconds" /></label>
+                                <label><span>SQL timeout seconds</span><input type="number" min="1" max="300" @bind="VersionSettings.CommandTimeoutSeconds" /></label>
+                                <label><span>Maximum response MiB</span><input type="number" min="1" max="100" @bind="VersionSettings.MaximumResponseMiB" /></label>
+                            </div>
+                            <div class="form-actions"><RadzenButton Text="Cancel" ButtonStyle="ButtonStyle.Light" Click="@(() => VersionVisible = false)" /><RadzenButton Text="Create and activate version" Icon="publish" ButtonStyle="ButtonStyle.Success" Click="@CreateVersionAsync" Disabled="@Busy" /></div>
+                        }
+                    </div>
+                }
+
+                @if (Selected.Versions.Count == 0)
+                {
+                    <div class="page-state compact"><p>No source version exists. Discover an approved SQL table or view to continue.</p></div>
+                }
+                else
+                {
+                    <table class="activity-table"><thead><tr><th>Version</th><th>Source</th><th>Concurrency</th><th>Created</th><th>State</th><th></th></tr></thead><tbody>@foreach (var version in Selected.Versions.OrderByDescending(version => version.VersionNumber)){<tr><td><strong>v@(version.VersionNumber)</strong></td><td>@version.SourceSchema.@version.SourceObject</td><td>@version.ConcurrencyMode</td><td class="muted">@version.CreatedAtUtc.ToLocalTime().ToString("g")</td><td>@(Selected.ActiveVersionId == version.Id ? "Active" : "Inactive")</td><td class="publication-actions">@if (Selected.ActiveVersionId != version.Id){<button type="button" @onclick="() => ActivateAsync(version.Id)">Activate</button>}</td></tr>}</tbody></table>
+                }
+            </div>
+        }
+        else if (SelectedTab == DetailTab.Tokens)
+        {
+            <div class="detail-section">
+                <div class="section-heading"><div><h3>Opaque bearer tokens</h3><p>Each token rotates independently; plaintext is shown only once and accepted requests are metered.</p></div><RadzenButton Text="New token" Icon="key" Size="ButtonSize.Small" ButtonStyle="ButtonStyle.Primary" Click="@(() => TokenCreateVisible = true)" Disabled="@(Busy || Selected.State != PublicationState.Active)" /></div>
+                @if (CreatedToken is not null)
+                {
+                    <div class="token-once"><RadzenIcon Icon="key" /><div><strong>Copy @CreatedToken.Name now — it will not be shown again.</strong><code>@CreatedToken.PlaintextToken</code><small>Expires @CreatedToken.ExpiresAtUtc.ToLocalTime().ToString("G")</small></div><button type="button" @onclick="() => CreatedToken = null">Dismiss</button></div>
+                }
+                @if (TokenCreateVisible)
+                {
+                    <div class="inline-form token-form"><label><span>Token name</span><input maxlength="200" @bind="TokenName" /></label><label><span>Expires (local)</span><input type="datetime-local" @bind="TokenExpiresLocal" /></label><div class="field-button"><RadzenButton Text="Create token" Icon="add" ButtonStyle="ButtonStyle.Primary" Click="@CreateTokenAsync" Disabled="@Busy" /></div></div>
+                }
+                @if (Tokens.Count == 0)
+                {
+                    <div class="page-state compact"><p>No bearer tokens exist for this REST publication.</p></div>
+                }
+                else
+                {
+                    <table class="activity-table"><thead><tr><th>Name</th><th>Prefix</th><th>Status</th><th>Accepted uses</th><th>Last used</th><th>Expires</th><th></th></tr></thead><tbody>@foreach (var token in Tokens){<tr><td><strong>@token.Name</strong></td><td><code>@token.DisplayPrefix…</code></td><td><span class="status-chip @TokenCss(token.Status)">@token.Status</span></td><td class="duration">@token.AcceptedRequestCount.ToString("N0")</td><td class="muted">@(token.LastUsedAtUtc?.ToLocalTime().ToString("g") ?? "Never")</td><td class="muted">@token.ExpiresAtUtc.ToLocalTime().ToString("g")</td><td class="publication-actions">@if (token.Status != PublicationAccessTokenStatus.Revoked){<button type="button" @onclick="() => RevokeTokenAsync(token.Id)">Revoke</button>}</td></tr>}</tbody></table>
+                }
+            </div>
+        }
+        else if (SelectedTab == DetailTab.Grants)
+        {
+            <div class="detail-section">
+                <div class="section-heading"><div><h3>Editor role grants</h3><p>Management permission does not imply data access. Every load, lookup, stage, review, and apply is checked server-side.</p></div></div>
+                <table class="grant-table"><thead><tr><th>Global role</th><th>View</th><th>Insert</th><th>Update</th><th>Delete</th><th>Approve</th></tr></thead><tbody>@foreach (var grant in GrantRows){<tr><td><strong>@grant.Role</strong></td><td><input type="checkbox" @bind="grant.CanView" /></td><td><input type="checkbox" @bind="grant.CanInsert" /></td><td><input type="checkbox" @bind="grant.CanUpdate" /></td><td><input type="checkbox" @bind="grant.CanDelete" /></td><td><input type="checkbox" @bind="grant.CanApprove" /></td></tr>}</tbody></table>
+                <div class="form-actions"><RadzenButton Text="Save role grants" Icon="save" ButtonStyle="ButtonStyle.Primary" Click="@SaveGrantsAsync" Disabled="@Busy" /></div>
+            </div>
+        }
+    </section>
+}
+
+@code {
+    private readonly CancellationTokenSource cancellation = new();
+    private IReadOnlyList<PublicationSummaryDto> Items { get; set; } = [];
+    private IReadOnlyList<ConnectionSummary> SqlConnections { get; set; } = [];
+    private PublicationDetailDto? Selected { get; set; }
+    private DetailTab SelectedTab { get; set; }
+    private bool Loading { get; set; }
+    private bool Busy { get; set; }
+    private string? Error { get; set; }
+    private bool CreateVisible { get; set; }
+    private string CreateName { get; set; } = string.Empty;
+    private string CreateSlug { get; set; } = string.Empty;
+    private PublicationKind CreateKind { get; set; } = PublicationKind.RestApi;
+    private bool VersionVisible { get; set; }
+    private Guid VersionConnectionId { get; set; }
+    private IReadOnlyList<PublicationSourceObjectDto> SourceObjects { get; set; } = [];
+    private string SelectedObjectKey { get; set; } = string.Empty;
+    private PublicationSourceObjectInspectionDto? Inspection { get; set; }
+    private List<ColumnPolicyModel> ColumnPolicies { get; set; } = [];
+    private List<ForeignKeyPolicyModel> ForeignKeyPolicies { get; set; } = [];
+    private VersionSettingsModel VersionSettings { get; set; } = new();
+    private IReadOnlyList<PublicationTokenMetadataDto> Tokens { get; set; } = [];
+    private bool TokenCreateVisible { get; set; }
+    private string TokenName { get; set; } = string.Empty;
+    private DateTime TokenExpiresLocal { get; set; } = DateTime.Now.AddMonths(3);
+    private CreatedPublicationTokenDto? CreatedToken { get; set; }
+    private string GrantFingerprint { get; set; } = string.Empty;
+    private List<GrantRowModel> GrantRows { get; set; } = [];
+
+    protected override Task OnInitializedAsync() => LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        Loading = true;
+        Error = null;
+        try
+        {
+            var publicationsTask = Catalog.ListAsync(new PublicationCatalogQuery(), cancellation.Token);
+            var connectionsTask = ConnectionService.ListAsync(cancellation.Token);
+            await Task.WhenAll(publicationsTask, connectionsTask);
+            var result = await publicationsTask;
+            if (!result.IsSuccess || result.Value is null)
+            {
+                Error = result.Problem?.Message ?? "Publications could not be loaded.";
+                return;
+            }
+            Items = result.Value;
+            SqlConnections = (await connectionsTask).Where(connection => connection.Kind == ConnectionKind.SqlServer && connection.IsEnabled).ToArray();
+            if (Selected is not null)
+            {
+                await SelectAsync(Selected.Id);
+            }
+        }
+        catch (OperationCanceledException) when (cancellation.IsCancellationRequested)
+        {
+        }
+        catch (Exception)
+        {
+            Error = "Publications are temporarily unavailable.";
+        }
+        finally
+        {
+            Loading = false;
+        }
+    }
+
+    private void StartCreate()
+    {
+        CreateName = string.Empty;
+        CreateSlug = string.Empty;
+        CreateKind = PublicationKind.RestApi;
+        CreateVisible = true;
+    }
+
+    private async Task CreateAsync()
+    {
+        Busy = true;
+        try
+        {
+            var result = await Catalog.CreateAsync(
+                new CreatePublicationCommand(CreateSlug, CreateName, CreateKind, await GetActorAsync()),
+                cancellation.Token);
+            if (!result.IsSuccess || result.Value is null)
+            {
+                Notify(false, result.Problem?.Message ?? "The publication could not be created.");
+                return;
+            }
+            CreateVisible = false;
+            await LoadAsync();
+            await SelectAsync(result.Value.Id);
+            Notify(true, "Publication created. Discover and activate its first source version.");
+        }
+        finally { Busy = false; }
+    }
+
+    private async Task SelectAsync(Guid id)
+    {
+        Busy = true;
+        try
+        {
+            var result = await Catalog.GetAsync(id, cancellation.Token);
+            if (!result.IsSuccess || result.Value is null)
+            {
+                Notify(false, result.Problem?.Message ?? "The publication could not be loaded.");
+                return;
+            }
+            Selected = result.Value;
+            SelectedTab = DetailTab.Source;
+            ResetVersionWizard();
+            Tokens = [];
+            GrantRows = [];
+            CreatedToken = null;
+        }
+        finally { Busy = false; }
+    }
+
+    private void StartVersion()
+    {
+        ResetVersionWizard();
+        VersionVisible = true;
+    }
+
+    private async Task DiscoverObjectsAsync()
+    {
+        Busy = true;
+        Inspection = null;
+        ColumnPolicies = [];
+        ForeignKeyPolicies = [];
+        try
+        {
+            var result = await SourceInspection.ListObjectsAsync(VersionConnectionId, null, 200, cancellation.Token);
+            if (!result.IsSuccess || result.Value is null)
+            {
+                Notify(false, result.Problem?.Message ?? "Source objects could not be discovered.");
+                return;
+            }
+            SourceObjects = result.Value.Objects;
+            SelectedObjectKey = string.Empty;
+            Notify(true, $"Discovered {SourceObjects.Count} bounded source objects.");
+        }
+        finally { Busy = false; }
+    }
+
+    private async Task InspectObjectAsync()
+    {
+        var source = SourceObjects.SingleOrDefault(item => ObjectKey(item) == SelectedObjectKey);
+        if (source is null) return;
+        Busy = true;
+        try
+        {
+            var result = await SourceInspection.InspectObjectAsync(VersionConnectionId, source.Schema, source.Name, cancellation.Token);
+            if (!result.IsSuccess || result.Value is null)
+            {
+                Notify(false, result.Problem?.Message ?? "The source schema could not be inspected.");
+                return;
+            }
+            Inspection = result.Value;
+            ColumnPolicies = BuildColumnPolicies(result.Value);
+            ForeignKeyPolicies = BuildForeignKeyPolicies(result.Value);
+        }
+        finally { Busy = false; }
+    }
+
+    private async Task CreateVersionAsync()
+    {
+        if (Selected is null || Inspection is null) return;
+        if (!Inspection.Columns.Any(column => column.IsKey))
+        {
+            Notify(false, "A deterministic primary key is required.");
+            return;
+        }
+        foreach (var foreignKey in ForeignKeyPolicies.Where(policy => policy.IsApproved))
+        {
+            var policyError = foreignKey.Validate(ColumnPolicies);
+            if (policyError is not null)
+            {
+                Notify(false, policyError);
+                return;
+            }
+        }
+        Busy = true;
+        try
+        {
+            var concurrency = DetermineConcurrency();
+            var settings = VersionSettings.ToValue();
+            var commands = ColumnPolicies.Where(column => column.Include && column.IsSupported).Select(column => column.ToCommand(concurrency, ForeignKeyPolicies)).ToArray();
+            var create = await Catalog.CreateVersionAsync(new CreatePublicationVersionCommand(
+                Selected.Id,
+                Inspection.ConnectionId,
+                Inspection.Schema,
+                Inspection.Name,
+                Inspection.Kind,
+                Inspection.SchemaFingerprint,
+                concurrency,
+                settings,
+                commands,
+                await GetActorAsync()), cancellation.Token);
+            if (!create.IsSuccess || create.Value is null)
+            {
+                Notify(false, create.Problem?.Message ?? "The source version could not be created.");
+                return;
+            }
+            var activate = await Catalog.ActivateAsync(Selected.Id, create.Value.Id, await GetActorAsync(), cancellation.Token);
+            if (!activate.IsSuccess || activate.Value is null)
+            {
+                Notify(false, activate.Problem?.Message ?? "The version was created but could not be activated.");
+                await SelectAsync(Selected.Id);
+                return;
+            }
+            Selected = activate.Value;
+            VersionVisible = false;
+            await LoadAsync();
+            Notify(true, $"Version {create.Value.VersionNumber} is active.");
+        }
+        catch (ArgumentException exception)
+        {
+            Notify(false, exception.Message);
+        }
+        finally { Busy = false; }
+    }
+
+    private async Task ActivateAsync(Guid versionId)
+    {
+        if (Selected is null) return;
+        Busy = true;
+        try
+        {
+            var result = await Catalog.ActivateAsync(Selected.Id, versionId, await GetActorAsync(), cancellation.Token);
+            Notify(result.IsSuccess, result.Problem?.Message ?? "Publication version activated.");
+            if (result.IsSuccess) Selected = result.Value;
+            await LoadAsync();
+        }
+        finally { Busy = false; }
+    }
+
+    private async Task DisableAsync()
+    {
+        if (Selected is null) return;
+        Busy = true;
+        try
+        {
+            var result = await Catalog.DisableAsync(Selected.Id, await GetActorAsync(), cancellation.Token);
+            Notify(result.IsSuccess, result.Problem?.Message ?? "Publication disabled.");
+            if (result.IsSuccess) Selected = result.Value;
+            await LoadAsync();
+        }
+        finally { Busy = false; }
+    }
+
+    private async Task OpenTokensAsync()
+    {
+        SelectedTab = DetailTab.Tokens;
+        await LoadTokensAsync();
+    }
+
+    private async Task LoadTokensAsync()
+    {
+        if (Selected is null) return;
+        var result = await TokenService.ListAsync(Selected.Id, cancellation.Token);
+        if (result.IsSuccess) Tokens = result.Value!;
+        else Notify(false, result.Problem?.Message ?? "Tokens could not be loaded.");
+    }
+
+    private async Task CreateTokenAsync()
+    {
+        if (Selected is null) return;
+        Busy = true;
+        try
+        {
+            var expires = new DateTimeOffset(TokenExpiresLocal, TimeZoneInfo.Local.GetUtcOffset(TokenExpiresLocal)).ToUniversalTime();
+            var result = await TokenService.CreateAsync(new CreatePublicationTokenCommand(Selected.Id, TokenName, expires, await GetActorAsync()), cancellation.Token);
+            if (!result.IsSuccess || result.Value is null)
+            {
+                Notify(false, result.Problem?.Message ?? "The token could not be created.");
+                return;
+            }
+            CreatedToken = result.Value;
+            TokenCreateVisible = false;
+            TokenName = string.Empty;
+            await LoadTokensAsync();
+        }
+        finally { Busy = false; }
+    }
+
+    private async Task RevokeTokenAsync(Guid tokenId)
+    {
+        if (Selected is null) return;
+        Busy = true;
+        try
+        {
+            var result = await TokenService.RevokeAsync(new RevokePublicationTokenCommand(Selected.Id, tokenId, await GetActorAsync()), cancellation.Token);
+            Notify(result.IsSuccess, result.Problem?.Message ?? "Token revoked.");
+            await LoadTokensAsync();
+        }
+        finally { Busy = false; }
+    }
+
+    private async Task OpenGrantsAsync()
+    {
+        SelectedTab = DetailTab.Grants;
+        if (Selected is null) return;
+        var result = await GrantService.GetAsync(Selected.Id, cancellation.Token);
+        if (!result.IsSuccess || result.Value is null)
+        {
+            Notify(false, result.Problem?.Message ?? "Role grants could not be loaded.");
+            return;
+        }
+        GrantFingerprint = result.Value.Fingerprint;
+        GrantRows = Enum.GetValues<PublicationRole>().Select(role =>
+        {
+            var existing = result.Value.Grants.SingleOrDefault(grant => grant.Role == role);
+            return new GrantRowModel(role, existing);
+        }).ToList();
+    }
+
+    private async Task SaveGrantsAsync()
+    {
+        if (Selected is null) return;
+        Busy = true;
+        try
+        {
+            var result = await GrantService.ReplaceAsync(new ReplacePublicationGrantsCommand(
+                Selected.Id,
+                GrantFingerprint,
+                GrantRows.Select(row => row.ToCommand()).ToArray()), cancellation.Token);
+            if (!result.IsSuccess || result.Value is null)
+            {
+                Notify(false, result.Problem?.Message ?? "Role grants could not be saved.");
+                return;
+            }
+            GrantFingerprint = result.Value.Fingerprint;
+            Notify(true, "Editor role grants saved.");
+        }
+        finally { Busy = false; }
+    }
+
+    private PublicationConcurrencyMode DetermineConcurrency()
+    {
+        if (Selected?.Kind != PublicationKind.Editor || Inspection?.Kind == PublicationSourceObjectKind.View || !ColumnPolicies.Any(column => column.IsWritable))
+            return PublicationConcurrencyMode.ReadOnly;
+        return ColumnPolicies.Any(column => column.IsRowVersion)
+            ? PublicationConcurrencyMode.RowVersion
+            : PublicationConcurrencyMode.OriginalValues;
+    }
+
+    private bool CanWriteColumn(ColumnPolicyModel column) => Selected?.Kind == PublicationKind.Editor && Inspection?.Kind == PublicationSourceObjectKind.Table && column.Include && column.IsSupported && column.IsReadable && !column.IsKey && !column.IsGenerated && !column.IsRowVersion;
+
+    private static List<ColumnPolicyModel> BuildColumnPolicies(PublicationSourceObjectInspectionDto inspection) => inspection.Columns.Select(column =>
+    {
+        var foreignKey = inspection.ForeignKeys.FirstOrDefault(key => key.Columns.Any(item => string.Equals(item.LocalColumn, column.Name, StringComparison.OrdinalIgnoreCase)));
+        var foreignKeyColumn = foreignKey?.Columns.Single(item => string.Equals(item.LocalColumn, column.Name, StringComparison.OrdinalIgnoreCase));
+        return new ColumnPolicyModel(column, MakeAlias(column.Name), foreignKey, foreignKeyColumn);
+    }).ToList();
+
+    private static List<ForeignKeyPolicyModel> BuildForeignKeyPolicies(
+        PublicationSourceObjectInspectionDto inspection) =>
+        inspection.ForeignKeys
+            .Select(foreignKey => new ForeignKeyPolicyModel(foreignKey))
+            .ToList();
+
+    private static string MakeAlias(string sourceName)
+    {
+        var filtered = new string(sourceName.Select(character => char.IsAsciiLetterOrDigit(character) || character is '_' or '-' ? character : '_').ToArray());
+        if (string.IsNullOrEmpty(filtered) || !char.IsAsciiLetter(filtered[0])) filtered = $"column_{filtered}";
+        return filtered.Length <= 100 ? filtered : filtered[..100];
+    }
+
+    private void ResetVersionWizard()
+    {
+        VersionVisible = false;
+        VersionConnectionId = Guid.Empty;
+        SourceObjects = [];
+        SelectedObjectKey = string.Empty;
+        Inspection = null;
+        ColumnPolicies = [];
+        ForeignKeyPolicies = [];
+        VersionSettings = new();
+    }
+
+    private async Task<string> GetActorAsync() => (await AuthenticationStateProvider.GetAuthenticationStateAsync()).User.Identity?.Name ?? "unknown";
+    private void Notify(bool success, string detail) => Notifications.Notify(new NotificationMessage { Severity = success ? NotificationSeverity.Success : NotificationSeverity.Error, Summary = success ? "Publication updated" : "Publication operation failed", Detail = detail, Duration = 6_000 });
+    private static string ObjectKey(PublicationSourceObjectDto source) => $"{source.Schema}\u001f{source.Name}\u001f{source.Kind}";
+    private static string RouteText(PublicationDetailDto publication) => publication.Kind == PublicationKind.RestApi ? $"GET /api/v1/publications/{publication.Slug}/rows" : $"/editor/{publication.Id}";
+    private static string StateCss(PublicationState state) => state switch { PublicationState.Active => string.Empty, PublicationState.Draft or PublicationState.Disabled => "draft", PublicationState.Archived => "failed", _ => string.Empty };
+    private static string TokenCss(PublicationAccessTokenStatus status) => status == PublicationAccessTokenStatus.Active ? string.Empty : status == PublicationAccessTokenStatus.Expired ? "draft" : "failed";
+
+    public void Dispose() { cancellation.Cancel(); cancellation.Dispose(); }
+
+    private enum DetailTab { Source, Tokens, Grants }
+
+    private sealed class VersionSettingsModel
+    {
+        public int DefaultPageSize { get; set; } = 100; public int MaximumPageSize { get; set; } = 500; public int RequestsPerWindow { get; set; } = 600; public int RateLimitWindowSeconds { get; set; } = 60; public int MaximumConcurrentRequests { get; set; } = 10; public int EditorWindowSize { get; set; } = 250; public int RequestTimeoutSeconds { get; set; } = 30; public int CommandTimeoutSeconds { get; set; } = 30; public int MaximumResponseMiB { get; set; } = 10;
+        public PublicationVersionSettings ToValue() => new(DefaultPageSize, MaximumPageSize, RequestsPerWindow, RateLimitWindowSeconds, MaximumConcurrentRequests, EditorWindowSize, RequestTimeoutSeconds, CommandTimeoutSeconds, checked(MaximumResponseMiB * 1_024 * 1_024));
+    }
+
+    private sealed class ColumnPolicyModel
+    {
+        public ColumnPolicyModel(PublicationSourceColumnDto column, string alias, PublicationSourceForeignKeyDto? foreignKey, PublicationSourceForeignKeyColumnDto? foreignKeyColumn)
+        {
+            Source = column; SourceName = column.Name; PublicAlias = alias; SourceTypeName = column.SourceTypeName; IsSupported = column.IsSupported && column.DataType is not null; Include = IsSupported; IsReadable = IsSupported; IsFilterable = IsSupported; IsSortable = IsSupported; IsWritable = IsSupported && !column.IsKey && !column.IsGenerated && !column.IsRowVersion; IsKey = column.IsKey; KeyOrdinal = column.KeyOrdinal; IsRowVersion = column.IsRowVersion; IsGenerated = column.IsGenerated; ForeignKey = foreignKey; ForeignKeyColumn = foreignKeyColumn;
+        }
+        public PublicationSourceColumnDto Source { get; } public string SourceName { get; } public string PublicAlias { get; set; } public string SourceTypeName { get; } public bool IsSupported { get; } public bool Include { get; set; } public bool IsReadable { get; set; } public bool IsFilterable { get; set; } public bool IsSortable { get; set; } public bool IsWritable { get; set; } public bool IsKey { get; } public int? KeyOrdinal { get; } public bool IsRowVersion { get; } public bool IsGenerated { get; } public PublicationSourceForeignKeyDto? ForeignKey { get; } public PublicationSourceForeignKeyColumnDto? ForeignKeyColumn { get; }
+        public CreatePublicationColumnCommand ToCommand(
+            PublicationConcurrencyMode concurrency,
+            IReadOnlyList<ForeignKeyPolicyModel> foreignKeyPolicies)
+        {
+            var approved = ForeignKey is null
+                ? null
+                : foreignKeyPolicies.SingleOrDefault(policy =>
+                    policy.IsApproved && string.Equals(
+                        policy.ConstraintName,
+                        ForeignKey.ConstraintName,
+                        StringComparison.OrdinalIgnoreCase));
+            var fk = approved is null || ForeignKey is null || ForeignKeyColumn is null
+                ? null
+                : new CreatePublicationForeignKeyCommand(ForeignKey.ConstraintName, ForeignKeyColumn.Ordinal, ForeignKey.Columns.Count, ForeignKey.ReferencedSchema, ForeignKey.ReferencedObject, ForeignKeyColumn.ReferencedColumn, approved.DisplayColumn, approved.ApprovedSearchColumns, approved.LookupMode);
+            return new(Source.Ordinal, Source.Name, PublicAlias, Source.DataType!.Value, Source.SourceTypeName, Source.IsNullable, IsReadable || IsKey, IsFilterable && IsReadable, IsSortable || IsKey, IsWritable && concurrency != PublicationConcurrencyMode.ReadOnly, IsKey, KeyOrdinal, IsRowVersion && concurrency == PublicationConcurrencyMode.RowVersion, IsGenerated, Source.MaximumLength, Source.NumericPrecision, Source.NumericScale, fk);
+        }
+    }
+
+    private sealed class ForeignKeyPolicyModel
+    {
+        private readonly HashSet<string> approvedSearchColumns = new(StringComparer.OrdinalIgnoreCase);
+
+        public ForeignKeyPolicyModel(PublicationSourceForeignKeyDto source)
+        {
+            Source = source;
+            ConstraintName = source.ConstraintName;
+            DisplayCandidates = source.DisplayCandidates;
+            SearchCandidates = source.SearchCandidates;
+            RecommendedDisplayColumn = source.RecommendedDisplayColumn;
+            RecommendedLookupMode = source.RecommendedLookupMode;
+            LookupMode = PublicationLookupMode.ServerFiltered;
+            LocalMapping = string.Join(", ", source.Columns
+                .OrderBy(column => column.Ordinal)
+                .Select(column => $"{column.LocalColumn} → {column.ReferencedColumn}"));
+        }
+
+        public PublicationSourceForeignKeyDto Source { get; }
+        public string ConstraintName { get; }
+        public IReadOnlyList<string> DisplayCandidates { get; }
+        public IReadOnlyList<string> SearchCandidates { get; }
+        public string RecommendedDisplayColumn { get; }
+        public PublicationLookupMode RecommendedLookupMode { get; }
+        public string LocalMapping { get; }
+        public bool IsApproved { get; set; }
+        public string DisplayColumn { get; set; } = string.Empty;
+        public PublicationLookupMode LookupMode { get; set; }
+        public IReadOnlyList<string> ApprovedSearchColumns => approvedSearchColumns
+            .OrderBy(column => column, StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+
+        public bool IsSearchColumnApproved(string column) => approvedSearchColumns.Contains(column);
+
+        public void SetSearchColumn(string column, bool enabled)
+        {
+            if (enabled)
+            {
+                approvedSearchColumns.Add(column);
+            }
+            else
+            {
+                approvedSearchColumns.Remove(column);
+            }
+        }
+
+        public string? Validate(IReadOnlyList<ColumnPolicyModel> columns)
+        {
+            if (string.IsNullOrWhiteSpace(DisplayColumn) || approvedSearchColumns.Count == 0)
+            {
+                return $"Lookup '{ConstraintName}' requires an explicitly selected display column and at least one search column.";
+            }
+
+            if (!DisplayCandidates.Contains(DisplayColumn, StringComparer.OrdinalIgnoreCase) ||
+                approvedSearchColumns.Any(column => !SearchCandidates.Contains(column, StringComparer.OrdinalIgnoreCase)))
+            {
+                return $"Lookup '{ConstraintName}' contains a column outside the inspected candidate set.";
+            }
+
+            var components = columns
+                .Where(column => string.Equals(
+                    column.ForeignKey?.ConstraintName,
+                    ConstraintName,
+                    StringComparison.OrdinalIgnoreCase))
+                .ToArray();
+            if (components.Length != Source.Columns.Count ||
+                components.Any(column => !column.Include || !column.IsReadable))
+            {
+                return $"Lookup '{ConstraintName}' requires every local component to be included and readable.";
+            }
+
+            if (components.Length > 1 &&
+                (components.Select(column => column.IsWritable).Distinct().Count() != 1 ||
+                 components.Select(column => column.Source.IsNullable).Distinct().Count() != 1))
+            {
+                return $"Composite lookup '{ConstraintName}' requires identical write and nullability policy for every component.";
+            }
+
+            if (components.Length > 1 && LookupMode == PublicationLookupMode.ListValidation)
+            {
+                return $"Composite lookup '{ConstraintName}' cannot use list validation.";
+            }
+
+            return null;
+        }
+    }
+
+    private sealed class GrantRowModel(PublicationRole role, PublicationGrantDto? existing)
+    {
+        public PublicationRole Role { get; } = role; public bool CanView { get; set; } = existing?.CanView ?? false; public bool CanInsert { get; set; } = existing?.CanInsert ?? false; public bool CanUpdate { get; set; } = existing?.CanUpdate ?? false; public bool CanDelete { get; set; } = existing?.CanDelete ?? false; public bool CanApprove { get; set; } = existing?.CanApprove ?? false;
+        public PublicationGrantCommand ToCommand() => new(Role, CanView, CanInsert, CanUpdate, CanDelete, CanApprove);
+    }
+}

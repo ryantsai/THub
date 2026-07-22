@@ -1,6 +1,6 @@
 # ADR-0007: Govern generated REST APIs and online data editors
 
-- Status: Proposed
+- Status: Superseded by [ADR-0011](0011-isolated-governed-data-publications.md)
 - Date: 2026-07-22
 - Deciders: Project maintainers
 
@@ -53,3 +53,7 @@ No publication runtime should be implemented until the unresolved identity and w
 - Confirm internal-only vs partner/public network exposure.
 - Confirm direct write vs staging/approval behavior.
 - Define audit retention, row/column classification, and ownership before changing status to Accepted.
+
+## Superseded by
+
+[ADR-0011](0011-isolated-governed-data-publications.md) resolves the initial host, managed bearer-token, usage-metering, role-grant, Spreadsheet, foreign-key, and staged-write direction.

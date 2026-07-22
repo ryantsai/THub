@@ -1,137 +1,246 @@
 @page "/designer"
+@page "/designer/{WorkflowId:guid}"
 @attribute [Authorize(Policy = Permissions.WorkflowEdit)]
+@implements IDisposable
+@using System.Text.Json
+@using System.Text.Json.Nodes
+@using THub.Application.Alerts
+@using THub.Application.Connections
+@using THub.Application.Execution
 @using THub.Application.Workflows
+@using THub.Application.Workflows.Management
+@using THub.Domain.Connections
 @using THub.Domain.Workflows
+@inject ConnectionManagementService ConnectionService
+@inject EmailAlertAdministrationService EmailAdministration
 @inject WorkflowGraphValidator GraphValidator
+@inject WorkflowNodeSettingsValidator NodeSettingsValidator
+@inject WorkflowGraphSerializer GraphSerializer
+@inject WorkflowCatalogService WorkflowCatalog
+@inject AuthenticationStateProvider AuthenticationStateProvider
 @inject NotificationService Notifications
+@inject NavigationManager Navigation
 
-<PageTitle>Workflow designer · THub</PageTitle>
+<PageTitle>@WorkflowName · THub designer</PageTitle>
 
 <div class="designer-heading">
-    <div class="designer-breadcrumb"><a href="/workflows">Workflows</a><span>/</span><input aria-label="Workflow name" @bind="WorkflowName" /></div>
+    <div class="designer-breadcrumb">
+        <a href="/workflows">Workflows</a><span>/</span>
+        <input aria-label="Workflow name" @bind="WorkflowName" disabled="@Busy" />
+    </div>
     <div class="designer-actions">
-        <span class="draft-state"><i></i>Draft · saved just now</span>
-        <RadzenButton Text="Validate" Icon="fact_check" ButtonStyle="ButtonStyle.Light" Size="ButtonSize.Small" Click="@Validate" />
-        <RadzenButton Text="Save draft" Icon="save" ButtonStyle="ButtonStyle.Primary" Size="ButtonSize.Small" Click="@SaveDraft" />
-        <RadzenButton Text="Publish" Icon="rocket_launch" ButtonStyle="ButtonStyle.Success" Size="ButtonSize.Small" Click="@Publish" />
+        <span class="draft-state"><i></i>@StatusText</span>
+        <RadzenButton Text="Validate" Icon="fact_check" ButtonStyle="ButtonStyle.Light" Size="ButtonSize.Small" Click="@Validate" Disabled="@Busy" />
+        <RadzenButton Text="Save draft" Icon="save" ButtonStyle="ButtonStyle.Primary" Size="ButtonSize.Small" Click="@SaveDraftAsync" Disabled="@Busy" />
+        <RadzenButton Text="Publish" Icon="rocket_launch" ButtonStyle="ButtonStyle.Success" Size="ButtonSize.Small" Click="@PublishAsync" Disabled="@Busy" />
     </div>
 </div>
 
-<div class="designer-shell">
-    <aside class="node-palette">
-        <div class="palette-head"><strong>Toolbox</strong><small>Click to add a step</small></div>
-        <div class="palette-search"><RadzenIcon Icon="search" /><input placeholder="Find a tool..." @bind="Search" /></div>
-        @foreach (var group in FilteredGroups)
-        {
-            <section class="palette-group">
-                <h3>@group.Name</h3>
-                @foreach (var tool in group.Tools)
-                {
-                    <button class="tool-item" type="button" @onclick="() => AddNode(tool)">
-                        <span class="tool-icon @tool.Tone"><RadzenIcon Icon="@tool.Icon" /></span>
-                        <span><strong>@tool.Name</strong><small>@tool.Description</small></span>
-                        <RadzenIcon Icon="add" />
-                    </button>
-                }
-            </section>
-        }
-    </aside>
-
-    <section class="workflow-canvas" @onclick="ClearSelection">
-        <div class="canvas-toolbar">
-            <button type="button" title="Select"><RadzenIcon Icon="near_me" /></button>
-            <button type="button" title="Fit workflow"><RadzenIcon Icon="fit_screen" /></button>
-            <span></span>
-            <button type="button" title="Zoom out"><RadzenIcon Icon="remove" /></button>
-            <small>100%</small>
-            <button type="button" title="Zoom in"><RadzenIcon Icon="add" /></button>
-        </div>
-
-        <svg class="edge-layer" aria-hidden="true">
-            @foreach (var edge in Edges)
+@if (Loading)
+{
+    <div class="page-state"><RadzenProgressBar Mode="ProgressBarMode.Indeterminate" /><p>Loading the workflow…</p></div>
+}
+else if (LoadError is not null)
+{
+    <div class="page-state error"><RadzenIcon Icon="error_outline" /><h3>Workflow unavailable</h3><p>@LoadError</p><a href="/workflows">Return to workflows</a></div>
+}
+else
+{
+    <div class="designer-shell">
+        <aside class="node-palette">
+            <div class="palette-head"><strong>Toolbox</strong><small>Click to add a step</small></div>
+            <div class="palette-search"><RadzenIcon Icon="search" /><input placeholder="Find a tool…" @bind="Search" /></div>
+            @foreach (var group in FilteredGroups)
             {
-                <path d="@GetEdgePath(edge)" />
+                <section class="palette-group">
+                    <h3>@group.Name</h3>
+                    @foreach (var tool in group.Tools)
+                    {
+                        <button class="tool-item" type="button" disabled="@(!tool.IsOperational)" title="@(tool.IsOperational ? tool.Description : "Disabled by administrator policy")" @onclick="() => AddNode(tool)">
+                            <span class="tool-icon @tool.Tone"><RadzenIcon Icon="@tool.Icon" /></span>
+                            <span><strong>@tool.Name</strong><small>@tool.Description</small></span>
+                            <RadzenIcon Icon="@(tool.IsOperational ? "add" : "lock")" />
+                        </button>
+                    }
+                </section>
             }
-        </svg>
+        </aside>
 
-        @foreach (var node in Nodes)
-        {
-            <button type="button" class="canvas-node @(SelectedNode == node ? "selected" : "")" style="@GetNodeStyle(node)" @onclick:stopPropagation @onclick="() => SelectNode(node)">
-                <span class="node-port input"></span>
-                <span class="node-icon @node.Tone"><RadzenIcon Icon="@node.Icon" /></span>
-                <span class="node-copy"><strong>@node.Name</strong><small>@node.Subtitle</small></span>
-                <span class="node-menu"><RadzenIcon Icon="more_vert" /></span>
-                <span class="node-state @node.State.ToLowerInvariant()">@node.State</span>
-                <span class="node-port output"></span>
-            </button>
-        }
-
-        <div class="canvas-hint"><RadzenIcon Icon="lightbulb" /><span>Select a node to configure it. New tools connect to the end of the current path.</span></div>
-    </section>
-
-    <aside class="properties-panel">
-        @if (SelectedNode is null)
-        {
-            <div class="empty-properties">
-                <span><RadzenIcon Icon="tune" /></span>
-                <h3>Nothing selected</h3>
-                <p>Select a node on the canvas to edit its connection, schema, and runtime settings.</p>
+        <section class="workflow-canvas" @onclick="ClearSelection">
+            <div class="canvas-toolbar">
+                <button type="button" title="Fit workflow" @onclick:stopPropagation @onclick="FitWorkflow"><RadzenIcon Icon="fit_screen" /></button>
+                <span></span>
+                <small>@Nodes.Count steps · @Edges.Count links</small>
             </div>
-        }
-        else
-        {
-            <div class="properties-head"><div><strong>@SelectedNode.Name</strong><small>@SelectedNode.Kind</small></div><button type="button" @onclick="DeleteSelected" aria-label="Delete node"><RadzenIcon Icon="delete_outline" /></button></div>
-            <div class="properties-body">
-                <label>Step name<input @bind="SelectedNode.Name" /></label>
-                <label>Connection<select><option>Production SQL</option><option>Local staging</option><option>Add connection…</option></select></label>
-                <label>Object<input value="dbo.Customers" /></label>
-                <div class="setting-row"><div><strong>First row is header</strong><small>Use column names from the source</small></div><RadzenSwitch @bind-Value="HasHeader" /></div>
-                <div class="property-section"><span>Schema</span><button type="button">Refresh</button></div>
-                <div class="schema-list">
-                    <div><RadzenIcon Icon="key" /><span>CustomerId</span><small>int</small></div>
-                    <div><RadzenIcon Icon="short_text" /><span>Email</span><small>nvarchar</small></div>
-                    <div><RadzenIcon Icon="calendar_today" /><span>UpdatedAt</span><small>datetime2</small></div>
+
+            <svg class="edge-layer" aria-hidden="true">
+                @foreach (var edge in Edges)
+                {
+                    <path d="@GetEdgePath(edge)" />
+                }
+            </svg>
+
+            @foreach (var node in Nodes)
+            {
+                <button type="button" class="canvas-node @(SelectedNode == node ? "selected" : "")" style="@GetNodeStyle(node)" @onclick:stopPropagation @onclick="() => SelectNode(node)">
+                    <span class="node-port input"></span>
+                    <span class="node-icon @node.Tone"><RadzenIcon Icon="@node.Icon" /></span>
+                    <span class="node-copy"><strong>@node.Name</strong><small>@node.Subtitle</small></span>
+                    <span class="node-menu"><RadzenIcon Icon="more_vert" /></span>
+                    <span class="node-state @node.State.ToLowerInvariant()">@node.State</span>
+                    <span class="node-port output"></span>
+                </button>
+            }
+
+            @if (Nodes.Count == 0)
+            {
+                <div class="canvas-empty"><RadzenIcon Icon="account_tree" /><strong>Start with a source</strong><span>Add SQL Server, CSV, or Excel from the toolbox.</span></div>
+            }
+            <div class="canvas-hint"><RadzenIcon Icon="lightbulb" /><span>Steps are persisted as versioned JSON. Publishing freezes an immutable graph for every run.</span></div>
+        </section>
+
+        <aside class="properties-panel">
+            <div class="properties-head"><div><strong>Workflow</strong><small>@StatusText</small></div></div>
+            <div class="properties-body workflow-properties">
+                <label>Description<textarea rows="2" @bind="Description" disabled="@Busy"></textarea></label>
+                <label>Five-field cron<input placeholder="Manual (leave empty)" @bind="CronExpression" disabled="@Busy" /></label>
+                <label>Time zone<input @bind="TimeZoneId" disabled="@Busy" /></label>
+            </div>
+
+            @if (SelectedNode is null)
+            {
+                <div class="empty-properties">
+                    <span><RadzenIcon Icon="tune" /></span>
+                    <h3>Nothing selected</h3>
+                    <p>Select a step to edit its JSON settings and incoming links.</p>
                 </div>
-                <button class="preview-button" type="button"><RadzenIcon Icon="table_view" />Preview data</button>
-            </div>
-        }
-    </aside>
-</div>
+            }
+            else
+            {
+                <div class="properties-head"><div><strong>@SelectedNode.Name</strong><small>@SelectedNode.Kind</small></div><button type="button" @onclick="DeleteSelected" aria-label="Delete node"><RadzenIcon Icon="delete_outline" /></button></div>
+                <div class="properties-body">
+                    <label>Step name<input @bind="SelectedNode.Name" /></label>
+                    @if (ExpectedConnectionKind(SelectedNode.Kind) is { } connectionKind)
+                    {
+                        <label>Approved connection
+                            <select value="@(GetSettingString(SelectedNode, "connectionId"))" @onchange="SetSelectedConnection">
+                                <option value="">Select a @ConnectionKindLabel(connectionKind) connection…</option>
+                                @foreach (var connection in Connections.Where(connection => connection.IsEnabled && connection.Kind == connectionKind))
+                                {
+                                    <option value="@connection.Id.ToString("D")">@connection.Name</option>
+                                }
+                            </select>
+                        </label>
+                    }
+                    @if (SelectedNode.Kind == WorkflowNodeKind.EmailAlert)
+                    {
+                        <label>Email delivery profile
+                            <select value="@(GetSettingString(SelectedNode, "profileId"))" @onchange="SetSelectedEmailProfile">
+                                <option value="">Select an enabled profile…</option>
+                                @foreach (var profile in EmailProfiles.Where(profile => profile.IsEnabled))
+                                {
+                                    <option value="@profile.Id.ToString("D")">@profile.Name · @profile.SenderAddress</option>
+                                }
+                            </select>
+                        </label>
+                    }
+                    @if (SelectedNode.Kind == WorkflowNodeKind.Join)
+                    {
+                        <div class="join-input-summary"><span>Left input</span><code>@(GetSettingString(SelectedNode, "leftNodeId") ?? "Not connected")</code><span>Right input</span><code>@(GetSettingString(SelectedNode, "rightNodeId") ?? "Not connected")</code></div>
+                    }
+                    <label>Settings JSON<textarea class="settings-json" rows="11" spellcheck="false" @bind="SelectedNode.SettingsJson"></textarea></label>
+                    <button class="format-settings" type="button" @onclick="FormatSelectedSettings"><RadzenIcon Icon="data_object" /> Format JSON</button>
+                    <small class="property-help">Settings are validated again at publication and execution boundaries. Connection identifiers and SQL object names must reference approved metadata.</small>
+                    @if (DependencyWarning is not null)
+                    {
+                        <small class="property-help warning">@DependencyWarning Raw JSON editing remains available.</small>
+                    }
+
+                    @if (!IsSource(SelectedNode.Kind))
+                    {
+                        <div class="property-section"><span>Incoming links</span></div>
+                        <div class="link-editor">
+                            <select aria-label="Connect from step" @bind="ConnectFromNodeId">
+                                <option value="">Select upstream step…</option>
+                                @foreach (var candidate in Nodes.Where(candidate => candidate != SelectedNode))
+                                {
+                                    <option value="@candidate.Id">@candidate.Name</option>
+                                }
+                            </select>
+                            <button type="button" @onclick="ConnectSelected"><RadzenIcon Icon="add_link" /> Add</button>
+                            @foreach (var edge in IncomingEdges)
+                            {
+                                <div class="link-row"><span>@NodeName(edge.From)</span><button type="button" aria-label="Remove link from @NodeName(edge.From)" @onclick="() => RemoveEdge(edge)"><RadzenIcon Icon="close" /></button></div>
+                            }
+                        </div>
+                    }
+                </div>
+            }
+
+            @if (ValidationIssues.Count > 0)
+            {
+                <div class="validation-panel" role="status">
+                    <strong>@ValidationIssues.Count validation issue@(ValidationIssues.Count == 1 ? "" : "s")</strong>
+                    @foreach (var issue in ValidationIssues.Take(8))
+                    {
+                        <button type="button" @onclick="() => SelectIssue(issue)"><span>@issue.Code</span>@issue.Message</button>
+                    }
+                </div>
+            }
+        </aside>
+    </div>
+}
 
 @code {
-    private string WorkflowName { get; set; } = "Customer 360 sync";
+    [Parameter] public Guid? WorkflowId { get; set; }
+
+    private readonly CancellationTokenSource cancellation = new();
+    private string WorkflowName { get; set; } = "Untitled workflow";
+    private string Description { get; set; } = string.Empty;
+    private string Owner { get; set; } = string.Empty;
+    private string? CronExpression { get; set; }
+    private string TimeZoneId { get; set; } = TimeZoneInfo.Local.Id;
+    private int DraftRevision { get; set; }
+    private WorkflowStatus CurrentStatus { get; set; } = WorkflowStatus.Draft;
     private string Search { get; set; } = string.Empty;
-    private bool HasHeader { get; set; } = true;
+    private string ConnectFromNodeId { get; set; } = string.Empty;
     private DesignerNode? SelectedNode { get; set; }
+    private bool Busy { get; set; }
+    private bool Loading { get; set; }
+    private string? LoadError { get; set; }
+    private IReadOnlyList<GraphValidationIssue> ValidationIssues { get; set; } = [];
+    private IReadOnlyList<ConnectionSummary> Connections { get; set; } = [];
+    private IReadOnlyList<EmailDeliveryProfileDto> EmailProfiles { get; set; } = [];
+    private string? DependencyWarning { get; set; }
+    private readonly List<DesignerNode> Nodes = [];
+    private readonly List<DesignerEdge> Edges = [];
 
-    private readonly List<DesignerNode> Nodes =
-    [
-        new("sql-source", WorkflowNodeKind.SqlSource, "SQL customers", "dbo.Customers", "database", "blue", "Ready", 80, 135),
-        new("filter", WorkflowNodeKind.FilterRows, "Recent changes", "UpdatedAt > checkpoint", "filter_alt", "amber", "Ready", 335, 135),
-        new("map", WorkflowNodeKind.SelectColumns, "Map customer schema", "12 mapped columns", "schema", "violet", "Ready", 590, 135),
-        new("target", WorkflowNodeKind.SqlTarget, "Customer warehouse", "dw.DimCustomer", "storage", "green", "Ready", 845, 135),
-        new("webhook", WorkflowNodeKind.Webhook, "Notify downstream", "POST /customer-ready", "webhook", "rose", "Idle", 845, 330)
-    ];
+    private string StatusText => WorkflowId is null
+        ? "Unsaved draft"
+        : $"{CurrentStatus} · revision {DraftRevision}";
 
-    private readonly List<DesignerEdge> Edges =
-    [
-        new("sql-source", "filter"), new("filter", "map"), new("map", "target"), new("target", "webhook")
-    ];
+    private IEnumerable<DesignerEdge> IncomingEdges => SelectedNode is null
+        ? []
+        : Edges.Where(edge => edge.To == SelectedNode.Id).ToArray();
 
     private static readonly PaletteGroup[] Groups =
     [
         new("Sources", [
-            new("SQL Server", "Read a table or query", WorkflowNodeKind.SqlSource, "database", "blue"),
-            new("CSV file", "Delimited local file", WorkflowNodeKind.CsvSource, "description", "green"),
-            new("Excel workbook", "Sheet or named range", WorkflowNodeKind.ExcelSource, "grid_on", "green")]),
+            new("SQL Server", "Read an approved table", WorkflowNodeKind.SqlSource, "database", "blue", true),
+            new("CSV file", "Read a bounded local CSV", WorkflowNodeKind.CsvSource, "description", "green", true),
+            new("Excel workbook", "Read XLSX or XLSM", WorkflowNodeKind.ExcelSource, "grid_on", "green", true)]),
         new("Transform", [
-            new("Select & map", "Rename and cast columns", WorkflowNodeKind.SelectColumns, "schema", "violet"),
-            new("Filter rows", "Apply boolean conditions", WorkflowNodeKind.FilterRows, "filter_alt", "amber"),
-            new("Join", "Combine two data streams", WorkflowNodeKind.Join, "join_inner", "violet")]),
-        new("Destinations & actions", [
-            new("SQL target", "Insert, merge, or replace", WorkflowNodeKind.SqlTarget, "storage", "blue"),
-            new("Webhook", "Call an HTTP endpoint", WorkflowNodeKind.Webhook, "webhook", "rose"),
-            new("Executable", "Run an allow-listed process", WorkflowNodeKind.Executable, "terminal", "slate")])
+            new("Select & map", "Rename and cast columns", WorkflowNodeKind.SelectColumns, "schema", "violet", true),
+            new("Filter rows", "Apply typed conditions", WorkflowNodeKind.FilterRows, "filter_alt", "amber", true),
+            new("Join", "Combine exactly two streams", WorkflowNodeKind.Join, "join_inner", "violet", true)]),
+        new("Destinations", [
+            new("SQL target", "Insert into an approved table", WorkflowNodeKind.SqlTarget, "storage", "blue", true),
+            new("CSV target", "Write beneath an approved root", WorkflowNodeKind.CsvTarget, "description", "green", true),
+            new("Excel target", "Write an XLSX workbook", WorkflowNodeKind.ExcelTarget, "grid_on", "green", true)]),
+        new("Actions", [
+            new("Email alert", "Queue a durable Email message", WorkflowNodeKind.EmailAlert, "mail", "rose", true),
+            new("Webhook", "Disabled until allow-list policy exists", WorkflowNodeKind.Webhook, "webhook", "rose", false),
+            new("Executable", "Disabled until sandbox policy exists", WorkflowNodeKind.Executable, "terminal", "slate", false)])
     ];
 
     private IEnumerable<PaletteGroup> FilteredGroups => string.IsNullOrWhiteSpace(Search)
@@ -140,59 +249,523 @@
             .Where(tool => tool.Name.Contains(Search, StringComparison.OrdinalIgnoreCase)).ToArray()))
             .Where(group => group.Tools.Length > 0);
 
-    private void AddNode(PaletteTool tool)
+    protected override async Task OnInitializedAsync()
     {
-        var previous = Nodes.LastOrDefault();
-        var id = $"{tool.Kind.ToString().ToLowerInvariant()}-{Guid.NewGuid():N}"[..22];
-        var x = previous is null ? 80 : Math.Min(previous.X + 255, 845);
-        var y = previous is null || x > previous.X ? previous?.Y ?? 135 : previous.Y + 195;
-        var node = new DesignerNode(id, tool.Kind, tool.Name, "Configure this step", tool.Icon, tool.Tone, "Draft", x, y);
-        Nodes.Add(node);
-        if (previous is not null) Edges.Add(new(previous.Id, node.Id));
-        SelectedNode = node;
+        var authentication = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        Owner = authentication.User.Identity?.Name ?? "unknown";
+        try
+        {
+            var connectionsTask = ConnectionService.ListAsync(cancellation.Token);
+            var profilesTask = EmailAdministration.ListProfilesAsync(cancellation.Token);
+            await Task.WhenAll(connectionsTask, profilesTask);
+            Connections = await connectionsTask;
+            var profiles = await profilesTask;
+            if (profiles.IsSuccess && profiles.Value is not null)
+            {
+                EmailProfiles = profiles.Value;
+            }
+            else
+            {
+                DependencyWarning = "Email profiles could not be listed.";
+            }
+        }
+        catch (Exception) when (!cancellation.IsCancellationRequested)
+        {
+            DependencyWarning = "Approved connection/profile selectors are temporarily unavailable.";
+        }
+        if (WorkflowId is null)
+        {
+            return;
+        }
+
+        Loading = true;
+        try
+        {
+            var result = await WorkflowCatalog.LoadAsync(WorkflowId.Value, cancellation.Token);
+            if (!result.IsSuccess)
+            {
+                LoadError = string.Join(" ", result.Issues.Select(issue => issue.Message));
+                return;
+            }
+
+            ApplyDetails(result.Value!);
+        }
+        catch (OperationCanceledException) when (cancellation.IsCancellationRequested)
+        {
+        }
+        catch (Exception)
+        {
+            LoadError = "The workflow could not be loaded from the control-plane database.";
+        }
+        finally
+        {
+            Loading = false;
+        }
     }
 
-    private void SelectNode(DesignerNode node) => SelectedNode = node;
+    private void ApplyDetails(WorkflowDetailsDto details)
+    {
+        WorkflowId = details.Id;
+        WorkflowName = details.Name;
+        Description = details.Description;
+        Owner = details.Owner;
+        CronExpression = details.CronExpression;
+        TimeZoneId = details.TimeZoneId;
+        DraftRevision = details.DraftRevision;
+        CurrentStatus = details.Status;
+        Nodes.Clear();
+        Edges.Clear();
+        var graph = GraphSerializer.Deserialize(details.GraphJson);
+        Nodes.AddRange(graph.Nodes.Select(node => new DesignerNode(
+            node.Id,
+            node.Kind,
+            node.Name,
+            SubtitleFor(node.Kind),
+            IconFor(node.Kind),
+            ToneFor(node.Kind),
+            "Saved",
+            node.X,
+            node.Y,
+            node.SettingsJson)));
+        Edges.AddRange(graph.Edges.Select(edge => new DesignerEdge(edge.FromNodeId, edge.ToNodeId)));
+    }
+
+    private void AddNode(PaletteTool tool)
+    {
+        if (!tool.IsOperational)
+        {
+            return;
+        }
+
+        var previous = Nodes.LastOrDefault();
+        var id = $"{tool.Kind.ToString().ToLowerInvariant()}-{Guid.NewGuid():N}"[..Math.Min(48, tool.Kind.ToString().Length + 33)];
+        var x = previous is null ? 80 : Math.Min(previous.X + 255, 845);
+        var y = previous is null || x > previous.X ? previous?.Y ?? 135 : previous.Y + 195;
+        var node = new DesignerNode(
+            id,
+            tool.Kind,
+            tool.Name,
+            SubtitleFor(tool.Kind),
+            tool.Icon,
+            tool.Tone,
+            "Draft",
+            x,
+            y,
+            DefaultSettings(tool.Kind));
+        Nodes.Add(node);
+        if (previous is not null && !IsSource(tool.Kind))
+        {
+            Edges.Add(new(previous.Id, node.Id));
+        }
+        SelectedNode = node;
+        ValidationIssues = [];
+    }
+
+    private void SelectNode(DesignerNode node)
+    {
+        SelectedNode = node;
+        ConnectFromNodeId = string.Empty;
+    }
+
     private void ClearSelection() => SelectedNode = null;
+
     private void DeleteSelected()
     {
-        if (SelectedNode is null) return;
+        if (SelectedNode is null)
+        {
+            return;
+        }
         Nodes.Remove(SelectedNode);
         Edges.RemoveAll(edge => edge.From == SelectedNode.Id || edge.To == SelectedNode.Id);
         SelectedNode = null;
+        ValidationIssues = [];
     }
+
+    private void ConnectSelected()
+    {
+        if (SelectedNode is null || string.IsNullOrWhiteSpace(ConnectFromNodeId))
+        {
+            return;
+        }
+        if (!Edges.Any(edge => edge.From == ConnectFromNodeId && edge.To == SelectedNode.Id))
+        {
+            Edges.Add(new(ConnectFromNodeId, SelectedNode.Id));
+            SynchronizeJoinInputs();
+        }
+        ConnectFromNodeId = string.Empty;
+    }
+
+    private void RemoveEdge(DesignerEdge edge)
+    {
+        Edges.Remove(edge);
+        SynchronizeJoinInputs();
+    }
+
+    private void SynchronizeJoinInputs()
+    {
+        if (SelectedNode?.Kind != WorkflowNodeKind.Join)
+        {
+            return;
+        }
+
+        var inputs = Edges
+            .Where(edge => edge.To == SelectedNode.Id)
+            .Select(edge => edge.From)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .Take(2)
+            .ToArray();
+        SetSettingString(SelectedNode, "leftNodeId", inputs.ElementAtOrDefault(0));
+        SetSettingString(SelectedNode, "rightNodeId", inputs.ElementAtOrDefault(1));
+    }
+
+    private void FormatSelectedSettings()
+    {
+        if (SelectedNode is null)
+        {
+            return;
+        }
+
+        try
+        {
+            var node = JsonNode.Parse(SelectedNode.SettingsJson, documentOptions: new JsonDocumentOptions
+            {
+                AllowTrailingCommas = false,
+                CommentHandling = JsonCommentHandling.Disallow,
+                MaxDepth = 32
+            });
+            if (node is not JsonObject)
+            {
+                throw new JsonException("Settings must be an object.");
+            }
+            SelectedNode.SettingsJson = node.ToJsonString(new JsonSerializerOptions { WriteIndented = true });
+        }
+        catch (JsonException exception)
+        {
+            Notifications.Notify(NotificationSeverity.Error, "Settings JSON is invalid", exception.Message);
+        }
+    }
+
+    private static string? GetSettingString(DesignerNode node, string propertyName)
+    {
+        try
+        {
+            using var document = JsonDocument.Parse(node.SettingsJson);
+            return document.RootElement.TryGetProperty(propertyName, out var value) && value.ValueKind == JsonValueKind.String
+                ? value.GetString()
+                : null;
+        }
+        catch (JsonException)
+        {
+            return null;
+        }
+    }
+
+    private void SetSettingString(DesignerNode node, string propertyName, string? value)
+    {
+        try
+        {
+            var settings = JsonNode.Parse(node.SettingsJson) as JsonObject ?? new JsonObject();
+            settings[propertyName] = value ?? string.Empty;
+            node.SettingsJson = settings.ToJsonString();
+            ValidationIssues = [];
+        }
+        catch (JsonException)
+        {
+            Notifications.Notify(
+                NotificationSeverity.Error,
+                "Settings JSON is invalid",
+                "Repair the JSON object before using a governed selector.");
+        }
+    }
+
+    private void SetSelectedConnection(ChangeEventArgs eventArgs)
+    {
+        if (SelectedNode is not null)
+        {
+            SetSettingString(SelectedNode, "connectionId", eventArgs.Value?.ToString());
+        }
+    }
+
+    private void SetSelectedEmailProfile(ChangeEventArgs eventArgs)
+    {
+        if (SelectedNode is not null)
+        {
+            SetSettingString(SelectedNode, "profileId", eventArgs.Value?.ToString());
+        }
+    }
+
+    private static ConnectionKind? ExpectedConnectionKind(WorkflowNodeKind kind) => kind switch
+    {
+        WorkflowNodeKind.SqlSource or WorkflowNodeKind.SqlTarget => ConnectionKind.SqlServer,
+        WorkflowNodeKind.CsvSource or WorkflowNodeKind.CsvTarget => ConnectionKind.CsvFile,
+        WorkflowNodeKind.ExcelSource or WorkflowNodeKind.ExcelTarget => ConnectionKind.ExcelFile,
+        _ => null
+    };
+
+    private static string ConnectionKindLabel(ConnectionKind kind) => kind switch
+    {
+        ConnectionKind.SqlServer => "SQL Server",
+        ConnectionKind.CsvFile => "CSV",
+        ConnectionKind.ExcelFile => "Excel",
+        _ => kind.ToString()
+    };
 
     private void Validate()
     {
-        var graph = new WorkflowGraph(
-            Nodes.Select(ToDomainNode).ToArray(),
-            Edges.Select(edge => new WorkflowEdge(edge.From, edge.To)).ToArray());
-        var issues = GraphValidator.Validate(graph);
-        Notifications.Notify(issues.Count == 0 ? NotificationSeverity.Success : NotificationSeverity.Warning,
-            issues.Count == 0 ? "Workflow is valid" : "Validation needs attention",
-            issues.Count == 0 ? $"{Nodes.Count} nodes and {Edges.Count} edges are ready." : issues[0].Message);
+        var graph = BuildGraph();
+        ValidationIssues = GraphValidator.Validate(graph)
+            .Concat(NodeSettingsValidator.Validate(graph))
+            .GroupBy(issue => (issue.Code, issue.NodeId, issue.Message))
+            .Select(group => group.First())
+            .ToArray();
+        Notifications.Notify(
+            ValidationIssues.Count == 0 ? NotificationSeverity.Success : NotificationSeverity.Warning,
+            ValidationIssues.Count == 0 ? "Workflow is valid" : "Validation needs attention",
+            ValidationIssues.Count == 0
+                ? $"{Nodes.Count} steps and {Edges.Count} links are ready to publish."
+                : ValidationIssues[0].Message);
     }
 
-    private void SaveDraft() => Notifications.Notify(NotificationSeverity.Success, "Draft saved", $"{WorkflowName} is stored as version 1.");
-    private void Publish() => Notifications.Notify(NotificationSeverity.Info, "Publish is gated", "Persistence and execution approval will be wired after the deployment decisions are confirmed.");
-    private static WorkflowNode ToDomainNode(DesignerNode node) => new(node.Id, node.Kind, node.Name, node.X, node.Y);
+    private async Task SaveDraftAsync()
+    {
+        Busy = true;
+        try
+        {
+            var graphJson = GraphSerializer.Serialize(BuildGraph());
+            WorkflowOperationResult<WorkflowDetailsDto> result;
+            if (WorkflowId is null)
+            {
+                result = await WorkflowCatalog.CreateAsync(
+                    new CreateWorkflowCommand(
+                        WorkflowName,
+                        Description,
+                        Owner,
+                        graphJson,
+                        NormalizeCron(),
+                        TimeZoneId),
+                    cancellation.Token);
+            }
+            else
+            {
+                result = await WorkflowCatalog.SaveAsync(
+                    new SaveWorkflowCommand(
+                        WorkflowId.Value,
+                        DraftRevision,
+                        WorkflowName,
+                        Description,
+                        Owner,
+                        graphJson,
+                        NormalizeCron(),
+                        TimeZoneId),
+                    cancellation.Token);
+            }
+
+            if (!result.IsSuccess)
+            {
+                NotifyIssues("Draft was not saved", result.Issues);
+                return;
+            }
+
+            var wasNew = WorkflowId is null;
+            ApplyDetails(result.Value!);
+            Notifications.Notify(NotificationSeverity.Success, "Draft saved", $"Revision {DraftRevision} is durable.");
+            if (wasNew)
+            {
+                Navigation.NavigateTo($"/designer/{WorkflowId}", replace: true);
+            }
+        }
+        catch (WorkflowGraphSerializationException exception)
+        {
+            Notifications.Notify(NotificationSeverity.Error, "Graph could not be serialized", exception.Message);
+        }
+        finally
+        {
+            Busy = false;
+        }
+    }
+
+    private async Task PublishAsync()
+    {
+        if (WorkflowId is null)
+        {
+            await SaveDraftAsync();
+            if (WorkflowId is null)
+            {
+                return;
+            }
+        }
+
+        Busy = true;
+        try
+        {
+            var result = await WorkflowCatalog.PublishAsync(
+                new PublishWorkflowCommand(WorkflowId.Value, DraftRevision, Owner),
+                cancellation.Token);
+            if (!result.IsSuccess)
+            {
+                NotifyIssues("Workflow was not published", result.Issues);
+                return;
+            }
+
+            ApplyDetails(result.Value!.Workflow);
+            ValidationIssues = [];
+            Notifications.Notify(
+                NotificationSeverity.Success,
+                result.Value.CreatedNewVersion ? "Workflow published" : "Workflow resumed",
+                $"Immutable version {result.Value.Version.Version} is active.");
+        }
+        finally
+        {
+            Busy = false;
+        }
+    }
+
+    private void NotifyIssues(string title, IReadOnlyList<WorkflowIssue> issues)
+    {
+        Notifications.Notify(
+            NotificationSeverity.Error,
+            title,
+            issues.Count == 0 ? "The operation failed." : string.Join(" ", issues.Take(3).Select(issue => issue.Message)));
+    }
+
+    private void SelectIssue(GraphValidationIssue issue)
+    {
+        if (issue.NodeId is not null)
+        {
+            SelectedNode = Nodes.FirstOrDefault(node =>
+                string.Equals(node.Id, issue.NodeId, StringComparison.OrdinalIgnoreCase));
+        }
+    }
+
+    private WorkflowGraph BuildGraph() => new(
+        Nodes.Select(node => new WorkflowNode(
+            node.Id,
+            node.Kind,
+            node.Name,
+            node.X,
+            node.Y,
+            node.SettingsJson)).ToArray(),
+        Edges.Select(edge => new WorkflowEdge(edge.From, edge.To)).ToArray());
+
+    private string? NormalizeCron() => string.IsNullOrWhiteSpace(CronExpression)
+        ? null
+        : CronExpression.Trim();
+
+    private void FitWorkflow()
+    {
+        var index = 0;
+        foreach (var node in Nodes)
+        {
+            node.X = 80 + (index % 4) * 255;
+            node.Y = 135 + (index / 4) * 195;
+            index++;
+        }
+    }
+
+    private string NodeName(string id) =>
+        Nodes.FirstOrDefault(node => node.Id == id)?.Name ?? id;
+
+    private static bool IsSource(WorkflowNodeKind kind) => kind is
+        WorkflowNodeKind.SqlSource or WorkflowNodeKind.CsvSource or WorkflowNodeKind.ExcelSource;
+
+    private static string DefaultSettings(WorkflowNodeKind kind) => kind switch
+    {
+        WorkflowNodeKind.SqlSource => "{\"connectionId\":\"\",\"schema\":\"dbo\",\"object\":\"\",\"batchSize\":1000}",
+        WorkflowNodeKind.CsvSource => "{\"connectionId\":\"\",\"relativePath\":\"inbound/data.csv\",\"hasHeader\":true,\"delimiter\":\",\"}",
+        WorkflowNodeKind.ExcelSource => "{\"connectionId\":\"\",\"relativePath\":\"inbound/data.xlsx\",\"worksheet\":\"Sheet1\",\"hasHeader\":true}",
+        WorkflowNodeKind.SelectColumns => "{\"columns\":[]}",
+        WorkflowNodeKind.FilterRows => "{\"conditions\":[]}",
+        WorkflowNodeKind.Join => "{\"leftNodeId\":\"\",\"rightNodeId\":\"\",\"leftKeys\":[],\"rightKeys\":[],\"type\":\"inner\",\"maximumBufferedRows\":100000}",
+        WorkflowNodeKind.SqlTarget => "{\"connectionId\":\"\",\"schema\":\"dbo\",\"object\":\"\",\"mode\":\"insert\"}",
+        WorkflowNodeKind.CsvTarget => "{\"connectionId\":\"\",\"relativePath\":\"outbound/result.csv\",\"mode\":\"createNew\",\"includeHeader\":true}",
+        WorkflowNodeKind.ExcelTarget => "{\"connectionId\":\"\",\"relativePath\":\"outbound/result.xlsx\",\"worksheet\":\"Results\",\"mode\":\"createNew\"}",
+        WorkflowNodeKind.EmailAlert => "{\"profileId\":\"\",\"recipients\":[],\"subject\":\"THub workflow notification\",\"body\":\"The workflow reached this Email action.\",\"maximumAttempts\":5}",
+        _ => "{}"
+    };
+
+    private static string SubtitleFor(WorkflowNodeKind kind) => kind switch
+    {
+        WorkflowNodeKind.SqlSource => "Approved SQL table",
+        WorkflowNodeKind.CsvSource => "Bounded CSV input",
+        WorkflowNodeKind.ExcelSource => "XLSX/XLSM input",
+        WorkflowNodeKind.SelectColumns => "Column mapping",
+        WorkflowNodeKind.FilterRows => "Typed conditions",
+        WorkflowNodeKind.Join => "Two-input join",
+        WorkflowNodeKind.SqlTarget => "SQL table output",
+        WorkflowNodeKind.CsvTarget => "CSV file output",
+        WorkflowNodeKind.ExcelTarget => "Excel output",
+        WorkflowNodeKind.EmailAlert => "Durable Email outbox",
+        _ => "Disabled by policy"
+    };
+
+    private static string IconFor(WorkflowNodeKind kind) => kind switch
+    {
+        WorkflowNodeKind.SqlSource or WorkflowNodeKind.SqlTarget => "database",
+        WorkflowNodeKind.CsvSource or WorkflowNodeKind.CsvTarget => "description",
+        WorkflowNodeKind.ExcelSource or WorkflowNodeKind.ExcelTarget => "grid_on",
+        WorkflowNodeKind.SelectColumns => "schema",
+        WorkflowNodeKind.FilterRows => "filter_alt",
+        WorkflowNodeKind.Join => "join_inner",
+        WorkflowNodeKind.EmailAlert => "mail",
+        WorkflowNodeKind.Webhook => "webhook",
+        _ => "terminal"
+    };
+
+    private static string ToneFor(WorkflowNodeKind kind) => kind switch
+    {
+        WorkflowNodeKind.SqlSource or WorkflowNodeKind.SqlTarget => "blue",
+        WorkflowNodeKind.CsvSource or WorkflowNodeKind.CsvTarget or WorkflowNodeKind.ExcelSource or WorkflowNodeKind.ExcelTarget => "green",
+        WorkflowNodeKind.SelectColumns or WorkflowNodeKind.Join => "violet",
+        WorkflowNodeKind.FilterRows => "amber",
+        WorkflowNodeKind.EmailAlert or WorkflowNodeKind.Webhook => "rose",
+        _ => "slate"
+    };
+
     private string GetNodeStyle(DesignerNode node) => $"left:{node.X}px;top:{node.Y}px";
+
     private string GetEdgePath(DesignerEdge edge)
     {
         var from = Nodes.First(node => node.Id == edge.From);
         var to = Nodes.First(node => node.Id == edge.To);
-        var x1 = from.X + 184; var y1 = from.Y + 39; var x2 = to.X; var y2 = to.Y + 39;
+        var x1 = from.X + 184;
+        var y1 = from.Y + 39;
+        var x2 = to.X;
+        var y2 = to.Y + 39;
         var bend = Math.Max(55, Math.Abs(x2 - x1) / 2);
         return $"M{x1},{y1} C{x1 + bend},{y1} {x2 - bend},{y2} {x2},{y2}";
     }
 
-    private sealed record PaletteGroup(string Name, PaletteTool[] Tools);
-    private sealed record PaletteTool(string Name, string Description, WorkflowNodeKind Kind, string Icon, string Tone);
-    private sealed record DesignerEdge(string From, string To);
-    private sealed class DesignerNode(string id, WorkflowNodeKind kind, string name, string subtitle, string icon, string tone, string state, double x, double y)
+    public void Dispose()
     {
-        public string Id { get; } = id; public WorkflowNodeKind Kind { get; } = kind; public string Name { get; set; } = name;
-        public string Subtitle { get; } = subtitle; public string Icon { get; } = icon; public string Tone { get; } = tone; public string State { get; } = state;
-        public double X { get; } = x; public double Y { get; } = y;
+        cancellation.Cancel();
+        cancellation.Dispose();
+    }
+
+    private sealed record PaletteGroup(string Name, PaletteTool[] Tools);
+    private sealed record PaletteTool(string Name, string Description, WorkflowNodeKind Kind, string Icon, string Tone, bool IsOperational);
+    private sealed record DesignerEdge(string From, string To);
+
+    private sealed class DesignerNode(
+        string id,
+        WorkflowNodeKind kind,
+        string name,
+        string subtitle,
+        string icon,
+        string tone,
+        string state,
+        double x,
+        double y,
+        string settingsJson)
+    {
+        public string Id { get; } = id;
+        public WorkflowNodeKind Kind { get; } = kind;
+        public string Name { get; set; } = name;
+        public string Subtitle { get; } = subtitle;
+        public string Icon { get; } = icon;
+        public string Tone { get; } = tone;
+        public string State { get; } = state;
+        public double X { get; set; } = x;
+        public double Y { get; set; } = y;
+        public string SettingsJson { get; set; } = settingsJson;
     }
 }

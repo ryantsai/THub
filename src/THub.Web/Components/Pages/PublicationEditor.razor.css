@@ -1,0 +1,255 @@
+.editor-heading {
+    align-items: end;
+}
+
+.editor-control-strip,
+.editor-window-nav {
+    align-items: center;
+    background: #f7f9fc;
+    border: 1px solid var(--line);
+    border-radius: 0.75rem;
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 0.75rem;
+    padding: 0.7rem 0.85rem;
+}
+
+.editor-facts,
+.editor-actions,
+.editor-window-nav > div {
+    align-items: center;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.55rem;
+}
+
+.editor-facts span {
+    border-right: 1px solid var(--line);
+    display: grid;
+    gap: 0.1rem;
+    padding-right: 0.85rem;
+}
+
+.editor-facts small {
+    color: var(--muted);
+    font-size: 0.68rem;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+}
+
+.editor-facts strong {
+    font-size: 0.82rem;
+}
+
+.spreadsheet-shell {
+    background: #fff;
+    border: 1px solid var(--line);
+    border-radius: 0.75rem;
+    height: min(66vh, 48rem);
+    min-height: 30rem;
+    overflow: hidden;
+}
+
+.spreadsheet-shell ::deep .rz-spreadsheet {
+    height: 100%;
+}
+
+.spreadsheet-shell ::deep .publication-lookup-value {
+    align-items: center;
+    display: inline-flex;
+    gap: 0.15rem;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.spreadsheet-shell ::deep .publication-lookup-value .rzi {
+    color: var(--accent);
+    font-size: 1rem;
+}
+
+.editor-notice {
+    align-items: center;
+    background: #fff8e8;
+    border: 1px solid #edd89e;
+    border-radius: 0.55rem;
+    color: #6a4b00;
+    display: flex;
+    gap: 0.45rem;
+    margin-bottom: 0.75rem;
+    padding: 0.6rem 0.75rem;
+}
+
+.editor-query-strip {
+    background: #f7f9fc;
+    border: 1px solid var(--line);
+    border-radius: 0.75rem;
+    margin-bottom: 0.75rem;
+    padding: 0.65rem 0.75rem;
+}
+
+.editor-query-controls {
+    align-items: end;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+}
+
+.editor-query-controls label {
+    display: grid;
+    gap: 0.2rem;
+}
+
+.editor-query-controls label > span {
+    color: var(--muted);
+    font-size: 0.68rem;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+}
+
+.editor-query-controls input,
+.editor-query-controls select {
+    background: #fff;
+    border: 1px solid var(--line);
+    border-radius: 0.35rem;
+    min-height: 2rem;
+    padding: 0.3rem 0.45rem;
+}
+
+.editor-query-controls .query-value {
+    flex: 1 1 12rem;
+}
+
+.editor-query-controls .sort-direction {
+    align-items: center;
+    display: flex;
+    gap: 0.35rem;
+    min-height: 2rem;
+}
+
+.editor-query-controls .sort-direction input {
+    min-height: auto;
+}
+
+.active-filter-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem;
+    margin-top: 0.55rem;
+}
+
+.active-filter-list button {
+    background: #eef3fb;
+    border: 1px solid #cbd8eb;
+    border-radius: 999px;
+    color: #2a4770;
+    cursor: pointer;
+    font-size: 0.72rem;
+    padding: 0.25rem 0.55rem;
+}
+
+.active-filter-list button.clear-filters {
+    background: #fff;
+    color: var(--muted);
+}
+
+.editor-window-nav {
+    color: var(--muted);
+    font-size: 0.78rem;
+    margin-top: 0.75rem;
+}
+
+.change-set-panel {
+    margin-top: 1rem;
+}
+
+.review-actions {
+    display: flex;
+    gap: 0.35rem;
+    justify-content: flex-end;
+    min-width: 22rem;
+}
+
+.review-actions input {
+    border: 1px solid var(--line);
+    border-radius: 0.35rem;
+    min-width: 14rem;
+    padding: 0.35rem 0.5rem;
+}
+
+.review-actions button {
+    background: #fff;
+    border: 1px solid var(--line);
+    border-radius: 0.35rem;
+    cursor: pointer;
+    padding: 0.35rem 0.55rem;
+}
+
+.review-actions button.danger {
+    color: #a21f31;
+}
+
+.change-set-detail {
+    background: #f8fafc;
+    border: 1px solid var(--line);
+    border-radius: 0.65rem;
+    margin-top: 0.9rem;
+    padding: 0.8rem;
+}
+
+.change-set-detail-head {
+    align-items: start;
+    display: flex;
+    gap: 1rem;
+    justify-content: space-between;
+    margin-bottom: 0.7rem;
+}
+
+.change-set-detail-head h3,
+.change-set-detail-head p {
+    margin: 0;
+}
+
+.change-set-detail-head p {
+    color: var(--muted);
+    font-size: 0.8rem;
+    margin-top: 0.2rem;
+}
+
+.change-detail-table pre {
+    font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+    font-size: 0.72rem;
+    margin: 0;
+    max-height: 12rem;
+    max-width: 28rem;
+    overflow: auto;
+    white-space: pre-wrap;
+    word-break: break-word;
+}
+
+.inspected-review-actions {
+    border-top: 1px solid var(--line);
+    justify-content: flex-start;
+    margin-top: 0.75rem;
+    padding-top: 0.75rem;
+}
+
+@media (max-width: 900px) {
+    .editor-control-strip,
+    .editor-window-nav {
+        align-items: stretch;
+        flex-direction: column;
+        gap: 0.7rem;
+    }
+
+    .spreadsheet-shell {
+        height: 60vh;
+        min-height: 26rem;
+    }
+
+    .editor-query-controls {
+        align-items: stretch;
+        flex-direction: column;
+    }
+}

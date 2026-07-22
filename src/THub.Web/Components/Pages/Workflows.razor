@@ -1,24 +1,178 @@
 @page "/workflows"
 @attribute [Authorize(Policy = Permissions.WorkflowView)]
+@implements IDisposable
+@using THub.Application.Workflows.Management
+@inject WorkflowCatalogService WorkflowCatalog
+@inject WorkflowRunService WorkflowRuns
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject IAuthorizationService AuthorizationService
+@inject NotificationService Notifications
+@inject NavigationManager Navigation
 
 <PageTitle>Workflows · THub</PageTitle>
-<div class="page-heading">
-    <div><div class="eyebrow">Workspace</div><h1>Workflows</h1><p>Design, version, publish, and monitor data movement.</p></div>
-    <div class="heading-actions"><RadzenButton Text="Import" Icon="upload_file" ButtonStyle="ButtonStyle.Light" /><RadzenButton Text="New workflow" Icon="add" ButtonStyle="ButtonStyle.Primary" Click="@NewWorkflow" /></div>
-</div>
-<section class="panel">
-    <div class="panel-head"><div><h2>All workflows</h2><p>12 total · 9 published · 2 drafts · 1 paused</p></div><a href="/designer">Open designer →</a></div>
-    <table class="activity-table"><thead><tr><th>Name</th><th>Status</th><th>Schedule</th><th>Last run</th><th>Owner</th></tr></thead><tbody>
-        @foreach (var workflow in Items)
-        {
-            <tr><td><div class="workflow-name"><span class="mini-flow-icon"><RadzenIcon Icon="account_tree" /></span>@workflow.Name</div></td><td><span class="status-chip @workflow.Status.ToLowerInvariant()">@workflow.Status</span></td><td>@workflow.Schedule</td><td class="muted">@workflow.LastRun</td><td class="muted">@workflow.Owner</td></tr>
-        }
-    </tbody></table>
-</section>
-@code {
-    [Inject] private NavigationManager Navigation { get; set; } = default!;
-    private void NewWorkflow() => Navigation.NavigateTo("/designer");
-    private static readonly Item[] Items = [new("Customer 360 sync", "Published", "Every 15 min", "4 min ago", "Ryan"), new("Order enrichment", "Published", "Hourly", "8 min ago", "Data Ops"), new("Finance export", "Draft", "Not scheduled", "Yesterday", "Avery"), new("Inventory snapshot", "Published", "0 2 * * *", "37 min ago", "Data Ops"), new("Partner CSV intake", "Paused", "File watch", "1 hr ago", "Morgan")];
-    private sealed record Item(string Name, string Status, string Schedule, string LastRun, string Owner);
-}
 
+<div class="page-heading">
+    <div>
+        <div class="eyebrow">Workspace</div>
+        <h1>Workflows</h1>
+        <p>Design, version, publish, and monitor durable data movement.</p>
+    </div>
+    <AuthorizeView Policy="@Permissions.WorkflowEdit">
+        <div class="heading-actions">
+            <RadzenButton Text="New workflow" Icon="add" ButtonStyle="ButtonStyle.Primary" Click="@NewWorkflow" />
+        </div>
+    </AuthorizeView>
+</div>
+
+<section class="panel">
+    <div class="panel-head">
+        <div>
+            <h2>All workflows</h2>
+            <p>@Summary</p>
+        </div>
+        <RadzenButton Text="Refresh" Icon="refresh" ButtonStyle="ButtonStyle.Light" Size="ButtonSize.Small" Click="@LoadAsync" Disabled="@Loading" />
+    </div>
+
+    @if (Loading)
+    {
+        <div class="page-state"><RadzenProgressBar Mode="ProgressBarMode.Indeterminate" /><p>Loading workflows…</p></div>
+    }
+    else if (Error is not null)
+    {
+        <div class="page-state error"><RadzenIcon Icon="error_outline" /><p>@Error</p><button type="button" @onclick="LoadAsync">Try again</button></div>
+    }
+    else if (Items.Count == 0)
+    {
+        <div class="page-state"><RadzenIcon Icon="account_tree" /><h3>No workflows yet</h3><p>Create a workflow, connect its steps, validate it, then publish an immutable version.</p></div>
+    }
+    else
+    {
+        <div class="table-scroll">
+            <table class="activity-table">
+                <thead><tr><th>Name</th><th>Status</th><th>Version</th><th>Schedule</th><th>Next run</th><th>Owner</th><th></th></tr></thead>
+                <tbody>
+                    @foreach (var workflow in Items)
+                    {
+                        <tr>
+                            <td><div class="workflow-name"><span class="mini-flow-icon"><RadzenIcon Icon="account_tree" /></span><AuthorizeView Policy="@Permissions.WorkflowEdit"><Authorized><a href="@($"/designer/{workflow.Id}")">@workflow.Name</a></Authorized><NotAuthorized><span>@workflow.Name</span></NotAuthorized></AuthorizeView></div></td>
+                            <td><span class="status-chip @workflow.Status.ToString().ToLowerInvariant()">@workflow.Status</span></td>
+                            <td class="muted">Draft r@(workflow.DraftRevision) · @(workflow.PublishedVersionNumber is null ? "not published" : $"v{workflow.PublishedVersionNumber}")</td>
+                            <td><code>@(workflow.CronExpression ?? "Manual")</code></td>
+                            <td class="muted">@(workflow.NextRunAtUtc?.ToLocalTime().ToString("g") ?? "—")</td>
+                            <td class="muted">@workflow.Owner</td>
+                            <td class="workflow-actions">
+                                <AuthorizeView Policy="@Permissions.WorkflowEdit">
+                                    <a href="@($"/designer/{workflow.Id}")" aria-label="Open @workflow.Name">Open</a>
+                                </AuthorizeView>
+                                @if (workflow.Status == THub.Domain.Workflows.WorkflowStatus.Published)
+                                {
+                                    <AuthorizeView Policy="@Permissions.WorkflowExecute">
+                                        <button type="button" disabled="@Loading" @onclick="() => QueueAsync(workflow.Id)">Run now</button>
+                                    </AuthorizeView>
+                                }
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+</section>
+
+@code {
+    private readonly CancellationTokenSource cancellation = new();
+    private IReadOnlyList<WorkflowListItemDto> Items { get; set; } = [];
+    private bool Loading { get; set; }
+    private string? Error { get; set; }
+
+    private string Summary =>
+        $"{Items.Count} shown · {Items.Count(item => item.Status == THub.Domain.Workflows.WorkflowStatus.Published)} published · " +
+        $"{Items.Count(item => item.Status == THub.Domain.Workflows.WorkflowStatus.Draft)} drafts · " +
+        $"{Items.Count(item => item.Status == THub.Domain.Workflows.WorkflowStatus.Paused)} paused";
+
+    protected override Task OnInitializedAsync() => LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        Loading = true;
+        Error = null;
+        try
+        {
+            var result = await WorkflowCatalog.ListAsync(
+                new WorkflowListRequest(Limit: WorkflowCatalogService.MaximumPageSize),
+                cancellation.Token);
+            if (result.IsSuccess)
+            {
+                Items = result.Value!.Items;
+            }
+            else
+            {
+                Error = string.Join(" ", result.Issues.Select(issue => issue.Message));
+            }
+        }
+        catch (OperationCanceledException) when (cancellation.IsCancellationRequested)
+        {
+        }
+        catch (Exception)
+        {
+            Error = "Workflows could not be loaded. Check the control-plane database and try again.";
+        }
+        finally
+        {
+            Loading = false;
+        }
+    }
+
+    private void NewWorkflow() => Navigation.NavigateTo("/designer");
+
+    private async Task QueueAsync(Guid workflowId)
+    {
+        var state = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        if (!(await AuthorizationService.AuthorizeAsync(
+                state.User,
+                Permissions.WorkflowExecute)).Succeeded)
+        {
+            Notifications.Notify(NotificationSeverity.Error, "Not authorized", "Workflow execution permission is required.");
+            return;
+        }
+
+        Loading = true;
+        try
+        {
+            var result = await WorkflowRuns.QueueAsync(
+                new QueueWorkflowRunCommand(
+                    workflowId,
+                    state.User.Identity?.Name ?? "unknown"),
+                cancellation.Token);
+            Notifications.Notify(new NotificationMessage
+            {
+                Severity = result.IsSuccess ? NotificationSeverity.Success : NotificationSeverity.Error,
+                Summary = result.IsSuccess ? "Run queued" : "Run could not be queued",
+                Detail = result.IsSuccess
+                    ? $"Run {result.Value!.Id.ToString("N")[..8].ToUpperInvariant()} is waiting for a worker lease."
+                    : result.Issues.FirstOrDefault()?.Message ?? "The request failed.",
+                Duration = 5_000
+            });
+        }
+        catch (OperationCanceledException) when (cancellation.IsCancellationRequested)
+        {
+        }
+        catch (Exception)
+        {
+            Notifications.Notify(
+                NotificationSeverity.Error,
+                "Run could not be queued",
+                "The control plane is temporarily unavailable. No run was confirmed.");
+        }
+        finally
+        {
+            Loading = false;
+        }
+    }
+
+    public void Dispose()
+    {
+        cancellation.Cancel();
+        cancellation.Dispose();
+    }
+}

@@ -41,7 +41,6 @@ Retain an explicitly enabled loopback-only development handler solely for automa
 
 ## Follow-up
 
-- Replace placeholder groups before deployment.
+- Configure real organization groups before deployment; checked-in production mapping arrays remain empty.
 - Decide whether default authenticated Viewer access remains acceptable.
 - Create a new ADR if per-resource grants or Entra/JWT consumers are added.
-

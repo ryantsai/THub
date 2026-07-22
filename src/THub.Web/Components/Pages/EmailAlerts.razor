@@ -1,0 +1,1056 @@
+@page "/alerts/email"
+@attribute [Authorize(Policy = Permissions.Administration)]
+@implements IDisposable
+@using THub.Application.Alerts
+@using THub.Application.Workflows.Management
+@using THub.Domain.Alerts
+@inject EmailAlertAdministrationService AlertAdministration
+@inject EmailAlertMonitoringService AlertMonitoring
+@inject WorkflowCatalogService WorkflowCatalog
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject NotificationService Notifications
+
+<PageTitle>Email alerts · THub</PageTitle>
+
+<div class="page-heading">
+    <div>
+        <div class="eyebrow">Administration</div>
+        <h1>Email alerts</h1>
+        <p>Govern approved SMTP relays and durable workflow-event notifications.</p>
+    </div>
+    <div class="heading-actions">
+        @if (SelectedTab == AlertTab.Profiles)
+        {
+            <RadzenButton Text="New profile" Icon="add" ButtonStyle="ButtonStyle.Primary" Click="@NewProfile" Disabled="@Busy" />
+        }
+        else if (SelectedTab == AlertTab.Rules)
+        {
+            <RadzenButton Text="New rule" Icon="add_alert" ButtonStyle="ButtonStyle.Primary" Click="@NewRule" Disabled="@(Busy || SelectedWorkflowId is null || !Profiles.Any(profile => profile.IsEnabled))" />
+        }
+        <RadzenButton Text="Refresh" Icon="refresh" ButtonStyle="ButtonStyle.Light" Click="@RefreshAsync" Disabled="@Busy" />
+    </div>
+</div>
+
+<section class="email-policy-note" aria-label="Email delivery boundary">
+    <RadzenIcon Icon="verified_user" />
+    <div>
+        <strong>Durable, policy-controlled delivery</strong>
+        <span>Email actions queue intent in SQL Server. SMTP delivery is at-least-once, so an ambiguous relay acknowledgement can produce a duplicate.</span>
+    </div>
+</section>
+
+<div class="alert-tabs" role="tablist" aria-label="Email alert management">
+    <button type="button" role="tab" aria-selected="@(SelectedTab == AlertTab.Profiles)" class="@(SelectedTab == AlertTab.Profiles ? "active" : null)" @onclick="() => SelectTab(AlertTab.Profiles)">
+        <RadzenIcon Icon="outgoing_mail" /> Delivery profiles <span>@Profiles.Count</span>
+    </button>
+    <button type="button" role="tab" aria-selected="@(SelectedTab == AlertTab.Rules)" class="@(SelectedTab == AlertTab.Rules ? "active" : null)" @onclick="() => SelectTab(AlertTab.Rules)">
+        <RadzenIcon Icon="notifications_active" /> Workflow rules <span>@Rules.Count</span>
+    </button>
+    <button type="button" role="tab" aria-selected="@(SelectedTab == AlertTab.Deliveries)" class="@(SelectedTab == AlertTab.Deliveries ? "active" : null)" @onclick="() => SelectTab(AlertTab.Deliveries)">
+        <RadzenIcon Icon="mark_email_read" /> Delivery monitor <span>@DeliveryTotal</span>
+    </button>
+</div>
+
+<div class="operation-status @(PageError is null ? "" : "error")" aria-live="polite" aria-atomic="true">
+    @if (PageError is not null)
+    {
+        <RadzenIcon Icon="error_outline" /><span>@PageError</span>
+    }
+</div>
+
+@if (Loading)
+{
+    <div class="page-state"><RadzenProgressBar Mode="ProgressBarMode.Indeterminate" /><p>Loading Email alert policy…</p></div>
+}
+else if (SelectedTab == AlertTab.Profiles)
+{
+    <section class="panel alert-catalog" role="tabpanel" aria-label="Email delivery profiles">
+        <div class="panel-head">
+            <div><h2>Delivery profiles</h2><p>Administrator-owned relay, sender, TLS, recipient, and message limits.</p></div>
+        </div>
+        @if (Profiles.Count == 0)
+        {
+            <div class="page-state compact"><RadzenIcon Icon="outgoing_mail" /><h3>No Email delivery profiles</h3><p>Create an approved relay profile before adding workflow rules or Email actions.</p></div>
+        }
+        else
+        {
+            <div class="table-scroll">
+                <table class="activity-table alert-table">
+                    <thead><tr><th>Profile</th><th>Relay</th><th>Sender</th><th>Policy</th><th>Status</th><th></th></tr></thead>
+                    <tbody>
+                        @foreach (var profile in Profiles)
+                        {
+                            <tr class="@(ProfileEditor.Id == profile.Id ? "selected" : null)">
+                                <td><strong>@profile.Name</strong><small>@CredentialSummary(profile)</small></td>
+                                <td><code>@profile.SmtpHost:@profile.SmtpPort</code><small>@SecurityLabel(profile.TransportSecurity)</small></td>
+                                <td>@profile.SenderAddress</td>
+                                <td><span>@profile.Limits.MaximumRecipients recipients</span><small>@profile.AllowedRecipientDomains.Count approved domain(s)</small></td>
+                                <td><span class="status-chip @(profile.IsEnabled ? "" : "draft")">@(profile.IsEnabled ? "Enabled" : "Disabled")</span></td>
+                                <td><button class="table-action" type="button" @onclick="() => EditProfile(profile)">Manage</button></td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+    </section>
+
+    @if (ProfileEditorVisible)
+    {
+        <section class="panel policy-editor" aria-labelledby="profile-editor-title">
+            <div class="panel-head">
+                <div><h2 id="profile-editor-title">@(ProfileEditor.Id is null ? "New delivery profile" : "Edit delivery profile")</h2><p>Enter only an approved secret-provider lookup key; never paste a username or password.</p></div>
+                <button class="icon-close" type="button" aria-label="Close profile editor" @onclick="CloseProfileEditor">×</button>
+            </div>
+
+            <div class="editor-section">
+                <h3>Relay and sender</h3>
+                <div class="policy-form">
+                    <label><span>Profile name <b aria-hidden="true">*</b></span><input maxlength="200" required aria-required="true" @bind="ProfileEditor.Name" disabled="@Busy" /></label>
+                    <label><span>SMTP host <b aria-hidden="true">*</b></span><input maxlength="253" placeholder="smtp.example.com" required aria-required="true" @bind="ProfileEditor.SmtpHost" disabled="@Busy" /></label>
+                    <label><span>Port</span><input type="number" min="1" max="65535" @bind="ProfileEditor.SmtpPort" disabled="@Busy" /></label>
+                    <label><span>Transport security</span>
+                        <select @bind="ProfileEditor.TransportSecurity" disabled="@Busy">
+                            <option value="@EmailTransportSecurity.StartTlsRequired">STARTTLS required</option>
+                            <option value="@EmailTransportSecurity.ImplicitTls">Implicit TLS</option>
+                        </select>
+                    </label>
+                    <label><span>Approved sender <b aria-hidden="true">*</b></span><input type="email" maxlength="320" placeholder="thub@example.com" required aria-required="true" @bind="ProfileEditor.SenderAddress" disabled="@Busy" /></label>
+                    <label><span>Credential secret reference</span><input maxlength="500" autocomplete="off" spellcheck="false" placeholder="smtp/production" @bind="ProfileEditor.CredentialSecretReference" disabled="@Busy" /><small>Optional reference only. Username/password are resolved by the Worker from the approved secret provider at send time.</small></label>
+                </div>
+            </div>
+
+            <div class="editor-section divided">
+                <h3>Recipient and message bounds</h3>
+                <div class="policy-form bounds">
+                    <label class="wide"><span>Allowed recipient domains <b aria-hidden="true">*</b></span><textarea rows="3" maxlength="3900" placeholder="example.com&#10;subsidiary.example.com" @bind="ProfileEditor.AllowedDomainsText" disabled="@Busy"></textarea><small>One domain per line. Up to 20 domains; every recipient is checked before SMTP.</small></label>
+                    <label><span>Maximum recipients</span><input type="number" min="1" max="100" @bind="ProfileEditor.MaximumRecipients" disabled="@Busy" /></label>
+                    <label><span>Maximum subject characters</span><input type="number" min="1" max="998" @bind="ProfileEditor.MaximumSubjectLength" disabled="@Busy" /></label>
+                    <label><span>Maximum body characters</span><input type="number" min="1" max="1000000" @bind="ProfileEditor.MaximumBodyLength" disabled="@Busy" /></label>
+                    <label><span>Maximum concurrent sends</span><input type="number" min="1" max="100" @bind="ProfileEditor.MaximumConcurrentSends" disabled="@Busy" /></label>
+                </div>
+            </div>
+
+            @if (ProfileFormError is not null)
+            {
+                <div class="form-error" role="alert"><RadzenIcon Icon="error_outline" /><span>@ProfileFormError</span></div>
+            }
+            <div class="editor-actions policy-actions">
+                @if (ProfileEditor.Id is not null)
+                {
+                    <RadzenButton Text="Reload current" Icon="history" ButtonStyle="ButtonStyle.Light" Click="@ReloadProfileAsync" Disabled="@Busy" />
+                    <RadzenButton Text="@(ProfileEditor.IsEnabled ? "Disable" : "Enable")" Icon="power_settings_new" ButtonStyle="@(ProfileEditor.IsEnabled ? ButtonStyle.Danger : ButtonStyle.Success)" Click="@ToggleProfileAsync" Disabled="@Busy" />
+                }
+                <span></span>
+                <RadzenButton Text="Cancel" ButtonStyle="ButtonStyle.Light" Click="@CloseProfileEditor" Disabled="@Busy" />
+                <RadzenButton Text="Save profile" Icon="save" ButtonStyle="ButtonStyle.Primary" Click="@SaveProfileAsync" Disabled="@Busy" />
+            </div>
+        </section>
+    }
+}
+else if (SelectedTab == AlertTab.Rules)
+{
+    <section class="panel workflow-picker" role="tabpanel" aria-label="Workflow alert rules">
+        <div class="panel-head"><div><h2>Workflow scope</h2><p>Rules subscribe to terminal run events and queue through the same durable Email outbox.</p></div></div>
+        <div class="workflow-filter">
+            <label><span>Find workflow</span><input maxlength="200" placeholder="Search by workflow name" @bind="WorkflowSearch" disabled="@Busy" /></label>
+            <RadzenButton Text="Search" Icon="search" ButtonStyle="ButtonStyle.Light" Click="@SearchWorkflowsAsync" Disabled="@Busy" />
+            <label class="workflow-select"><span>Selected workflow</span>
+                <select @bind="SelectedWorkflowId" @bind:after="ChangeWorkflowAsync" disabled="@Busy">
+                    <option value="">Choose a workflow</option>
+                    @foreach (var workflow in Workflows)
+                    {
+                        <option value="@workflow.Id">@workflow.Name · @workflow.Status</option>
+                    }
+                </select>
+            </label>
+            <small>Showing up to 100 matches. Search narrows larger catalogs without loading unbounded workflow metadata.</small>
+        </div>
+    </section>
+
+    <section class="panel alert-catalog rules-catalog">
+        <div class="panel-head">
+            <div><h2>Terminal-event rules</h2><p>@RuleSummary</p></div>
+        </div>
+        @if (SelectedWorkflowId is null)
+        {
+            <div class="page-state compact"><RadzenIcon Icon="account_tree" /><p>Select a workflow to manage its Email rules.</p></div>
+        }
+        else if (Rules.Count == 0)
+        {
+            <div class="page-state compact"><RadzenIcon Icon="notifications_off" /><h3>No rules for this workflow</h3><p>Add a rule for failure, success, cancellation, or any supported combination.</p></div>
+        }
+        else
+        {
+            <div class="table-scroll">
+                <table class="activity-table alert-table">
+                    <thead><tr><th>Rule</th><th>Events</th><th>Profile</th><th>Recipients</th><th>Status</th><th></th></tr></thead>
+                    <tbody>
+                        @foreach (var rule in Rules)
+                        {
+                            <tr class="@(RuleEditor.Id == rule.Id ? "selected" : null)">
+                                <td><strong>@rule.Name</strong><small>Updated @rule.UpdatedAtUtc.ToLocalTime().ToString("g")</small></td>
+                                <td>@TriggerSummary(rule.Triggers)</td>
+                                <td>@ProfileName(rule.EmailDeliveryProfileId)</td>
+                                <td>@rule.Recipients.Count</td>
+                                <td><span class="status-chip @(rule.IsEnabled ? "" : "draft")">@(rule.IsEnabled ? "Enabled" : "Disabled")</span></td>
+                                <td><button class="table-action" type="button" @onclick="() => EditRule(rule)">Manage</button></td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+    </section>
+
+    @if (RuleEditorVisible)
+    {
+        <section class="panel policy-editor" aria-labelledby="rule-editor-title">
+            <div class="panel-head">
+                <div><h2 id="rule-editor-title">@(RuleEditor.Id is null ? "New workflow rule" : "Edit workflow rule")</h2><p>Templates accept only the documented run metadata variables—never source rows or secrets.</p></div>
+                <button class="icon-close" type="button" aria-label="Close rule editor" @onclick="CloseRuleEditor">×</button>
+            </div>
+            <div class="editor-section">
+                <h3>Subscription</h3>
+                <div class="policy-form">
+                    <label><span>Rule name <b aria-hidden="true">*</b></span><input maxlength="200" required aria-required="true" @bind="RuleEditor.Name" disabled="@Busy" /></label>
+                    <label><span>Delivery profile <b aria-hidden="true">*</b></span>
+                        <select @bind="RuleEditor.ProfileId" disabled="@Busy">
+                            <option value="@Guid.Empty">Choose an enabled profile</option>
+                            @foreach (var profile in Profiles)
+                            {
+                                <option value="@profile.Id" disabled="@(!profile.IsEnabled && profile.Id != RuleEditor.ProfileId)">@profile.Name · @(profile.IsEnabled ? "enabled" : "disabled")</option>
+                            }
+                        </select>
+                    </label>
+                    <fieldset class="wide trigger-fieldset">
+                        <legend>Terminal events <b aria-hidden="true">*</b></legend>
+                        <label><input type="checkbox" @bind="RuleEditor.RunFailed" disabled="@Busy" /><span>Run failed</span></label>
+                        <label><input type="checkbox" @bind="RuleEditor.RunSucceeded" disabled="@Busy" /><span>Run succeeded</span></label>
+                        <label><input type="checkbox" @bind="RuleEditor.RunCancelled" disabled="@Busy" /><span>Run cancelled</span></label>
+                    </fieldset>
+                    <label class="wide"><span>Recipients <b aria-hidden="true">*</b></span><textarea rows="3" maxlength="32768" placeholder="ops@example.com&#10;data-owner@example.com" @bind="RuleEditor.RecipientsText" disabled="@Busy"></textarea><small>One address per line. The selected profile checks recipient count and approved domains.</small></label>
+                </div>
+            </div>
+            <div class="editor-section divided">
+                <h3>Bounded template</h3>
+                <div class="policy-form template-form">
+                    <label class="wide"><span>Subject template <b aria-hidden="true">*</b></span><input maxlength="998" required aria-required="true" @bind="RuleEditor.SubjectTemplate" disabled="@Busy" /></label>
+                    <label class="wide"><span>Plain-text body template</span><textarea rows="6" maxlength="1000000" @bind="RuleEditor.BodyTemplate" disabled="@Busy"></textarea></label>
+                </div>
+                <div class="template-help" aria-label="Allowed Email template variables">
+                    <strong>Allowed variables</strong>
+                    <code>{{workflow.id}}</code><code>{{workflow.name}}</code><code>{{run.id}}</code><code>{{run.status}}</code><code>{{run.triggeredBy}}</code><code>{{run.startedAtUtc}}</code><code>{{run.completedAtUtc}}</code><code>{{error.code}}</code><code>{{error.category}}</code><code>{{error.summary}}</code>
+                </div>
+            </div>
+            @if (SelectedRuleProfile is { } selectedProfile)
+            {
+                <div class="selected-policy"><RadzenIcon Icon="policy" /><span><strong>@selectedProfile.Name policy:</strong> @selectedProfile.Limits.MaximumRecipients recipients, @selectedProfile.Limits.MaximumSubjectLength subject characters, @selectedProfile.Limits.MaximumBodyLength body characters.</span></div>
+            }
+            @if (RuleFormError is not null)
+            {
+                <div class="form-error" role="alert"><RadzenIcon Icon="error_outline" /><span>@RuleFormError</span></div>
+            }
+            <div class="editor-actions policy-actions">
+                @if (RuleEditor.Id is not null)
+                {
+                    <RadzenButton Text="Reload current" Icon="history" ButtonStyle="ButtonStyle.Light" Click="@ReloadRuleAsync" Disabled="@Busy" />
+                    <RadzenButton Text="@(RuleEditor.IsEnabled ? "Disable" : "Enable")" Icon="power_settings_new" ButtonStyle="@(RuleEditor.IsEnabled ? ButtonStyle.Danger : ButtonStyle.Success)" Click="@ToggleRuleAsync" Disabled="@Busy" />
+                }
+                <span></span>
+                <RadzenButton Text="Cancel" ButtonStyle="ButtonStyle.Light" Click="@CloseRuleEditor" Disabled="@Busy" />
+                <RadzenButton Text="Save rule" Icon="save" ButtonStyle="ButtonStyle.Primary" Click="@SaveRuleAsync" Disabled="@Busy" />
+            </div>
+        </section>
+    }
+}
+else
+{
+    <section class="panel alert-catalog" role="tabpanel" aria-label="Email delivery monitor">
+        <div class="panel-head">
+            <div><h2>Durable delivery monitor</h2><p>Safe outbox state and retry outcomes. Message recipients, subjects, and bodies are intentionally not displayed.</p></div>
+        </div>
+        <div class="delivery-filter">
+            <label><span>Status</span>
+                <select @bind="DeliveryStatusFilter" disabled="@Busy">
+                    <option value="">All statuses</option>
+                    @foreach (var status in Enum.GetValues<AlertDeliveryStatus>())
+                    {
+                        <option value="@status">@status</option>
+                    }
+                </select>
+            </label>
+            <label><span>Delivery profile</span>
+                <select @bind="DeliveryProfileFilter" disabled="@Busy">
+                    <option value="">All profiles</option>
+                    @foreach (var profile in Profiles)
+                    {
+                        <option value="@profile.Id">@profile.Name</option>
+                    }
+                </select>
+            </label>
+            <RadzenButton Text="Apply filters" Icon="filter_alt" ButtonStyle="ButtonStyle.Light" Click="@ApplyDeliveryFiltersAsync" Disabled="@Busy" />
+            <small>@DeliveryTotal matching deliver@(DeliveryTotal == 1 ? "y" : "ies"); newest 100 are shown.</small>
+        </div>
+        @if (Deliveries.Count == 0)
+        {
+            <div class="page-state compact"><RadzenIcon Icon="mail_outline" /><h3>No matching deliveries</h3><p>Delivery rows appear after a terminal workflow rule or Email action queues durable intent.</p></div>
+        }
+        else
+        {
+            <div class="table-scroll">
+                <table class="activity-table alert-table delivery-table">
+                    <thead><tr><th>Delivery</th><th>Source</th><th>Profile</th><th>Status</th><th>Attempts</th><th>Timing</th><th>Last safe outcome</th></tr></thead>
+                    <tbody>
+                        @foreach (var delivery in Deliveries)
+                        {
+                            <tr>
+                                <td><strong>@ShortId(delivery.Id)</strong><small>Run @ShortId(delivery.WorkflowRunId)@(delivery.WorkflowNodeId is null ? string.Empty : $" · {delivery.WorkflowNodeId}")</small></td>
+                                <td>@delivery.Event<small>@delivery.Source</small></td>
+                                <td>@delivery.ProfileName</td>
+                                <td><span class="status-chip @DeliveryStatusCss(delivery.Status)">@delivery.Status</span></td>
+                                <td>@delivery.AttemptCount / @delivery.MaximumAttempts</td>
+                                <td>@delivery.CreatedAtUtc.ToLocalTime().ToString("g")<small>@DeliveryTiming(delivery)</small></td>
+                                <td>@(delivery.LastErrorCode ?? delivery.ProviderMessageId ?? "—")<small>@(delivery.LastErrorSummary ?? (delivery.CompletedAtUtc is null ? "No terminal outcome" : "Completed"))</small></td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+    </section>
+}
+
+@code {
+    private readonly CancellationTokenSource cancellation = new();
+    private IReadOnlyList<EmailDeliveryProfileDto> Profiles { get; set; } = [];
+    private IReadOnlyList<WorkflowListItemDto> Workflows { get; set; } = [];
+    private IReadOnlyList<WorkflowAlertRuleDto> Rules { get; set; } = [];
+    private IReadOnlyList<EmailAlertDeliveryListItem> Deliveries { get; set; } = [];
+    private int DeliveryTotal { get; set; }
+    private AlertDeliveryStatus? DeliveryStatusFilter { get; set; }
+    private Guid? DeliveryProfileFilter { get; set; }
+    private AlertTab SelectedTab { get; set; }
+    private Guid? SelectedWorkflowId { get; set; }
+    private string WorkflowSearch { get; set; } = string.Empty;
+    private ProfileEditModel ProfileEditor { get; set; } = ProfileEditModel.Create();
+    private RuleEditModel RuleEditor { get; set; } = RuleEditModel.Create(Guid.Empty);
+    private bool ProfileEditorVisible { get; set; }
+    private bool RuleEditorVisible { get; set; }
+    private bool Loading { get; set; }
+    private bool Busy { get; set; }
+    private string? PageError { get; set; }
+    private string? ProfileFormError { get; set; }
+    private string? RuleFormError { get; set; }
+
+    private EmailDeliveryProfileDto? SelectedRuleProfile =>
+        Profiles.SingleOrDefault(profile => profile.Id == RuleEditor.ProfileId);
+
+    private string RuleSummary => SelectedWorkflowId is null
+        ? "Choose a workflow to view its alert policy."
+        : $"{Rules.Count} configured rule{(Rules.Count == 1 ? string.Empty : "s")}.";
+
+    protected override Task OnInitializedAsync() => RefreshAsync();
+
+    private async Task RefreshAsync()
+    {
+        Loading = true;
+        PageError = null;
+        try
+        {
+            await LoadProfilesAsync();
+            await LoadWorkflowOptionsAsync();
+            await LoadRulesAsync();
+            await LoadDeliveriesAsync();
+        }
+        catch (OperationCanceledException) when (cancellation.IsCancellationRequested)
+        {
+        }
+        catch (Exception)
+        {
+            PageError = "Email alert policy is temporarily unavailable.";
+        }
+        finally
+        {
+            Loading = false;
+        }
+    }
+
+    private async Task LoadProfilesAsync()
+    {
+        var result = await AlertAdministration.ListProfilesAsync(cancellation.Token);
+        if (!result.IsSuccess || result.Value is null)
+        {
+            PageError = result.Problem?.Message ?? "Email delivery profiles could not be loaded.";
+            return;
+        }
+
+        Profiles = result.Value;
+    }
+
+    private async Task LoadWorkflowOptionsAsync()
+    {
+        var result = await WorkflowCatalog.ListAsync(
+            new WorkflowListRequest(0, 100, NullIfWhitespace(WorkflowSearch)),
+            cancellation.Token);
+        if (!result.IsSuccess || result.Value is null)
+        {
+            PageError = result.Issues.FirstOrDefault()?.Message ?? "Workflows could not be loaded.";
+            Workflows = [];
+            return;
+        }
+
+        Workflows = result.Value.Items;
+        if (SelectedWorkflowId is not null && Workflows.All(workflow => workflow.Id != SelectedWorkflowId))
+        {
+            SelectedWorkflowId = null;
+            Rules = [];
+            CloseRuleEditor();
+        }
+    }
+
+    private async Task SearchWorkflowsAsync()
+    {
+        Busy = true;
+        PageError = null;
+        try
+        {
+            await LoadWorkflowOptionsAsync();
+        }
+        catch (OperationCanceledException) when (cancellation.IsCancellationRequested)
+        {
+        }
+        catch (Exception)
+        {
+            PageError = "The workflow catalog is temporarily unavailable.";
+        }
+        finally
+        {
+            Busy = false;
+        }
+    }
+
+    private async Task LoadRulesAsync()
+    {
+        if (SelectedWorkflowId is not Guid workflowId)
+        {
+            Rules = [];
+            return;
+        }
+
+        var result = await AlertAdministration.ListRulesAsync(workflowId, cancellation.Token);
+        if (!result.IsSuccess || result.Value is null)
+        {
+            PageError = result.Problem?.Message ?? "Workflow alert rules could not be loaded.";
+            Rules = [];
+            return;
+        }
+
+        Rules = result.Value;
+    }
+
+    private async Task LoadDeliveriesAsync()
+    {
+        var result = await AlertMonitoring.ListAsync(
+            new EmailAlertDeliveryListRequest(
+                Limit: 100,
+                Status: DeliveryStatusFilter,
+                EmailDeliveryProfileId: DeliveryProfileFilter),
+            cancellation.Token);
+        if (!result.IsSuccess || result.Value is null)
+        {
+            PageError = result.Problem?.Message ?? "Email deliveries could not be loaded.";
+            Deliveries = [];
+            DeliveryTotal = 0;
+            return;
+        }
+
+        Deliveries = result.Value.Items;
+        DeliveryTotal = result.Value.TotalCount;
+    }
+
+    private async Task ApplyDeliveryFiltersAsync()
+    {
+        Busy = true;
+        PageError = null;
+        try
+        {
+            await LoadDeliveriesAsync();
+        }
+        catch (OperationCanceledException) when (cancellation.IsCancellationRequested)
+        {
+        }
+        catch (Exception)
+        {
+            PageError = "Email deliveries are temporarily unavailable.";
+        }
+        finally
+        {
+            Busy = false;
+        }
+    }
+
+    private async Task ChangeWorkflowAsync()
+    {
+        CloseRuleEditor();
+        PageError = null;
+        try
+        {
+            await LoadRulesAsync();
+        }
+        catch (OperationCanceledException) when (cancellation.IsCancellationRequested)
+        {
+        }
+        catch (Exception)
+        {
+            PageError = "Workflow alert rules are temporarily unavailable.";
+        }
+    }
+
+    private void SelectTab(AlertTab tab)
+    {
+        SelectedTab = tab;
+        PageError = null;
+    }
+
+    private void NewProfile()
+    {
+        ProfileEditor = ProfileEditModel.Create();
+        ProfileFormError = null;
+        ProfileEditorVisible = true;
+    }
+
+    private void EditProfile(EmailDeliveryProfileDto profile)
+    {
+        ProfileEditor = ProfileEditModel.From(profile);
+        ProfileFormError = null;
+        ProfileEditorVisible = true;
+    }
+
+    private async Task SaveProfileAsync()
+    {
+        ProfileFormError = ValidateProfile();
+        if (ProfileFormError is not null)
+        {
+            return;
+        }
+
+        Busy = true;
+        try
+        {
+            var limits = new EmailDeliveryLimits(
+                ProfileEditor.MaximumRecipients,
+                ProfileEditor.MaximumSubjectLength,
+                ProfileEditor.MaximumBodyLength,
+                ProfileEditor.MaximumConcurrentSends);
+            var domains = SplitValues(ProfileEditor.AllowedDomainsText);
+            AlertResult<EmailDeliveryProfileDto> result;
+            if (ProfileEditor.Id is Guid profileId)
+            {
+                result = await AlertAdministration.UpdateProfileAsync(
+                    new UpdateEmailDeliveryProfileCommand(
+                        profileId,
+                        ProfileEditor.Name,
+                        ProfileEditor.SmtpHost,
+                        ProfileEditor.SmtpPort,
+                        ProfileEditor.TransportSecurity,
+                        ProfileEditor.SenderAddress,
+                        domains,
+                        NullIfWhitespace(ProfileEditor.CredentialSecretReference),
+                        limits,
+                        ProfileEditor.UpdatedAtUtc),
+                    cancellation.Token);
+            }
+            else
+            {
+                result = await AlertAdministration.CreateProfileAsync(
+                    new CreateEmailDeliveryProfileCommand(
+                        ProfileEditor.Name,
+                        ProfileEditor.SmtpHost,
+                        ProfileEditor.SmtpPort,
+                        ProfileEditor.TransportSecurity,
+                        ProfileEditor.SenderAddress,
+                        domains,
+                        await GetActorAsync(),
+                        NullIfWhitespace(ProfileEditor.CredentialSecretReference),
+                        limits),
+                    cancellation.Token);
+            }
+
+            if (!result.IsSuccess || result.Value is null)
+            {
+                ProfileFormError = result.Problem?.Message ?? "The Email delivery profile could not be saved.";
+                return;
+            }
+
+            ProfileEditor = ProfileEditModel.From(result.Value);
+            await LoadProfilesAsync();
+            Notify(true, "Email delivery profile saved.");
+        }
+        catch (OperationCanceledException) when (cancellation.IsCancellationRequested)
+        {
+        }
+        catch (ArgumentException exception)
+        {
+            ProfileFormError = exception.Message;
+        }
+        catch (Exception)
+        {
+            ProfileFormError = "The Email delivery profile could not be saved because the service is temporarily unavailable.";
+        }
+        finally
+        {
+            Busy = false;
+        }
+    }
+
+    private async Task ToggleProfileAsync()
+    {
+        if (ProfileEditor.Id is not Guid profileId)
+        {
+            return;
+        }
+
+        Busy = true;
+        ProfileFormError = null;
+        try
+        {
+            var result = await AlertAdministration.SetProfileEnabledAsync(
+                new SetEmailDeliveryProfileEnabledCommand(
+                    profileId,
+                    !ProfileEditor.IsEnabled,
+                    ProfileEditor.UpdatedAtUtc),
+                cancellation.Token);
+            if (!result.IsSuccess || result.Value is null)
+            {
+                ProfileFormError = result.Problem?.Message ?? "The profile state could not be changed.";
+                return;
+            }
+
+            ProfileEditor = ProfileEditModel.From(result.Value);
+            await LoadProfilesAsync();
+            Notify(true, $"Email profile {(result.Value.IsEnabled ? "enabled" : "disabled")}.");
+        }
+        catch (OperationCanceledException) when (cancellation.IsCancellationRequested)
+        {
+        }
+        catch (Exception)
+        {
+            ProfileFormError = "The profile state could not be changed because the service is temporarily unavailable.";
+        }
+        finally
+        {
+            Busy = false;
+        }
+    }
+
+    private async Task ReloadProfileAsync()
+    {
+        if (ProfileEditor.Id is not Guid profileId)
+        {
+            return;
+        }
+
+        Busy = true;
+        try
+        {
+            var result = await AlertAdministration.GetProfileAsync(profileId, cancellation.Token);
+            if (!result.IsSuccess || result.Value is null)
+            {
+                ProfileFormError = result.Problem?.Message ?? "The profile could not be reloaded.";
+                return;
+            }
+
+            ProfileEditor = ProfileEditModel.From(result.Value);
+            ProfileFormError = null;
+        }
+        catch (OperationCanceledException) when (cancellation.IsCancellationRequested)
+        {
+        }
+        catch (Exception)
+        {
+            ProfileFormError = "The profile could not be reloaded because the service is temporarily unavailable.";
+        }
+        finally
+        {
+            Busy = false;
+        }
+    }
+
+    private void CloseProfileEditor()
+    {
+        ProfileEditorVisible = false;
+        ProfileFormError = null;
+    }
+
+    private void NewRule()
+    {
+        if (SelectedWorkflowId is null)
+        {
+            return;
+        }
+
+        RuleEditor = RuleEditModel.Create(Profiles.FirstOrDefault(profile => profile.IsEnabled)?.Id ?? Guid.Empty);
+        RuleFormError = null;
+        RuleEditorVisible = true;
+    }
+
+    private void EditRule(WorkflowAlertRuleDto rule)
+    {
+        RuleEditor = RuleEditModel.From(rule);
+        RuleFormError = null;
+        RuleEditorVisible = true;
+    }
+
+    private async Task SaveRuleAsync()
+    {
+        RuleFormError = ValidateRule();
+        if (RuleFormError is not null || SelectedWorkflowId is not Guid workflowId)
+        {
+            return;
+        }
+
+        Busy = true;
+        try
+        {
+            var recipients = SplitValues(RuleEditor.RecipientsText);
+            AlertResult<WorkflowAlertRuleDto> result;
+            if (RuleEditor.Id is Guid ruleId)
+            {
+                result = await AlertAdministration.UpdateRuleAsync(
+                    new UpdateWorkflowAlertRuleCommand(
+                        ruleId,
+                        RuleEditor.ProfileId,
+                        RuleEditor.Name,
+                        RuleEditor.Triggers,
+                        recipients,
+                        RuleEditor.SubjectTemplate,
+                        RuleEditor.BodyTemplate,
+                        RuleEditor.UpdatedAtUtc),
+                    cancellation.Token);
+            }
+            else
+            {
+                result = await AlertAdministration.CreateRuleAsync(
+                    new CreateWorkflowAlertRuleCommand(
+                        workflowId,
+                        RuleEditor.ProfileId,
+                        RuleEditor.Name,
+                        RuleEditor.Triggers,
+                        recipients,
+                        RuleEditor.SubjectTemplate,
+                        RuleEditor.BodyTemplate,
+                        await GetActorAsync()),
+                    cancellation.Token);
+            }
+
+            if (!result.IsSuccess || result.Value is null)
+            {
+                RuleFormError = result.Problem?.Message ?? "The workflow alert rule could not be saved.";
+                return;
+            }
+
+            RuleEditor = RuleEditModel.From(result.Value);
+            await LoadRulesAsync();
+            Notify(true, "Workflow Email rule saved.");
+        }
+        catch (OperationCanceledException) when (cancellation.IsCancellationRequested)
+        {
+        }
+        catch (Exception)
+        {
+            RuleFormError = "The workflow alert rule could not be saved because the service is temporarily unavailable.";
+        }
+        finally
+        {
+            Busy = false;
+        }
+    }
+
+    private async Task ToggleRuleAsync()
+    {
+        if (RuleEditor.Id is not Guid ruleId)
+        {
+            return;
+        }
+
+        Busy = true;
+        RuleFormError = null;
+        try
+        {
+            var result = await AlertAdministration.SetRuleEnabledAsync(
+                new SetWorkflowAlertRuleEnabledCommand(
+                    ruleId,
+                    !RuleEditor.IsEnabled,
+                    RuleEditor.UpdatedAtUtc),
+                cancellation.Token);
+            if (!result.IsSuccess || result.Value is null)
+            {
+                RuleFormError = result.Problem?.Message ?? "The rule state could not be changed.";
+                return;
+            }
+
+            RuleEditor = RuleEditModel.From(result.Value);
+            await LoadRulesAsync();
+            Notify(true, $"Workflow Email rule {(result.Value.IsEnabled ? "enabled" : "disabled")}.");
+        }
+        catch (OperationCanceledException) when (cancellation.IsCancellationRequested)
+        {
+        }
+        catch (Exception)
+        {
+            RuleFormError = "The rule state could not be changed because the service is temporarily unavailable.";
+        }
+        finally
+        {
+            Busy = false;
+        }
+    }
+
+    private async Task ReloadRuleAsync()
+    {
+        if (RuleEditor.Id is not Guid ruleId)
+        {
+            return;
+        }
+
+        Busy = true;
+        try
+        {
+            await LoadRulesAsync();
+            var rule = Rules.SingleOrDefault(candidate => candidate.Id == ruleId);
+            if (rule is null)
+            {
+                RuleFormError = "The workflow alert rule no longer exists.";
+                return;
+            }
+
+            RuleEditor = RuleEditModel.From(rule);
+            RuleFormError = null;
+        }
+        catch (OperationCanceledException) when (cancellation.IsCancellationRequested)
+        {
+        }
+        catch (Exception)
+        {
+            RuleFormError = "The workflow alert rule could not be reloaded because the service is temporarily unavailable.";
+        }
+        finally
+        {
+            Busy = false;
+        }
+    }
+
+    private void CloseRuleEditor()
+    {
+        RuleEditorVisible = false;
+        RuleFormError = null;
+    }
+
+    private string? ValidateProfile()
+    {
+        if (string.IsNullOrWhiteSpace(ProfileEditor.Name)
+            || string.IsNullOrWhiteSpace(ProfileEditor.SmtpHost)
+            || string.IsNullOrWhiteSpace(ProfileEditor.SenderAddress))
+        {
+            return "Profile name, SMTP host, and sender are required.";
+        }
+
+        var domains = SplitValues(ProfileEditor.AllowedDomainsText);
+        if (domains.Count is < 1 or > 20)
+        {
+            return "Provide between 1 and 20 approved recipient domains.";
+        }
+
+        if (ProfileEditor.SmtpPort is < 1 or > 65_535
+            || ProfileEditor.MaximumRecipients is < 1 or > EmailDeliveryLimits.AbsoluteMaximumRecipients
+            || ProfileEditor.MaximumSubjectLength is < 1 or > EmailDeliveryLimits.AbsoluteMaximumSubjectLength
+            || ProfileEditor.MaximumBodyLength is < 1 or > EmailDeliveryLimits.AbsoluteMaximumBodyLength
+            || ProfileEditor.MaximumConcurrentSends is < 1 or > EmailDeliveryLimits.AbsoluteMaximumConcurrency)
+        {
+            return "One or more numeric profile bounds are outside the supported range.";
+        }
+
+        return null;
+    }
+
+    private string? ValidateRule()
+    {
+        if (SelectedWorkflowId is null || RuleEditor.ProfileId == Guid.Empty)
+        {
+            return "Select a workflow and an Email delivery profile.";
+        }
+
+        if (string.IsNullOrWhiteSpace(RuleEditor.Name)
+            || string.IsNullOrWhiteSpace(RuleEditor.SubjectTemplate))
+        {
+            return "Rule name and subject template are required.";
+        }
+
+        if (RuleEditor.Triggers == WorkflowAlertTriggers.None)
+        {
+            return "Select at least one terminal workflow event.";
+        }
+
+        var recipients = SplitValues(RuleEditor.RecipientsText);
+        if (recipients.Count is < 1 or > EmailDeliveryLimits.AbsoluteMaximumRecipients)
+        {
+            return $"Provide between 1 and {EmailDeliveryLimits.AbsoluteMaximumRecipients} recipients.";
+        }
+
+        return null;
+    }
+
+    private async Task<string> GetActorAsync() =>
+        (await AuthenticationStateProvider.GetAuthenticationStateAsync()).User.Identity?.Name
+        ?? "unknown";
+
+    private void Notify(bool success, string detail) => Notifications.Notify(new NotificationMessage
+    {
+        Severity = success ? NotificationSeverity.Success : NotificationSeverity.Error,
+        Summary = success ? "Email policy updated" : "Email policy operation failed",
+        Detail = detail,
+        Duration = 6_000
+    });
+
+    private string ProfileName(Guid profileId) =>
+        Profiles.SingleOrDefault(profile => profile.Id == profileId)?.Name ?? "Unavailable profile";
+
+    private static string CredentialSummary(EmailDeliveryProfileDto profile) =>
+        profile.CredentialSecretReference is null
+            ? "Approved anonymous relay"
+            : "Credential reference configured";
+
+    private static string SecurityLabel(EmailTransportSecurity security) => security switch
+    {
+        EmailTransportSecurity.StartTlsRequired => "STARTTLS required",
+        EmailTransportSecurity.ImplicitTls => "Implicit TLS",
+        _ => "Unknown transport"
+    };
+
+    private static string TriggerSummary(WorkflowAlertTriggers triggers)
+    {
+        var values = new List<string>(3);
+        if (triggers.HasFlag(WorkflowAlertTriggers.RunFailed)) values.Add("Failure");
+        if (triggers.HasFlag(WorkflowAlertTriggers.RunSucceeded)) values.Add("Success");
+        if (triggers.HasFlag(WorkflowAlertTriggers.RunCancelled)) values.Add("Cancellation");
+        return string.Join(", ", values);
+    }
+
+    private static string ShortId(Guid id) => id.ToString("N")[..8].ToUpperInvariant();
+
+    private static string DeliveryStatusCss(AlertDeliveryStatus status) => status switch
+    {
+        AlertDeliveryStatus.Sending or AlertDeliveryStatus.RetryScheduled => "running",
+        AlertDeliveryStatus.DeadLettered => "failed",
+        AlertDeliveryStatus.Pending => "draft",
+        _ => string.Empty
+    };
+
+    private static string DeliveryTiming(EmailAlertDeliveryListItem delivery) => delivery.Status switch
+    {
+        AlertDeliveryStatus.Pending or AlertDeliveryStatus.RetryScheduled =>
+            $"Next {delivery.NextAttemptAtUtc.ToLocalTime():g}",
+        AlertDeliveryStatus.Sending when delivery.LeaseExpiresAtUtc is { } lease =>
+            $"Lease until {lease.ToLocalTime():g}",
+        _ when delivery.CompletedAtUtc is { } completed =>
+            $"Completed {completed.ToLocalTime():g}",
+        _ => "Awaiting outcome"
+    };
+
+    private static IReadOnlyList<string> SplitValues(string value) => value
+        .Split([',', ';', '\r', '\n'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+        .Distinct(StringComparer.OrdinalIgnoreCase)
+        .ToArray();
+
+    private static string? NullIfWhitespace(string? value) =>
+        string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+
+    public void Dispose()
+    {
+        cancellation.Cancel();
+        cancellation.Dispose();
+    }
+
+    private enum AlertTab
+    {
+        Profiles,
+        Rules,
+        Deliveries
+    }
+
+    private sealed class ProfileEditModel
+    {
+        public Guid? Id { get; set; }
+        public string Name { get; set; } = string.Empty;
+        public string SmtpHost { get; set; } = string.Empty;
+        public int SmtpPort { get; set; } = 587;
+        public EmailTransportSecurity TransportSecurity { get; set; } = EmailTransportSecurity.StartTlsRequired;
+        public string SenderAddress { get; set; } = string.Empty;
+        public string AllowedDomainsText { get; set; } = string.Empty;
+        public string CredentialSecretReference { get; set; } = string.Empty;
+        public int MaximumRecipients { get; set; } = EmailDeliveryLimits.Default.MaximumRecipients;
+        public int MaximumSubjectLength { get; set; } = EmailDeliveryLimits.Default.MaximumSubjectLength;
+        public int MaximumBodyLength { get; set; } = EmailDeliveryLimits.Default.MaximumBodyLength;
+        public int MaximumConcurrentSends { get; set; } = EmailDeliveryLimits.Default.MaximumConcurrentSends;
+        public bool IsEnabled { get; set; } = true;
+        public DateTimeOffset UpdatedAtUtc { get; set; }
+
+        public static ProfileEditModel Create() => new();
+
+        public static ProfileEditModel From(EmailDeliveryProfileDto profile) => new()
+        {
+            Id = profile.Id,
+            Name = profile.Name,
+            SmtpHost = profile.SmtpHost,
+            SmtpPort = profile.SmtpPort,
+            TransportSecurity = profile.TransportSecurity,
+            SenderAddress = profile.SenderAddress,
+            AllowedDomainsText = string.Join(Environment.NewLine, profile.AllowedRecipientDomains),
+            CredentialSecretReference = profile.CredentialSecretReference ?? string.Empty,
+            MaximumRecipients = profile.Limits.MaximumRecipients,
+            MaximumSubjectLength = profile.Limits.MaximumSubjectLength,
+            MaximumBodyLength = profile.Limits.MaximumBodyLength,
+            MaximumConcurrentSends = profile.Limits.MaximumConcurrentSends,
+            IsEnabled = profile.IsEnabled,
+            UpdatedAtUtc = profile.UpdatedAtUtc
+        };
+    }
+
+    private sealed class RuleEditModel
+    {
+        public Guid? Id { get; set; }
+        public Guid ProfileId { get; set; }
+        public string Name { get; set; } = string.Empty;
+        public bool RunFailed { get; set; } = true;
+        public bool RunSucceeded { get; set; }
+        public bool RunCancelled { get; set; }
+        public string RecipientsText { get; set; } = string.Empty;
+        public string SubjectTemplate { get; set; } = "{{workflow.name}} · {{run.status}}";
+        public string BodyTemplate { get; set; } = "Workflow {{workflow.name}} run {{run.id}} completed with status {{run.status}}.\n\n{{error.summary}}";
+        public bool IsEnabled { get; set; } = true;
+        public DateTimeOffset UpdatedAtUtc { get; set; }
+
+        public WorkflowAlertTriggers Triggers =>
+            (RunFailed ? WorkflowAlertTriggers.RunFailed : WorkflowAlertTriggers.None)
+            | (RunSucceeded ? WorkflowAlertTriggers.RunSucceeded : WorkflowAlertTriggers.None)
+            | (RunCancelled ? WorkflowAlertTriggers.RunCancelled : WorkflowAlertTriggers.None);
+
+        public static RuleEditModel Create(Guid profileId) => new() { ProfileId = profileId };
+
+        public static RuleEditModel From(WorkflowAlertRuleDto rule) => new()
+        {
+            Id = rule.Id,
+            ProfileId = rule.EmailDeliveryProfileId,
+            Name = rule.Name,
+            RunFailed = rule.Triggers.HasFlag(WorkflowAlertTriggers.RunFailed),
+            RunSucceeded = rule.Triggers.HasFlag(WorkflowAlertTriggers.RunSucceeded),
+            RunCancelled = rule.Triggers.HasFlag(WorkflowAlertTriggers.RunCancelled),
+            RecipientsText = string.Join(Environment.NewLine, rule.Recipients),
+            SubjectTemplate = rule.SubjectTemplate,
+            BodyTemplate = rule.BodyTemplate,
+            IsEnabled = rule.IsEnabled,
+            UpdatedAtUtc = rule.UpdatedAtUtc
+        };
+    }
+}

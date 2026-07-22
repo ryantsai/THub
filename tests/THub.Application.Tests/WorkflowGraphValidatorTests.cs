@@ -11,7 +11,7 @@ public sealed class WorkflowGraphValidatorTests
     public void ValidDirectedAcyclicGraphHasNoIssues()
     {
         var graph = new WorkflowGraph(
-            [Node("source"), Node("target")],
+            [Node("source", WorkflowNodeKind.SqlSource), Node("target", WorkflowNodeKind.SqlTarget)],
             [new WorkflowEdge("source", "target")]);
 
         Assert.Empty(_validator.Validate(graph));
@@ -21,24 +21,74 @@ public sealed class WorkflowGraphValidatorTests
     public void CycleIsRejected()
     {
         var graph = new WorkflowGraph(
-            [Node("one"), Node("two")],
+            [Node("one", WorkflowNodeKind.SelectColumns), Node("two", WorkflowNodeKind.FilterRows)],
             [new WorkflowEdge("one", "two"), new WorkflowEdge("two", "one")]);
 
-        var issue = Assert.Single(_validator.Validate(graph));
-        Assert.Equal("graph.cycle", issue.Code);
+        Assert.Contains(_validator.Validate(graph), issue => issue.Code == "graph.cycle");
     }
 
     [Fact]
     public void MissingEdgeEndpointIsRejected()
     {
         var graph = new WorkflowGraph(
-            [Node("source")],
+            [Node("source", WorkflowNodeKind.SqlSource)],
             [new WorkflowEdge("source", "missing")]);
 
         Assert.Contains(_validator.Validate(graph), issue => issue.Code == "edge.target.missing");
     }
 
-    private static WorkflowNode Node(string id) =>
-        new(id, WorkflowNodeKind.SqlSource, id, 0, 0);
-}
+    [Fact]
+    public void EmptyGraphIsRejected()
+    {
+        Assert.Contains(
+            _validator.Validate(WorkflowGraph.Empty),
+            issue => issue.Code == "graph.empty");
+    }
 
+    [Fact]
+    public void DuplicateEdgeIsRejected()
+    {
+        var graph = new WorkflowGraph(
+            [Node("source", WorkflowNodeKind.SqlSource), Node("target", WorkflowNodeKind.SqlTarget)],
+            [new("source", "target"), new("SOURCE", "TARGET")]);
+
+        Assert.Contains(_validator.Validate(graph), issue => issue.Code == "edge.duplicate");
+    }
+
+    [Fact]
+    public void JoinRequiresExactlyTwoInputs()
+    {
+        var graph = new WorkflowGraph(
+            [Node("source", WorkflowNodeKind.SqlSource), Node("join", WorkflowNodeKind.Join)],
+            [new("source", "join")]);
+
+        Assert.Contains(
+            _validator.Validate(graph),
+            issue => issue.Code == "node.input.cardinality" && issue.NodeId == "join");
+    }
+
+    [Fact]
+    public void InvalidSettingsAreRejected()
+    {
+        var graph = new WorkflowGraph(
+            [new("source", WorkflowNodeKind.SqlSource, "Source", 0, 0, "not-json")],
+            []);
+
+        Assert.Contains(_validator.Validate(graph), issue => issue.Code == "node.settings.invalid");
+    }
+
+    [Theory]
+    [InlineData(WorkflowNodeKind.Webhook)]
+    [InlineData(WorkflowNodeKind.Executable)]
+    public void GatedExecutorsCannotBePublished(WorkflowNodeKind kind)
+    {
+        var graph = new WorkflowGraph(
+            [Node("source", WorkflowNodeKind.SqlSource), Node("action", kind)],
+            [new("source", "action")]);
+
+        Assert.Contains(_validator.Validate(graph), issue => issue.Code == "node.kind.disabled");
+    }
+
+    private static WorkflowNode Node(string id, WorkflowNodeKind kind) =>
+        new(id, kind, id, 0, 0);
+}

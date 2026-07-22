@@ -11,9 +11,9 @@ public enum WorkflowNodeKind
     SqlTarget,
     CsvTarget,
     ExcelTarget,
+    EmailAlert,
     Webhook,
     Executable,
     PublishRestApi,
     PublishDataEditor
 }
-

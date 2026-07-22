@@ -1,11 +1,380 @@
 @page "/connections"
 @attribute [Authorize(Policy = Permissions.ConnectionManage)]
+@implements IDisposable
+@using THub.Application.Connections
+@using THub.Domain.Connections
+@inject ConnectionManagementService ConnectionService
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject NotificationService Notifications
+@inject TimeProvider TimeProvider
 
 <PageTitle>Connections · THub</PageTitle>
-<div class="page-heading"><div><div class="eyebrow">Data plane</div><h1>Connections</h1><p>Approved SQL Server and local-file endpoints available to workflows.</p></div><div class="heading-actions"><RadzenButton Text="New connection" Icon="add" ButtonStyle="ButtonStyle.Primary" /></div></div>
-<div class="resource-grid">
-    <article class="resource-card"><span class="resource-logo sql"><RadzenIcon Icon="database" /></span><div><h2>Production SQL</h2><p>sql-prod-01 · SalesWarehouse</p></div><span class="status-chip">Connected</span><dl><dt>Authentication</dt><dd>Windows integrated</dd><dt>Used by</dt><dd>7 workflows</dd></dl><button type="button">Manage connection →</button></article>
-    <article class="resource-card"><span class="resource-logo sql"><RadzenIcon Icon="database" /></span><div><h2>Local staging</h2><p>localhost · THubStaging</p></div><span class="status-chip">Connected</span><dl><dt>Authentication</dt><dd>Service identity</dd><dt>Used by</dt><dd>3 workflows</dd></dl><button type="button">Manage connection →</button></article>
-    <article class="resource-card"><span class="resource-logo files"><RadzenIcon Icon="folder_zip" /></span><div><h2>Inbound files</h2><p>D:\Data\Inbound</p></div><span class="status-chip">Available</span><dl><dt>Formats</dt><dd>CSV, XLSX</dd><dt>Used by</dt><dd>2 workflows</dd></dl><button type="button">Manage connection →</button></article>
+
+<div class="page-heading">
+    <div>
+        <div class="eyebrow">Data plane</div>
+        <h1>Connections</h1>
+        <p>Approved SQL Server identities and bounded local CSV or Excel roots.</p>
+    </div>
+    <div class="heading-actions">
+        <RadzenButton Text="New connection" Icon="add" ButtonStyle="ButtonStyle.Primary" Click="@NewConnection" Disabled="@Busy" />
+        <RadzenButton Text="Refresh" Icon="refresh" ButtonStyle="ButtonStyle.Light" Click="@LoadAsync" Disabled="@Busy" />
+    </div>
 </div>
 
+@if (Loading)
+{
+    <div class="page-state"><RadzenProgressBar Mode="ProgressBarMode.Indeterminate" /><p>Loading connections…</p></div>
+}
+else if (LoadError is not null)
+{
+    <div class="page-state error"><RadzenIcon Icon="error_outline" /><p>@LoadError</p><button type="button" @onclick="LoadAsync">Try again</button></div>
+}
+else
+{
+    <div class="connections-layout">
+        <section class="resource-grid" aria-label="Configured connections">
+            @if (Items.Count == 0)
+            {
+                <div class="page-state empty-card"><RadzenIcon Icon="cable" /><h3>No connections yet</h3><p>Add an approved source before configuring workflow nodes or publications.</p></div>
+            }
+            @foreach (var item in Items)
+            {
+                <article class="resource-card @(Edit.Id == item.Id ? "selected" : null)">
+                    <span class="resource-logo @(item.Kind == ConnectionKind.SqlServer ? "sql" : "files")"><RadzenIcon Icon="@KindIcon(item.Kind)" /></span>
+                    <div><h2>@item.Name</h2><p>@KindLabel(item.Kind)</p></div>
+                    <span class="status-chip @(item.IsEnabled ? null : "draft")">@(item.IsEnabled ? "Enabled" : "Disabled")</span>
+                    <dl><dt>Connector</dt><dd>@item.Kind</dd><dt>Updated</dt><dd>@item.UpdatedAtUtc.ToLocalTime().ToString("g")</dd></dl>
+                    <button type="button" @onclick="() => EditConnectionAsync(item.Id)">Manage connection →</button>
+                </article>
+            }
+        </section>
+
+        @if (ShowEditor)
+        {
+            <section class="panel connection-editor" aria-label="Connection editor">
+                <div class="panel-head"><div><h2>@(Edit.Id is null ? "New connection" : "Edit connection")</h2><p>Credentials are never stored in connection metadata. SQL connections use the service identity.</p></div><button class="close-editor" type="button" title="Close" @onclick="CloseEditor">×</button></div>
+                <div class="connection-form">
+                    <label><span>Name</span><input maxlength="200" @bind="Edit.Name" disabled="@Busy" /></label>
+                    <label><span>Connector</span>
+                        <select @bind="Edit.Kind" disabled="@(Busy || Edit.Id is not null)">
+                            <option value="@ConnectionKind.SqlServer">SQL Server</option>
+                            <option value="@ConnectionKind.CsvFile">CSV files</option>
+                            <option value="@ConnectionKind.ExcelFile">Excel workbooks</option>
+                        </select>
+                    </label>
+
+                    @if (Edit.Kind == ConnectionKind.SqlServer)
+                    {
+                        <label><span>Server</span><input placeholder="sql01.contoso.local" maxlength="253" @bind="Edit.Server" disabled="@Busy" /></label>
+                        <label><span>Database</span><input placeholder="Warehouse" maxlength="128" @bind="Edit.Database" disabled="@Busy" /></label>
+                        <label class="check"><input type="checkbox" @bind="Edit.Encrypt" disabled="@Busy" /><span>Require transport encryption</span></label>
+                        <label class="check"><input type="checkbox" @bind="Edit.TrustServerCertificate" disabled="@Busy" /><span>Trust server certificate (development only)</span></label>
+                        <label><span>Connect timeout (seconds)</span><input type="number" min="1" max="60" @bind="Edit.ConnectTimeoutSeconds" disabled="@Busy" /></label>
+                        <label><span>Command timeout (seconds)</span><input type="number" min="1" max="300" @bind="Edit.CommandTimeoutSeconds" disabled="@Busy" /></label>
+                        <label><span>Maximum batch rows</span><input type="number" min="1" max="10000" @bind="Edit.MaximumBatchRows" disabled="@Busy" /></label>
+                    }
+                    else
+                    {
+                        <label class="wide"><span>Approved root</span><input placeholder="D:\Data\Inbound" maxlength="1024" @bind="Edit.ApprovedRoot" disabled="@Busy" /></label>
+                        <label class="check wide"><input type="checkbox" @bind="Edit.AllowUncRoot" disabled="@Busy" /><span>Administrator approved this UNC root</span></label>
+                        <label><span>Maximum file size (MiB)</span><input type="number" min="1" max="4096" @bind="Edit.MaximumFileMiB" disabled="@Busy" /></label>
+                        <label><span>Maximum rows</span><input type="number" min="1" max="10000000" @bind="Edit.MaximumRows" disabled="@Busy" /></label>
+                        <label><span>Maximum columns</span><input type="number" min="1" max="16384" @bind="Edit.MaximumColumns" disabled="@Busy" /></label>
+                    }
+                </div>
+                @if (FormError is not null)
+                {
+                    <div class="form-error"><RadzenIcon Icon="error_outline" />@FormError</div>
+                }
+                @if (ProbeResult is not null)
+                {
+                    <div class="probe-result @(ProbeResult.IsSuccessful ? "ok" : "failed")"><RadzenIcon Icon="@(ProbeResult.IsSuccessful ? "check_circle" : "warning")" /><div><strong>@ProbeResult.Message</strong><small>@ProbeResult.Elapsed.TotalMilliseconds.ToString("0") ms@(ProbeResult.ServerVersion is null ? string.Empty : $" · SQL {ProbeResult.ServerVersion}")</small></div></div>
+                }
+                <div class="editor-actions">
+                    @if (Edit.Id is not null)
+                    {
+                        <RadzenButton Text="Test connection" Icon="network_check" ButtonStyle="ButtonStyle.Light" Click="@ProbeAsync" Disabled="@Busy" />
+                        <RadzenButton Text="@(Edit.IsEnabled ? "Disable" : "Enable")" Icon="power_settings_new" ButtonStyle="@(Edit.IsEnabled ? ButtonStyle.Danger : ButtonStyle.Success)" Click="@ToggleAsync" Disabled="@Busy" />
+                    }
+                    <span></span>
+                    <RadzenButton Text="Cancel" ButtonStyle="ButtonStyle.Light" Click="@CloseEditor" Disabled="@Busy" />
+                    <RadzenButton Text="Save connection" Icon="save" ButtonStyle="ButtonStyle.Primary" Click="@SaveAsync" Disabled="@Busy" />
+                </div>
+            </section>
+        }
+    </div>
+}
+
+@code {
+    private readonly CancellationTokenSource cancellation = new();
+    private IReadOnlyList<ConnectionSummary> Items { get; set; } = [];
+    private ConnectionEditModel Edit { get; set; } = ConnectionEditModel.Create();
+    private bool ShowEditor { get; set; }
+    private bool Loading { get; set; }
+    private bool Busy { get; set; }
+    private string? LoadError { get; set; }
+    private string? FormError { get; set; }
+    private ConnectionProbeResult? ProbeResult { get; set; }
+
+    protected override Task OnInitializedAsync() => LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        Loading = true;
+        LoadError = null;
+        try
+        {
+            Items = await ConnectionService.ListAsync(cancellation.Token);
+        }
+        catch (OperationCanceledException) when (cancellation.IsCancellationRequested)
+        {
+        }
+        catch (Exception)
+        {
+            LoadError = "Connections are temporarily unavailable.";
+        }
+        finally
+        {
+            Loading = false;
+        }
+    }
+
+    private void NewConnection()
+    {
+        Edit = ConnectionEditModel.Create();
+        FormError = null;
+        ProbeResult = null;
+        ShowEditor = true;
+    }
+
+    private async Task EditConnectionAsync(Guid id)
+    {
+        Busy = true;
+        try
+        {
+            var details = await ConnectionService.GetAsync(id, cancellation.Token);
+            if (details is null)
+            {
+                Notify(NotificationSeverity.Error, "The connection no longer exists.");
+                await LoadAsync();
+                return;
+            }
+
+            Edit = ConnectionEditModel.From(details);
+            FormError = null;
+            ProbeResult = null;
+            ShowEditor = true;
+        }
+        finally
+        {
+            Busy = false;
+        }
+    }
+
+    private async Task SaveAsync()
+    {
+        Busy = true;
+        FormError = null;
+        ProbeResult = null;
+        try
+        {
+            var configuration = Edit.ToConfiguration();
+            ConnectionCommandResult result;
+            if (Edit.Id is { } id)
+            {
+                result = await ConnectionService.UpdateAsync(
+                    id,
+                    Edit.Name,
+                    configuration,
+                    Edit.UpdatedAtUtc,
+                    TimeProvider.GetUtcNow(),
+                    cancellation.Token);
+            }
+            else
+            {
+                var state = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+                result = await ConnectionService.CreateAsync(
+                    Edit.Name,
+                    configuration,
+                    state.User.Identity?.Name ?? "unknown",
+                    TimeProvider.GetUtcNow(),
+                    cancellation.Token);
+            }
+
+            if (result.Status != ConnectionSaveStatus.Saved || result.Connection is null)
+            {
+                FormError = result.Message ?? "The connection could not be saved.";
+                return;
+            }
+
+            Edit = ConnectionEditModel.From(result.Connection);
+            Notify(NotificationSeverity.Success, "Connection metadata was saved.");
+            await LoadAsync();
+        }
+        catch (ArgumentException exception)
+        {
+            FormError = exception.Message;
+        }
+        catch (OverflowException)
+        {
+            FormError = "The configured file size is outside the supported range.";
+        }
+        finally
+        {
+            Busy = false;
+        }
+    }
+
+    private async Task ProbeAsync()
+    {
+        if (Edit.Id is not { } id)
+        {
+            return;
+        }
+
+        Busy = true;
+        try
+        {
+            ProbeResult = await ConnectionService.ProbeAsync(id, cancellation.Token);
+        }
+        finally
+        {
+            Busy = false;
+        }
+    }
+
+    private async Task ToggleAsync()
+    {
+        if (Edit.Id is not { } id)
+        {
+            return;
+        }
+
+        Busy = true;
+        FormError = null;
+        try
+        {
+            var result = await ConnectionService.SetEnabledAsync(
+                id,
+                !Edit.IsEnabled,
+                Edit.UpdatedAtUtc,
+                TimeProvider.GetUtcNow(),
+                cancellation.Token);
+            if (result.Status != ConnectionSaveStatus.Saved || result.Connection is null)
+            {
+                FormError = result.Message ?? "The connection state could not be changed.";
+                return;
+            }
+
+            Edit = ConnectionEditModel.From(result.Connection);
+            await LoadAsync();
+        }
+        finally
+        {
+            Busy = false;
+        }
+    }
+
+    private void CloseEditor()
+    {
+        ShowEditor = false;
+        FormError = null;
+        ProbeResult = null;
+    }
+
+    private void Notify(NotificationSeverity severity, string detail) => Notifications.Notify(new NotificationMessage
+    {
+        Severity = severity,
+        Summary = severity == NotificationSeverity.Error ? "Connection failed" : "Connection updated",
+        Detail = detail,
+        Duration = 5_000
+    });
+
+    private static string KindIcon(ConnectionKind kind) => kind == ConnectionKind.SqlServer ? "database" : "folder";
+    private static string KindLabel(ConnectionKind kind) => kind switch
+    {
+        ConnectionKind.SqlServer => "Windows-integrated SQL Server",
+        ConnectionKind.CsvFile => "Bounded CSV file root",
+        ConnectionKind.ExcelFile => "Bounded XLSX/XLSM root",
+        _ => kind.ToString()
+    };
+
+    public void Dispose()
+    {
+        cancellation.Cancel();
+        cancellation.Dispose();
+    }
+
+    private sealed class ConnectionEditModel
+    {
+        public Guid? Id { get; set; }
+        public string Name { get; set; } = string.Empty;
+        public ConnectionKind Kind { get; set; } = ConnectionKind.SqlServer;
+        public bool IsEnabled { get; set; } = true;
+        public DateTimeOffset UpdatedAtUtc { get; set; }
+        public string Server { get; set; } = string.Empty;
+        public string Database { get; set; } = string.Empty;
+        public bool Encrypt { get; set; } = true;
+        public bool TrustServerCertificate { get; set; }
+        public int ConnectTimeoutSeconds { get; set; } = 15;
+        public int CommandTimeoutSeconds { get; set; } = 30;
+        public int MaximumBatchRows { get; set; } = 1_000;
+        public string ApprovedRoot { get; set; } = string.Empty;
+        public bool AllowUncRoot { get; set; }
+        public long MaximumFileMiB { get; set; } = 256;
+        public int MaximumRows { get; set; } = 1_000_000;
+        public int MaximumColumns { get; set; } = 1_024;
+
+        public static ConnectionEditModel Create() => new();
+
+        public static ConnectionEditModel From(ConnectionDetails details)
+        {
+            var model = new ConnectionEditModel
+            {
+                Id = details.Id,
+                Name = details.Name,
+                Kind = details.Kind,
+                IsEnabled = details.IsEnabled,
+                UpdatedAtUtc = details.UpdatedAtUtc
+            };
+            if (details.Configuration is SqlServerConnectionConfiguration sql)
+            {
+                model.Server = sql.Server;
+                model.Database = sql.Database;
+                model.Encrypt = sql.Encrypt;
+                model.TrustServerCertificate = sql.TrustServerCertificate;
+                model.ConnectTimeoutSeconds = sql.ConnectTimeoutSeconds;
+                model.CommandTimeoutSeconds = sql.CommandTimeoutSeconds;
+                model.MaximumBatchRows = sql.MaximumBatchRows;
+            }
+            else if (details.Configuration is FileConnectionConfiguration file)
+            {
+                model.ApprovedRoot = file.ApprovedRoot;
+                model.AllowUncRoot = file.AllowUncRoot;
+                model.MaximumFileMiB = file.MaximumFileBytes / (1_024 * 1_024);
+                model.MaximumRows = file.MaximumRows;
+                model.MaximumColumns = file.MaximumColumns;
+            }
+
+            return model;
+        }
+
+        public ConnectionConfiguration ToConfiguration() => Kind == ConnectionKind.SqlServer
+            ? new SqlServerConnectionConfiguration(
+                Server,
+                Database,
+                Encrypt,
+                TrustServerCertificate,
+                ConnectTimeoutSeconds,
+                CommandTimeoutSeconds,
+                MaximumBatchRows)
+            : new FileConnectionConfiguration(
+                Kind,
+                ApprovedRoot,
+                AllowUncRoot,
+                checked(MaximumFileMiB * 1_024 * 1_024),
+                MaximumRows,
+                MaximumColumns);
+    }
+}

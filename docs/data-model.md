@@ -10,9 +10,11 @@
 - All timestamps are stored in UTC. Schedule evaluation also stores an explicit time-zone identifier.
 - Development uses SQL Server LocalDB (`THub.Debug`) so the same SQL Server provider, schema, and migrations are exercised locally; published environments use an externally configured SQL Server instance.
 
+The migration chain and runtime now implement the immutable workflow/run/step model required by [ADR-0010](adr/0010-durable-leased-workflow-execution.md), the durable Email model required by [ADR-0012](adr/0012-durable-email-alert-delivery.md), and the governed publication model required by [ADR-0011](adr/0011-isolated-governed-data-publications.md).
+
 ## Current relational model
 
-The initial EF Core migration creates the `thub` schema and these tables.
+The initial EF Core migration creates the `thub` schema and the foundation tables below. Reviewed forward migrations add the durable slices described later in this document.
 
 ### `thub.Workflows`
 
@@ -24,14 +26,32 @@ Represents the current workflow aggregate and draft graph.
 | `Name`, `Description` | Human metadata |
 | `Owner` | Windows identity recorded as owner |
 | `Status` | Draft, Published, Paused, or Archived |
-| `Version` | Current graph version number |
-| `GraphJson` | Serialized workflow DAG/settings |
+| `Version` | Candidate graph version; advances when a published graph is edited |
+| `DraftRevision` | Optimistic concurrency revision for editable workflow state |
+| `GraphJson` | Canonical schema-versioned mutable draft DAG/settings |
+| `PublishedVersionId`, `PublishedVersionNumber` | Pointer to the active immutable snapshot |
 | `CronExpression` | Standard five-field cron expression, when scheduled |
 | `TimeZoneId` | Time zone used to interpret the schedule |
 | `NextRunAtUtc` | Indexed next due occurrence |
 | `CreatedAtUtc`, `UpdatedAtUtc` | Audit timestamps |
+| `ArchivedAtUtc` | Archive timestamp when lifecycle state is Archived |
 
-The current aggregate is sufficient for the scheduling scaffold. Before production authoring, split immutable published versions into a separate `WorkflowVersions` table so a draft can change without overwriting the graph used by queued or historical runs.
+The mutable draft remains on this row for editing convenience, but a publish transaction inserts or selects a `WorkflowVersions` snapshot and updates the published pointer. Editing a published graph creates a new candidate version without changing the prior snapshot used by queued or historical runs.
+
+### `thub.WorkflowVersions`
+
+Represents one immutable published workflow graph.
+
+| Field | Meaning |
+| --- | --- |
+| `Id` | Deterministic identity derived from workflow plus version number |
+| `WorkflowId`, `Version` | Owning workflow and unique version number |
+| `SchemaVersion` | Supported workflow document schema version |
+| `GraphJson` | Canonical immutable DAG and typed node-settings document |
+| `Checksum` | SHA-256 integrity checksum over the stored graph JSON |
+| `PublishedBy`, `PublishedAtUtc` | Publication actor and UTC time |
+
+`(WorkflowId, Version)` is unique. Runs have a restrictive foreign key to this row; the Worker also verifies the deterministic identity, version tuple, and checksum before execution.
 
 ### `thub.WorkflowRuns`
 
@@ -41,16 +61,35 @@ Represents an execution request for a specific workflow version.
 | --- | --- |
 | `Id` | Run identity |
 | `WorkflowId` | Parent workflow |
-| `WorkflowVersion` | Version frozen at enqueue time |
+| `WorkflowVersionId`, `WorkflowVersion` | Exact immutable version identity and number frozen at enqueue time |
+| `RetryOfRunId` | Prior run identity for a user-requested retry, otherwise null |
 | `Status` | Queued, Running, Succeeded, Failed, or Cancelled |
 | `TriggeredBy` | Scheduler or initiating identity/source |
 | `ScheduledForUtc` | Logical Quartz occurrence for scheduled runs; null for manual/event runs |
 | `QueuedAtUtc`, `StartedAtUtc`, `CompletedAtUtc` | Lifecycle timestamps |
-| `ErrorMessage` | Bounded terminal summary; never secret or row data |
+| `AttemptCount` | Number of run-lease claims, including abandoned-run recovery |
+| `LeaseOwner`, `LeaseExpiresAtUtc`, `LastHeartbeatAtUtc` | Current SQL-coordinated execution ownership |
+| `CancellationRequestedAtUtc`, `CancellationRequestedBy` | Durable cancellation request |
+| `ErrorJson`, `ErrorMessage` | Normalized code/category/retryability/safe summary plus compatibility summary; never secret or row data |
 
-Claim/lease, attempt, and step-run fields are intentionally not invented yet. They require decisions about worker scale, retry, and cancellation semantics.
+Workers atomically claim queued runs or running runs whose lease expired, prefer recovery work, and permit at most one unexpired running lease per workflow. Heartbeats and every durable step/terminal write verify the current lease. Run recovery restarts the immutable graph; it is not checkpoint/resume and may replay an ambiguous external effect.
 
 Scheduled runs have a filtered unique index on `(WorkflowId, WorkflowVersion, ScheduledForUtc)`. This keeps Quartz recovery or repeated delivery idempotent for one logical occurrence without constraining manual runs, whose `ScheduledForUtc` is null.
+
+### `thub.WorkflowStepRuns`
+
+Represents one durable attempt to execute or skip one node in a run.
+
+| Field | Meaning |
+| --- | --- |
+| `WorkflowRunId`, `NodeId`, `Attempt` | Unique run/node/attempt identity |
+| `Status` | Queued, Running, Succeeded, Failed, Cancelled, or Skipped |
+| `QueuedAtUtc`, `StartedAtUtc`, `CompletedAtUtc` | Attempt lifecycle |
+| `RowsRead`, `RowsWritten`, `BatchesProcessed` | Durable progress counters |
+| `BytesRead`, `BytesWritten` | Durable byte counters |
+| `ErrorJson` | Bounded normalized safe execution error |
+
+When an expired run is recovered, any still-running prior step for a node is failed as `execution.lease-recovered` and a new attempt number is created. Downstream nodes whose dependency did not succeed are recorded as skipped.
 
 ### `thub.Connections`
 
@@ -96,19 +135,51 @@ Quartz rows are operational projections, not the source of truth for workflow de
 }
 ```
 
-The current C# model stores `SettingsJson` as an opaque versioned value. Persistence APIs must wrap the graph in an explicit `schemaVersion` envelope before import/export is implemented. Deserializers must reject unsupported future versions instead of silently dropping fields.
+The serializer requires the explicit `schemaVersion` envelope, rejects unknown/duplicate properties and unsupported future versions, and canonicalizes saved documents. Each node retains a JSON `settings` object in the graph, but publish and Worker execution parse it through a strict kind-specific contract with required fields, bounds, allow-listed properties/operators/modes, and graph-aware join inputs.
 
-## Target tables
+## Durable persistence slices
 
-The next persistence slices are expected to introduce:
+These concepts are governed by accepted ADRs. Each subsection states whether its current persistence is implemented; unresolved invariants must not be collapsed into opaque UI state.
 
-- `WorkflowVersions`: immutable graph snapshot, checksum, publisher, and publication timestamp.
-- `WorkflowRunClaims`: owner, lease expiry, heartbeat, and concurrency token, or equivalent fields on `WorkflowRuns`.
-- `WorkflowStepRuns`: node identity, attempt, state, timing, counters, checkpoint, and bounded error summary.
-- `AuditEvents`: actor, action, subject, correlation, timestamp, and redacted details.
-- `Publications` and `PublicationGrants`: approved source object, columns, operations, row policy, and authentication policy.
+### Durable workflow execution (implemented)
 
-These are target concepts, not current schema promises. Add migrations and an ADR when their concurrency and retention behavior is chosen.
+- `WorkflowVersions`: immutable schema-versioned graph JSON, checksum, publisher, and publication timestamp. A workflow stores its mutable draft and active published-version pointer separately.
+- `WorkflowRuns`: exact version foreign key/number, retry origin, cancellation state, attempt count, lease owner/expiry/heartbeat, normalized error, and row-version concurrency.
+- `WorkflowStepRuns`: node identity, attempt, state, timing, row/batch/byte counters, normalized error, and row-version concurrency.
+
+An atomic SQL claim plus a per-workflow application lock owns one run until its lease expires and prevents another unexpired run for that workflow from starting. Lease ownership is checked before recording step or terminal state. Error columns never contain secrets, SQL values, connection strings, or row payloads. The current model has no step-output checkpoint or staging table; bounded replayable intermediates live only in Worker memory for the active attempt.
+
+### Governed publications (implemented)
+
+- `Publications`: stable identity and normalized route slug, publication kind/state, active-version pointer, owner/audit fields, and row-version concurrency.
+- `PublicationVersions`: immutable approved SQL Server connection/object identity, schema fingerprint, source kind, concurrency mode, paging/editor/rate/concurrency/timeout/response bounds, creator, and creation timestamp. The selected deterministic key is represented by ordered key columns.
+- `PublicationColumns`: source name/type, public alias/type/nullability/length metadata, ordinal, readable/filterable/sortable/writable flags, ordered key metadata, generated/concurrency flags, and numeric bounds.
+- `PublicationColumnForeignKeys`: one administrator-approved owned mapping per governed local column, including constraint/group ordinal, referenced object/column, explicitly selected display/search columns, and lookup mode. Inspector suggestions are not persisted by default. A shared constraint name and column count group composite mappings whose readable, writable, and nullable policy is atomic.
+- `PublicationGrants`: publication plus global role with separate View, Insert, Update, Delete, and Approve capabilities. Publication-management permission is not a data grant.
+- `PublicationAccessTokens`: publication scope, random selector, display prefix, verifier algorithm/version and one-way verifier, label, expiry/revocation metadata, `AcceptedRequestCount`, `LastUsedAtUtc`, and row-version concurrency. The current active version is resolved and rechecked on every request, so a token follows version activation. Plaintext bearer secrets are never persisted.
+- `PublicationChangeSets` and `PublicationChanges`: publication/version identity, submitting/reviewing/applying actors and timestamps, approval/apply state, bounded key/before/after JSON, bounded outcome detail, heartbeat/update time, and row-version concurrency. The current claim treats `ApplyStartedBy` plus `UpdatedAtUtc` as apply ownership/heartbeat state.
+
+REST metering performs one conditional atomic update after authentication, route/publication authorization, and process-local admission. It increments `AcceptedRequestCount` and monotonically advances `LastUsedAtUtc` while rechecking that the token, publication, and expected active version remain usable. The count is an admitted credential use, so it remains incremented if the later source query fails. If this update cannot be committed, serving data fails closed.
+
+Editor source tables require a stable selected key; discovery prioritizes the primary key and otherwise may select a safe unfiltered unique index. Apply uses source `rowversion` when available; an explicitly approved original-value comparison is the v1 fallback. Non-generated key values are insertable but never updateable. Each approved change set is applied in one source transaction; concurrent changes, duplicate keys, and foreign-key violations become conflicts rather than overwrites. Foreign-key lookup metadata is discovered and frozen with the publication version, while the source constraint remains the final apply-time authority. A stale ambiguous `Applying` set is marked failed for operator reconciliation rather than automatically replayed across the source/control-plane transaction boundary.
+
+### Durable Email delivery
+
+The current migration chain and EF model create three Email-related tables:
+
+- `EmailDeliveryProfiles`: administrator-owned, non-secret SMTP host/port, approved sender, required transport-security mode, recipient-domain policy, delivery limits, enabled state, audit timestamps, optional credential secret reference, and row-version concurrency. The reference is a lookup key, never a user name or password.
+- `WorkflowAlertRules`: workflow/profile foreign keys, terminal-event flags, recipients, enabled/audit state, and a bounded subject/body template serialized as a value object. There is no separate `EmailTemplates` table.
+- `AlertDeliveries`: the durable outbox row for either a workflow rule or an `EmailAlert` node. It stores the source/run/rule-or-node and originating-step identity, a unique deduplication key, stable message identity, bounded message payload, status, maximum/current attempt counts, next/last attempt timestamps, completion time, lease/heartbeat fields, provider message ID, bounded normalized last error, and row-version concurrency.
+
+The composite delivery index covers status, next-attempt time, and lease expiry for due-work claims; the deduplication key is unique. Running-run terminal transitions and direct queued-run cancellation commit with their rule deliveries in one THub transaction. The commit rechecks the complete enabled matching rule set and each prepared rule/profile revision. An `EmailAlert` node uses a stable run/node deduplication key and reports success once its delivery row is durable; a recovered step attempt therefore observes the existing intent instead of creating a second delivery.
+
+V1 has no `AlertDeliveryAttempts` history table. Each attempt updates the aggregate delivery's attempt count, timestamps, retry/dead-letter state, optional provider identity, and latest safe error. Current structured logs report batch totals and batch exceptions rather than one event per attempt, so they are not an authoritative per-attempt history. The MailKit adapter uses the stable THub MIME Message-ID but currently leaves `ProviderMessageId` empty. The outbox is at-least-once: a crash after SMTP acceptance but before the delivered transition commits can duplicate a message.
+
+### Audit and retention
+
+- A future `AuditEvents` stream would record actor or token identity, action, subject, correlation, timestamp, result, and bounded redacted details for privileged changes, token lifecycle, publication access, editor submission/approval/apply, and Email administration/delivery. It is not mapped today; publication/token/change-set rows retain their own actor, counter, status, and timestamp metadata instead.
+
+PD-009 still blocks final retention periods and before/after value classification. No table may use the absence of a retention decision as permission to store credentials, bearer-token text, unrestricted row data, or full Email bodies.
 
 ## EF Core conventions
 

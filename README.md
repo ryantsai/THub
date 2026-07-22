@@ -2,26 +2,19 @@
 
 THub is an intranet-first data workflow orchestration and visual-design platform inspired by SSIS, n8n, DolphinScheduler, Kestra, and Azure Data Factory. The v1 product boundary is Microsoft SQL Server plus local CSV and Excel files.
 
-> **Repository status:** executable foundation. Authentication, authorization, the Blazor shell, in-memory graph designer, graph validation, SQL Server metadata model, migrations, Quartz scheduling, structured Serilog output, and scheduled-run enqueueing are implemented. Workflow persistence from the designer, schema discovery/mapping, node execution, run leasing, publications, and the online editor are not implemented yet.
+> **Repository status:** functional v1 foundation. The persisted designer/catalog, schema-versioned graph validation, immutable checksummed workflow versions, manual and scheduled run queues, SQL-leased Worker execution, durable step attempts, bounded SQL/CSV/Excel nodes, select/filter/join transforms, Email alerts, and governed publications are implemented. Webhook, executable, and publication canvas nodes remain intentionally non-operational; production readiness still requires deployment-specific identities and secrets, live connector/browser verification, readiness/metrics, audit, and retention work.
 
 ## Architecture at a glance
 
 ```text
-Windows user
-    |
-    v
-THub.Web (Blazor Interactive Server + Radzen)
-    |
-    v
-SQL Server control plane
-    ^
-    |
-THub.Worker (Windows Service + persistent Quartz scheduler; execution host in later slices)
+Windows user -------> THub.Web ----------------------------------> SQL Server control plane
+Internal API client -> THub.Publications ------------------------> SQL Server + approved source tables
+THub.Worker (Quartz + leased execution/background work) --------> SQL Server + approved sources/targets
 ```
 
-The web application owns management and design interactions. The worker owns durable background work. SQL Server is their coordination boundary. See the full [architecture description](docs/architecture.md) and [architecture decision records](docs/adr/README.md).
+The web application owns Windows-authenticated management, persisted workflow design, Email policy administration, publication administration, and bounded Spreadsheet-editor interactions. The worker owns durable scheduling and leased workflow execution as well as Email outbox delivery and approved staged editor writes. The isolated publication host owns internal read-only REST traffic authenticated with managed opaque bearer tokens. SQL Server is their coordination boundary. See the full [architecture description](docs/architecture.md) and [architecture decision records](docs/adr/README.md).
 
-Quartz owns schedule timing, persistence, misfire handling, and cluster coordination only. THub remains authoritative for workflow versions, queued runs, run state, and future step-run state. A Quartz fire is therefore a request to create a THub run, not the run itself.
+Quartz owns schedule timing, persistence, misfire handling, and scheduler cluster coordination only. THub remains authoritative for immutable workflow versions, queued/running runs, execution leases, cancellation, and step attempts. A Quartz fire is therefore a request to create a THub run, not the run itself.
 
 ## Capability status
 
@@ -30,27 +23,33 @@ Quartz owns schedule timing, persistence, misfire handling, and cluster coordina
 | Windows Authentication | Implemented | Negotiate in normal environments; explicit loopback-only development bypass available |
 | Permission-based RBAC | Implemented | AD/Windows groups map to Viewer, Operator, Designer, and Administrator |
 | Blazor/Radzen application shell | Implemented | Dashboard and management views are present |
-| Visual workflow designer | Foundation | Add/select/configure/remove nodes and validate an in-memory graph |
-| Workflow graph validation | Implemented | IDs, endpoints, self-edges, and cycle detection |
-| SQL Server metadata schema | Implemented | EF Core model and initial migration for workflows, runs, and connections |
+| Visual workflow designer | Implemented | Create/load/save/publish/pause/archive persisted workflows, configure/connect nodes, and detect optimistic draft-revision conflicts |
+| Workflow graph validation | Implemented | Explicit schema version, size bounds, IDs, endpoints, cardinality, cycles, typed per-node settings, and operational-policy checks |
+| SQL Server metadata schema | Implemented | The migration chain includes workflows, runs, connections, durable alerts, and governed publication versions/tokens/grants/change sets |
 | Cron/time-zone scheduling | Implemented | Quartz persists one trigger per published schedule; THub transactionally owns queued runs |
-| Designer save/load/publish | Planned | UI actions are placeholders until the repository slice is built |
-| SQL/CSV/XLSX execution | Planned | Libraries and node contracts exist; executors do not |
-| Schema mapping and transforms | Planned | Node types exist; execution and mapping UI remain |
-| Webhook/executable execution | Planned and gated | Requires allow-listing, secret, timeout, and service-identity policy |
-| Generated REST API/data editor | Planned and gated | Requires publication security and auditing decisions |
+| Designer save/load/publish | Implemented | Draft graph JSON is canonicalized and saved with optimistic revision checks; publish creates and selects an immutable checksummed version transactionally |
+| Immutable workflow versions and execution leases | Implemented | Runs reference exact versions; Workers atomically claim/heartbeat runs, recover expired leases, honor durable cancellation, and persist lease-checked step attempts |
+| SQL/CSV/XLSX execution | Implemented v1 | SQL sources and transactional insert targets, CSV/Excel sources, and create-new CSV/Excel targets use bounded, cancellation-aware execution |
+| Schema mapping and transforms | Implemented v1 | Explicit SQL target mappings plus select, typed filter, and bounded inner/left join nodes; configuration is still a power-user settings experience |
+| Email alerts/actions | Implemented | Administrator-managed profiles/rules, terminal-event and `EmailAlert` action enqueueing, deduplicated SQL outbox, leased Worker dispatch, bounded retries/dead letters, and MailKit SMTP delivery; credential-backed SMTP requires an approved `ISecretResolver` deployment integration |
+| Webhook/executable execution | Gated | Draft node concepts remain visible, but publish and execution reject them until administrator allow-list, secret, timeout, identity, and audit policies exist |
+| Publication canvas nodes | Gated and separated | `PublishRestApi` and `PublishDataEditor` cannot run in a workflow; create the implemented governed resources under Publications instead |
+| Isolated REST publication host | Implemented | Separate read-only `/schema` and `/rows` routes use managed bearer tokens, atomic accepted-use metering, typed filters/sorts, keyset cursors, schema checks, response/time limits, and process-local admission |
+| Role-governed Spreadsheet editor | Implemented | Independent View/Insert/Update/Delete/Approve grants, bounded windows, foreign-key lookup cells, typed staging/review, and worker-applied optimistic-concurrency change sets |
 
 ## Technology
 
 - .NET 10 / ASP.NET Core 10
 - Blazor Web App with global Interactive Server rendering
 - Radzen Blazor 11
+- Separate ASP.NET Core publication host for the internal read-only REST boundary
 - .NET Worker hosted as a Windows Service
 - EF Core 10 with Microsoft SQL Server
 - Quartz.NET 3.18 with a clustered SQL Server job store
+- MailKit for bounded TLS-protected SMTP delivery
 - Cronos for the product's five-field cron calculation
 - Serilog structured console and rolling JSON file logging
-- CsvHelper and ClosedXML reserved for v1 connector implementation
+- CsvHelper and ClosedXML for bounded CSV and modern Excel connector execution
 - xUnit for unit tests
 
 ## Repository layout
@@ -58,18 +57,20 @@ Quartz owns schedule timing, persistence, misfire handling, and cluster coordina
 | Path | Responsibility |
 | --- | --- |
 | `src/THub.Web` | Blazor UI, Negotiate authentication, permission policies, internal endpoints |
-| `src/THub.Worker` | Windows Service host, Quartz reconciliation, and scheduled-run dispatch |
-| `src/THub.Application` | Use-case contracts, graph validation, schedule calculation |
-| `src/THub.Domain` | Workflow, run, and connection domain model |
-| `src/THub.Infrastructure` | EF Core persistence, migrations, schedule projection, and THub run enqueueing |
+| `src/THub.Publications` | Isolated managed-bearer read-only REST API and process-local request admission |
+| `src/THub.Worker` | Windows Service host, Quartz reconciliation, leased workflow execution, Email dispatch, and approved editor apply |
+| `src/THub.Application` | Use cases, graph/settings validation, execution planning/policies, bounded tabular contracts, and publication/alert ports |
+| `src/THub.Domain` | Workflow/version/run/step, connection, alert, and publication domain models |
+| `src/THub.Infrastructure` | EF Core/SQL persistence, migrations, connector executors, lease stores, file safety, SMTP, and publication adapters |
 | `tests/THub.Domain.Tests` | Domain behavior tests |
 | `tests/THub.Application.Tests` | Application service tests |
 | `tests/THub.Web.Tests` | ASP.NET Core authentication and request-pipeline integration tests |
+| `tests/THub.Publications.Tests` | Publication-host pipeline tests |
 | `tests/THub.Worker.Tests` | Quartz schedule mapping and worker integration unit tests |
 | `docs` | Architecture, ADRs, product decisions, and documentation index |
 | `scripts` | Operational helper scripts |
 
-The dependency direction is `Web/Worker -> Infrastructure/Application -> Domain`. `Domain` must remain framework-independent.
+The dependency direction is `Web/Publications/Worker -> Infrastructure/Application -> Domain`. `Domain` must remain framework-independent.
 
 ## Prerequisites
 
@@ -93,7 +94,7 @@ The dependency direction is `Web/Worker -> Infrastructure/Application -> Domain`
    sqllocaldb info MSSQLLocalDB
    ```
 
-   Both Development hosts use the same `THub.Debug` LocalDB database through their checked-in `appsettings.Development.json` files. LocalDB uses the same EF Core SQL Server provider and migrations as the actual SQL Server environment.
+   Development host settings point to the same `THub.Debug` LocalDB database. LocalDB uses the same EF Core SQL Server provider and migrations as the actual SQL Server environment. Web, Worker, and Publications all load their control-plane state from this database in Development.
 
 3. Apply the metadata schema:
 
@@ -114,7 +115,23 @@ The dependency direction is `Web/Worker -> Infrastructure/Application -> Domain`
    dotnet run --project src/THub.Worker
    ```
 
-Base settings intentionally contain no database connection string. Non-Development environments must provide `ConnectionStrings:THub` through the approved deployment configuration or secret provider. Development settings are excluded from publish output.
+6. Start the publication host in a third terminal when testing a REST publication:
+
+   ```powershell
+   dotnet run --project src/THub.Publications --launch-profile https
+   ```
+
+   Create and activate a REST publication under `/publications`, create a named expiring token, and copy its plaintext value from the one-time response. The separate host exposes:
+
+   ```text
+   GET /api/v1/publications/{slug}/schema
+   GET /api/v1/publications/{slug}/rows?pageSize=100&filter=status:eq:Ready&sort=-createdAt
+   Authorization: Bearer thub_<selector>.<secret>
+   ```
+
+   The rows route accepts only `pageSize`, a server-issued `cursor`, up to 16 repeated `filter` values, and up to 8 repeated `sort` values. Filter syntax is `alias:operator:value`; `isNull` and `isNotNull` omit the value. Publication-version settings and the SQL connection's batch limit bound every request.
+
+Base settings intentionally contain no database connection string. Every non-Development Web, Worker, and Publications environment must provide `ConnectionStrings:THub` through approved deployment configuration. Use separate least-privilege host identities: Publications needs control-plane token/metering access and approved source-read access, while Worker alone receives approved editor source-write access. Development settings are excluded from publish output.
 
 ## VS Code: debug everything
 
@@ -123,14 +140,14 @@ Base settings intentionally contain no database connection string. Non-Developme
 3. Open **Run and Debug** (`Ctrl+Shift+D`).
 4. Select **THub: Debug All** and press `F5`.
 
-The compound profile runs one preparation task, then starts the web/frontend/backend host and worker under separate .NET debugger sessions. Preparation automatically:
+The compound profile runs one preparation task, then starts the web host, worker, and publication host under separate .NET debugger sessions. Preparation automatically:
 
 - restores local .NET tools and NuGet packages;
 - starts `MSSQLLocalDB`;
 - builds the Debug solution;
 - applies EF Core migrations to `THub.Debug`.
 
-The web application opens automatically at its HTTPS development URL. Stopping either debugger stops the complete compound session. Web-only and Worker-only profiles are also available. The VS Code web profiles explicitly enable the loopback-only Development identity so browser differences in Negotiate support do not block F5 debugging. Development logs are written beneath `src/THub.Web/logs` and `src/THub.Worker/logs`; those directories are ignored by Git.
+The web application opens automatically at its HTTPS development URL. Stopping a compound debugger stops the complete session. Web-only, Worker-only, and Publications-only profiles are also available. The VS Code web profiles explicitly enable the loopback-only Development identity so browser differences in Negotiate support do not block F5 debugging. Development logs are written beneath each executable project's `logs` directory; those directories are ignored by Git.
 
 ### Automated browser testing
 
@@ -182,11 +199,13 @@ The migration creates both THub metadata in the `thub` schema and Quartz operati
 ## Configuration and security
 
 - LocalDB is for Development/debugging only. Never use `(localdb)\MSSQLLocalDB` in a published environment.
-- Published web and worker environments must supply a real SQL Server `ConnectionStrings:THub`; startup fails fast when it is missing.
+- Published Web, Worker, and Publications environments must supply a real SQL Server `ConnectionStrings:THub`; startup fails fast when it is missing.
+- The publication host requires its own least-privilege control-plane identity plus Windows-integrated read access only to source objects approved by active REST publications. Keep source-write access on the Worker identity.
 - Production logs default to `%PROGRAMDATA%\THub\Logs`. Grant each host identity write access or override `Serilog:FilePath` through deployment configuration.
-- Replace the placeholder `CONTOSO\THub ...` groups under `Authorization:RoleMappings`.
+- Configure real AD groups under `Authorization:RoleMappings`; the checked-in production arrays are intentionally empty.
 - Production currently gives an authenticated unmapped account the configured default role (`Viewer`). Use an invalid/empty default when explicit group membership must be mandatory.
 - Never put source-system passwords or tokens in `DataConnection.ConfigurationJson`; store a protected secret reference.
+- Managed publication tokens are returned once and stored only as one-way verifiers; their list view exposes status, expiry/revocation, accepted-use count, and last-used time but never the bearer secret. Email delivery profiles store SMTP credential references, never secret values; the checked-in resolver fails closed for referenced credentials until deployment replaces it with an organization-approved provider. Profiles without a reference use only an explicitly approved anonymous relay.
 - Treat workflow JSON, file paths, SQL object names, webhook URLs, and executable settings as untrusted input at execution boundaries.
 - ClosedXML supports the intended `.xlsx`/`.xlsm` scope. Legacy `.xls` requires a separate connector decision.
 

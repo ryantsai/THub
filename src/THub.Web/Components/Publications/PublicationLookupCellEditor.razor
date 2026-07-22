@@ -1,0 +1,142 @@
+@implements IDisposable
+@using Radzen.Blazor.Spreadsheet
+@using THub.Web.Publications
+
+<div class="publication-lookup-editor">
+    <div class="lookup-search">
+        <input aria-label="Search foreign-key values" maxlength="256" placeholder="Search approved values…" @bind="SearchText" />
+        <button type="button" @onclick="SearchAsync" disabled="@Loading">Search</button>
+    </div>
+    @if (Loading)
+    {
+        <span class="lookup-message">Loading…</span>
+    }
+    else if (Error is not null)
+    {
+        <span class="lookup-message error">@Error</span>
+    }
+    else
+    {
+        <RadzenDropDownDataGrid TValue="string"
+                                Data="@Choices"
+                                @bind-Value="SelectedId"
+                                TextProperty="DisplayText"
+                                ValueProperty="Id"
+                                AllowFiltering="true"
+                                FilterCaseSensitivity="FilterCaseSensitivity.CaseInsensitive"
+                                FilterDelay="250"
+                                AllowPaging="true"
+                                PageSize="20"
+                                AllowSorting="false"
+                                AllowColumnResize="false"
+                                AllowColumnReorder="false"
+                                ShowSearch="true"
+                                SearchTextPlaceholder="Filter loaded approved values…"
+                                EmptyText="No approved values in this bounded result"
+                                InputAttributes="@(new Dictionary<string, object> { ["aria-label"] = "Approved foreign-key value" })"
+                                Style="width: 100%;">
+            <Columns>
+                <RadzenDropDownDataGridColumn Property="DisplayText" Title="Display value" />
+                <RadzenDropDownDataGridColumn Property="KeyText" Title="Stored key" />
+            </Columns>
+        </RadzenDropDownDataGrid>
+        <div class="lookup-actions">
+            @if (Column?.IsNullable == true)
+            {
+                <button type="button" @onclick="ClearAsync">Clear</button>
+            }
+            <button class="primary" type="button" @onclick="CommitAsync" disabled="@(string.IsNullOrEmpty(SelectedId))">Use value</button>
+            <button type="button" @onclick="Context.Cancel">Cancel</button>
+        </div>
+    }
+</div>
+
+@code {
+    private readonly CancellationTokenSource cancellation = new();
+    private IReadOnlyList<PublicationLookupChoice> Choices { get; set; } = [];
+    private string? SearchText { get; set; }
+    private string? SelectedId { get; set; }
+    private string? Error { get; set; }
+    private bool Loading { get; set; }
+
+    [Parameter]
+    public SpreadsheetCellEditContext Context { get; set; } = null!;
+
+    [CascadingParameter]
+    public PublicationSpreadsheetContext? SpreadsheetContext { get; set; }
+
+    private THub.Application.Publications.PublicationColumnDto? Column =>
+        SpreadsheetContext?.GetColumn(Context.Cell.Address.Column);
+
+    protected override async Task OnInitializedAsync()
+    {
+        Choices = SpreadsheetContext?.GetCachedChoices(Context.Cell.Address.Column) ?? [];
+        if (Choices.Count == 0)
+        {
+            await SearchAsync();
+        }
+    }
+
+    private async Task SearchAsync()
+    {
+        if (SpreadsheetContext is null)
+        {
+            Error = "The approved lookup context is unavailable.";
+            return;
+        }
+
+        Loading = true;
+        Error = null;
+        try
+        {
+            var result = await SpreadsheetContext.SearchAsync(
+                Context.Cell.Address.Column,
+                SearchText,
+                cancellation.Token);
+            Choices = result.Choices;
+            Error = result.Error;
+            SelectedId = null;
+        }
+        catch (OperationCanceledException) when (cancellation.IsCancellationRequested)
+        {
+        }
+        finally
+        {
+            Loading = false;
+        }
+    }
+
+    private async Task CommitAsync()
+    {
+        var column = Column;
+        var constraint = column?.ForeignKey?.ConstraintName;
+        var choice = Choices.SingleOrDefault(item => string.Equals(item.Id, SelectedId, StringComparison.Ordinal));
+        if (SpreadsheetContext is null || column is null || constraint is null || choice is null)
+        {
+            Error = "Select one approved value before committing the cell.";
+            return;
+        }
+
+        SpreadsheetContext.ApplyChoice(Context.Worksheet, Context.Cell.Address.Row, choice, constraint);
+        choice.KeyValues.TryGetValue(column.PublicAlias, out var currentValue);
+        await Context.CommitAsync(PublicationSpreadsheetChangeMapper.ToSpreadsheetValue(currentValue, column)!);
+    }
+
+    private async Task ClearAsync()
+    {
+        var constraint = Column?.ForeignKey?.ConstraintName;
+        if (SpreadsheetContext is null || constraint is null)
+        {
+            return;
+        }
+
+        SpreadsheetContext.ApplyChoice(Context.Worksheet, Context.Cell.Address.Row, null, constraint);
+        await Context.CommitAsync(null!);
+    }
+
+    public void Dispose()
+    {
+        cancellation.Cancel();
+        cancellation.Dispose();
+    }
+}

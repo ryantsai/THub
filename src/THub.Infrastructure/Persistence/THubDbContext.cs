@@ -1,5 +1,7 @@
 using Microsoft.EntityFrameworkCore;
+using THub.Domain.Alerts;
 using THub.Domain.Connections;
+using THub.Domain.Publications;
 using THub.Domain.Runs;
 using THub.Domain.Workflows;
 
@@ -8,54 +10,37 @@ namespace THub.Infrastructure.Persistence;
 public sealed class THubDbContext(DbContextOptions<THubDbContext> options) : DbContext(options)
 {
     public DbSet<WorkflowDefinition> Workflows => Set<WorkflowDefinition>();
+    public DbSet<WorkflowVersion> WorkflowVersions => Set<WorkflowVersion>();
     public DbSet<WorkflowRun> WorkflowRuns => Set<WorkflowRun>();
+    public DbSet<WorkflowStepRun> WorkflowStepRuns => Set<WorkflowStepRun>();
     public DbSet<DataConnection> Connections => Set<DataConnection>();
+    public DbSet<EmailDeliveryProfile> EmailDeliveryProfiles => Set<EmailDeliveryProfile>();
+    public DbSet<WorkflowAlertRule> WorkflowAlertRules => Set<WorkflowAlertRule>();
+    public DbSet<AlertDelivery> AlertDeliveries => Set<AlertDelivery>();
+    public DbSet<Publication> Publications => Set<Publication>();
+    public DbSet<PublicationVersion> PublicationVersions => Set<PublicationVersion>();
+    public DbSet<PublicationColumn> PublicationColumns => Set<PublicationColumn>();
+    public DbSet<PublicationGrant> PublicationGrants => Set<PublicationGrant>();
+    public DbSet<PublicationAccessToken> PublicationAccessTokens => Set<PublicationAccessToken>();
+    public DbSet<PublicationChangeSet> PublicationChangeSets => Set<PublicationChangeSet>();
+    public DbSet<PublicationChange> PublicationChanges => Set<PublicationChange>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.HasDefaultSchema("thub");
-
-        modelBuilder.Entity<WorkflowDefinition>(entity =>
-        {
-            entity.ToTable("Workflows");
-            entity.HasKey(x => x.Id);
-            entity.Property(x => x.Name).HasMaxLength(200).IsRequired();
-            entity.Property(x => x.Description).HasMaxLength(2_000);
-            entity.Property(x => x.Owner).HasMaxLength(256).IsRequired();
-            entity.Property(x => x.GraphJson).HasColumnType("nvarchar(max)").IsRequired();
-            entity.Property(x => x.CronExpression).HasMaxLength(100);
-            entity.Property(x => x.TimeZoneId).HasMaxLength(200).IsRequired();
-            entity.Property(x => x.Status).HasConversion<string>().HasMaxLength(32);
-            entity.HasIndex(x => new { x.Status, x.NextRunAtUtc });
-            entity.HasIndex(x => x.Name);
-        });
-
-        modelBuilder.Entity<WorkflowRun>(entity =>
-        {
-            entity.ToTable("WorkflowRuns");
-            entity.HasKey(x => x.Id);
-            entity.Property(x => x.Status).HasConversion<string>().HasMaxLength(32);
-            entity.Property(x => x.TriggeredBy).HasMaxLength(256).IsRequired();
-            entity.Property(x => x.ErrorMessage).HasMaxLength(4_000);
-            entity.HasIndex(x => new { x.Status, x.QueuedAtUtc });
-            entity.HasIndex(x => new { x.WorkflowId, x.WorkflowVersion, x.ScheduledForUtc })
-                .IsUnique()
-                .HasFilter("[ScheduledForUtc] IS NOT NULL");
-            entity.HasOne<WorkflowDefinition>()
-                .WithMany()
-                .HasForeignKey(x => x.WorkflowId)
-                .OnDelete(DeleteBehavior.Restrict);
-        });
+        modelBuilder.ApplyConfigurationsFromAssembly(typeof(THubDbContext).Assembly);
 
         modelBuilder.Entity<DataConnection>(entity =>
         {
             entity.ToTable("Connections");
             entity.HasKey(x => x.Id);
-            entity.Property(x => x.Name).HasMaxLength(200).IsRequired();
+            entity.Property(x => x.Name).HasMaxLength(DataConnection.MaximumNameLength).IsRequired();
             entity.Property(x => x.Kind).HasConversion<string>().HasMaxLength(32);
             entity.Property(x => x.ConfigurationJson).HasColumnType("nvarchar(max)").IsRequired();
-            entity.Property(x => x.CreatedBy).HasMaxLength(256).IsRequired();
+            entity.Property(x => x.CreatedBy).HasMaxLength(DataConnection.MaximumIdentityLength).IsRequired();
+            entity.Property<byte[]>("RowVersion").IsRowVersion();
             entity.HasIndex(x => x.Name).IsUnique();
+            entity.HasIndex(x => new { x.Kind, x.IsEnabled });
         });
     }
 }

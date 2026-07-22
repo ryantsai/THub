@@ -1,0 +1,23 @@
+.heading-actions .rz-dropdown { min-width: 150px; height: 36px; font-size: 11px; }
+.table-scroll { overflow-x: auto; }
+.run-table tr.selected td { background: #f2f8f6; }
+.run-link { display: grid; gap: 3px; padding: 0; border: 0; background: none; color: inherit; text-align: left; cursor: pointer; }
+.run-link strong { font-size: 11px; }
+.run-link small { color: #8b9895; font: 9px/1.2 ui-monospace, monospace; }
+.run-actions { white-space: nowrap; }
+.run-actions button { margin-right: 8px; padding: 0; border: 0; background: none; color: #17775f; font-size: 10px; font-weight: 700; cursor: pointer; }
+.run-actions button:disabled { color: #a2adaa; cursor: not-allowed; }
+.run-detail { margin-top: 18px; }
+.detail-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1px; padding: 18px; background: #edf1f0; }
+.detail-grid dl { margin: 0; padding: 13px; background: white; }
+.detail-grid dt { color: #83908d; font-size: 9px; text-transform: uppercase; letter-spacing: .7px; }
+.detail-grid dd { margin: 5px 0 0; font-size: 11px; overflow-wrap: anywhere; }
+.run-error { margin: 18px; padding: 14px; display: grid; grid-template-columns: auto 1fr; gap: 4px 10px; border: 1px solid #f1cbc5; border-radius: 8px; background: #fff7f5; color: #8c4037; }
+.run-error strong { font: 700 10px ui-monospace, monospace; }
+.run-error span { color: #a3635b; font-size: 9px; text-align: right; text-transform: uppercase; }
+.run-error p { grid-column: 1 / -1; margin: 4px 0 0; font-size: 11px; line-height: 1.5; }
+.error-cell { max-width: 320px; overflow-wrap: anywhere; }
+
+@media (max-width: 900px) {
+    .detail-grid { grid-template-columns: repeat(2, 1fr); }
+}
