@@ -1,0 +1,10 @@
+@page "/publications"
+@attribute [Authorize(Policy = Permissions.PublicationManage)]
+
+<PageTitle>Publications · THub</PageTitle>
+<div class="page-heading"><div><div class="eyebrow">Controlled access</div><h1>Data publications</h1><p>Expose approved tables through governed REST endpoints or browser editors.</p></div><div class="heading-actions"><RadzenButton Text="New publication" Icon="add" ButtonStyle="ButtonStyle.Primary" /></div></div>
+<section class="panel"><div class="panel-head"><div><h2>Published surfaces</h2><p>Every route enforces an explicit read/write policy</p></div><span class="status-chip draft">Design contract</span></div><table class="activity-table"><thead><tr><th>Name</th><th>Source</th><th>Mode</th><th>Access</th><th>State</th></tr></thead><tbody>
+<tr><td><strong>Customer lookup</strong></td><td>SalesWarehouse.dbo.Customers</td><td>REST · read only</td><td class="muted">API key + policy</td><td><span class="status-chip draft">Proposed</span></td></tr>
+<tr><td><strong>Product stewardship</strong></td><td>SalesWarehouse.dbo.Products</td><td>Editor · read/write</td><td class="muted">Windows role</td><td><span class="status-chip draft">Proposed</span></td></tr>
+</tbody></table></section>
+

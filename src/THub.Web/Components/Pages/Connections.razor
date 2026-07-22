@@ -1,0 +1,11 @@
+@page "/connections"
+@attribute [Authorize(Policy = Permissions.ConnectionManage)]
+
+<PageTitle>Connections · THub</PageTitle>
+<div class="page-heading"><div><div class="eyebrow">Data plane</div><h1>Connections</h1><p>Approved SQL Server and local-file endpoints available to workflows.</p></div><div class="heading-actions"><RadzenButton Text="New connection" Icon="add" ButtonStyle="ButtonStyle.Primary" /></div></div>
+<div class="resource-grid">
+    <article class="resource-card"><span class="resource-logo sql"><RadzenIcon Icon="database" /></span><div><h2>Production SQL</h2><p>sql-prod-01 · SalesWarehouse</p></div><span class="status-chip">Connected</span><dl><dt>Authentication</dt><dd>Windows integrated</dd><dt>Used by</dt><dd>7 workflows</dd></dl><button type="button">Manage connection →</button></article>
+    <article class="resource-card"><span class="resource-logo sql"><RadzenIcon Icon="database" /></span><div><h2>Local staging</h2><p>localhost · THubStaging</p></div><span class="status-chip">Connected</span><dl><dt>Authentication</dt><dd>Service identity</dd><dt>Used by</dt><dd>3 workflows</dd></dl><button type="button">Manage connection →</button></article>
+    <article class="resource-card"><span class="resource-logo files"><RadzenIcon Icon="folder_zip" /></span><div><h2>Inbound files</h2><p>D:\Data\Inbound</p></div><span class="status-chip">Available</span><dl><dt>Formats</dt><dd>CSV, XLSX</dd><dt>Used by</dt><dd>2 workflows</dd></dl><button type="button">Manage connection →</button></article>
+</div>
+

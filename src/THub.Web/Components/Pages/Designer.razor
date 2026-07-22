@@ -1,0 +1,198 @@
+@page "/designer"
+@attribute [Authorize(Policy = Permissions.WorkflowEdit)]
+@using THub.Application.Workflows
+@using THub.Domain.Workflows
+@inject WorkflowGraphValidator GraphValidator
+@inject NotificationService Notifications
+
+<PageTitle>Workflow designer · THub</PageTitle>
+
+<div class="designer-heading">
+    <div class="designer-breadcrumb"><a href="/workflows">Workflows</a><span>/</span><input aria-label="Workflow name" @bind="WorkflowName" /></div>
+    <div class="designer-actions">
+        <span class="draft-state"><i></i>Draft · saved just now</span>
+        <RadzenButton Text="Validate" Icon="fact_check" ButtonStyle="ButtonStyle.Light" Size="ButtonSize.Small" Click="@Validate" />
+        <RadzenButton Text="Save draft" Icon="save" ButtonStyle="ButtonStyle.Primary" Size="ButtonSize.Small" Click="@SaveDraft" />
+        <RadzenButton Text="Publish" Icon="rocket_launch" ButtonStyle="ButtonStyle.Success" Size="ButtonSize.Small" Click="@Publish" />
+    </div>
+</div>
+
+<div class="designer-shell">
+    <aside class="node-palette">
+        <div class="palette-head"><strong>Toolbox</strong><small>Click to add a step</small></div>
+        <div class="palette-search"><RadzenIcon Icon="search" /><input placeholder="Find a tool..." @bind="Search" /></div>
+        @foreach (var group in FilteredGroups)
+        {
+            <section class="palette-group">
+                <h3>@group.Name</h3>
+                @foreach (var tool in group.Tools)
+                {
+                    <button class="tool-item" type="button" @onclick="() => AddNode(tool)">
+                        <span class="tool-icon @tool.Tone"><RadzenIcon Icon="@tool.Icon" /></span>
+                        <span><strong>@tool.Name</strong><small>@tool.Description</small></span>
+                        <RadzenIcon Icon="add" />
+                    </button>
+                }
+            </section>
+        }
+    </aside>
+
+    <section class="workflow-canvas" @onclick="ClearSelection">
+        <div class="canvas-toolbar">
+            <button type="button" title="Select"><RadzenIcon Icon="near_me" /></button>
+            <button type="button" title="Fit workflow"><RadzenIcon Icon="fit_screen" /></button>
+            <span></span>
+            <button type="button" title="Zoom out"><RadzenIcon Icon="remove" /></button>
+            <small>100%</small>
+            <button type="button" title="Zoom in"><RadzenIcon Icon="add" /></button>
+        </div>
+
+        <svg class="edge-layer" aria-hidden="true">
+            @foreach (var edge in Edges)
+            {
+                <path d="@GetEdgePath(edge)" />
+            }
+        </svg>
+
+        @foreach (var node in Nodes)
+        {
+            <button type="button" class="canvas-node @(SelectedNode == node ? "selected" : "")" style="@GetNodeStyle(node)" @onclick:stopPropagation @onclick="() => SelectNode(node)">
+                <span class="node-port input"></span>
+                <span class="node-icon @node.Tone"><RadzenIcon Icon="@node.Icon" /></span>
+                <span class="node-copy"><strong>@node.Name</strong><small>@node.Subtitle</small></span>
+                <span class="node-menu"><RadzenIcon Icon="more_vert" /></span>
+                <span class="node-state @node.State.ToLowerInvariant()">@node.State</span>
+                <span class="node-port output"></span>
+            </button>
+        }
+
+        <div class="canvas-hint"><RadzenIcon Icon="lightbulb" /><span>Select a node to configure it. New tools connect to the end of the current path.</span></div>
+    </section>
+
+    <aside class="properties-panel">
+        @if (SelectedNode is null)
+        {
+            <div class="empty-properties">
+                <span><RadzenIcon Icon="tune" /></span>
+                <h3>Nothing selected</h3>
+                <p>Select a node on the canvas to edit its connection, schema, and runtime settings.</p>
+            </div>
+        }
+        else
+        {
+            <div class="properties-head"><div><strong>@SelectedNode.Name</strong><small>@SelectedNode.Kind</small></div><button type="button" @onclick="DeleteSelected" aria-label="Delete node"><RadzenIcon Icon="delete_outline" /></button></div>
+            <div class="properties-body">
+                <label>Step name<input @bind="SelectedNode.Name" /></label>
+                <label>Connection<select><option>Production SQL</option><option>Local staging</option><option>Add connection…</option></select></label>
+                <label>Object<input value="dbo.Customers" /></label>
+                <div class="setting-row"><div><strong>First row is header</strong><small>Use column names from the source</small></div><RadzenSwitch @bind-Value="HasHeader" /></div>
+                <div class="property-section"><span>Schema</span><button type="button">Refresh</button></div>
+                <div class="schema-list">
+                    <div><RadzenIcon Icon="key" /><span>CustomerId</span><small>int</small></div>
+                    <div><RadzenIcon Icon="short_text" /><span>Email</span><small>nvarchar</small></div>
+                    <div><RadzenIcon Icon="calendar_today" /><span>UpdatedAt</span><small>datetime2</small></div>
+                </div>
+                <button class="preview-button" type="button"><RadzenIcon Icon="table_view" />Preview data</button>
+            </div>
+        }
+    </aside>
+</div>
+
+@code {
+    private string WorkflowName { get; set; } = "Customer 360 sync";
+    private string Search { get; set; } = string.Empty;
+    private bool HasHeader { get; set; } = true;
+    private DesignerNode? SelectedNode { get; set; }
+
+    private readonly List<DesignerNode> Nodes =
+    [
+        new("sql-source", WorkflowNodeKind.SqlSource, "SQL customers", "dbo.Customers", "database", "blue", "Ready", 80, 135),
+        new("filter", WorkflowNodeKind.FilterRows, "Recent changes", "UpdatedAt > checkpoint", "filter_alt", "amber", "Ready", 335, 135),
+        new("map", WorkflowNodeKind.SelectColumns, "Map customer schema", "12 mapped columns", "schema", "violet", "Ready", 590, 135),
+        new("target", WorkflowNodeKind.SqlTarget, "Customer warehouse", "dw.DimCustomer", "storage", "green", "Ready", 845, 135),
+        new("webhook", WorkflowNodeKind.Webhook, "Notify downstream", "POST /customer-ready", "webhook", "rose", "Idle", 845, 330)
+    ];
+
+    private readonly List<DesignerEdge> Edges =
+    [
+        new("sql-source", "filter"), new("filter", "map"), new("map", "target"), new("target", "webhook")
+    ];
+
+    private static readonly PaletteGroup[] Groups =
+    [
+        new("Sources", [
+            new("SQL Server", "Read a table or query", WorkflowNodeKind.SqlSource, "database", "blue"),
+            new("CSV file", "Delimited local file", WorkflowNodeKind.CsvSource, "description", "green"),
+            new("Excel workbook", "Sheet or named range", WorkflowNodeKind.ExcelSource, "grid_on", "green")]),
+        new("Transform", [
+            new("Select & map", "Rename and cast columns", WorkflowNodeKind.SelectColumns, "schema", "violet"),
+            new("Filter rows", "Apply boolean conditions", WorkflowNodeKind.FilterRows, "filter_alt", "amber"),
+            new("Join", "Combine two data streams", WorkflowNodeKind.Join, "join_inner", "violet")]),
+        new("Destinations & actions", [
+            new("SQL target", "Insert, merge, or replace", WorkflowNodeKind.SqlTarget, "storage", "blue"),
+            new("Webhook", "Call an HTTP endpoint", WorkflowNodeKind.Webhook, "webhook", "rose"),
+            new("Executable", "Run an allow-listed process", WorkflowNodeKind.Executable, "terminal", "slate")])
+    ];
+
+    private IEnumerable<PaletteGroup> FilteredGroups => string.IsNullOrWhiteSpace(Search)
+        ? Groups
+        : Groups.Select(group => new PaletteGroup(group.Name, group.Tools
+            .Where(tool => tool.Name.Contains(Search, StringComparison.OrdinalIgnoreCase)).ToArray()))
+            .Where(group => group.Tools.Length > 0);
+
+    private void AddNode(PaletteTool tool)
+    {
+        var previous = Nodes.LastOrDefault();
+        var id = $"{tool.Kind.ToString().ToLowerInvariant()}-{Guid.NewGuid():N}"[..22];
+        var x = previous is null ? 80 : Math.Min(previous.X + 255, 845);
+        var y = previous is null || x > previous.X ? previous?.Y ?? 135 : previous.Y + 195;
+        var node = new DesignerNode(id, tool.Kind, tool.Name, "Configure this step", tool.Icon, tool.Tone, "Draft", x, y);
+        Nodes.Add(node);
+        if (previous is not null) Edges.Add(new(previous.Id, node.Id));
+        SelectedNode = node;
+    }
+
+    private void SelectNode(DesignerNode node) => SelectedNode = node;
+    private void ClearSelection() => SelectedNode = null;
+    private void DeleteSelected()
+    {
+        if (SelectedNode is null) return;
+        Nodes.Remove(SelectedNode);
+        Edges.RemoveAll(edge => edge.From == SelectedNode.Id || edge.To == SelectedNode.Id);
+        SelectedNode = null;
+    }
+
+    private void Validate()
+    {
+        var graph = new WorkflowGraph(
+            Nodes.Select(ToDomainNode).ToArray(),
+            Edges.Select(edge => new WorkflowEdge(edge.From, edge.To)).ToArray());
+        var issues = GraphValidator.Validate(graph);
+        Notifications.Notify(issues.Count == 0 ? NotificationSeverity.Success : NotificationSeverity.Warning,
+            issues.Count == 0 ? "Workflow is valid" : "Validation needs attention",
+            issues.Count == 0 ? $"{Nodes.Count} nodes and {Edges.Count} edges are ready." : issues[0].Message);
+    }
+
+    private void SaveDraft() => Notifications.Notify(NotificationSeverity.Success, "Draft saved", $"{WorkflowName} is stored as version 1.");
+    private void Publish() => Notifications.Notify(NotificationSeverity.Info, "Publish is gated", "Persistence and execution approval will be wired after the deployment decisions are confirmed.");
+    private static WorkflowNode ToDomainNode(DesignerNode node) => new(node.Id, node.Kind, node.Name, node.X, node.Y);
+    private string GetNodeStyle(DesignerNode node) => $"left:{node.X}px;top:{node.Y}px";
+    private string GetEdgePath(DesignerEdge edge)
+    {
+        var from = Nodes.First(node => node.Id == edge.From);
+        var to = Nodes.First(node => node.Id == edge.To);
+        var x1 = from.X + 184; var y1 = from.Y + 39; var x2 = to.X; var y2 = to.Y + 39;
+        var bend = Math.Max(55, Math.Abs(x2 - x1) / 2);
+        return $"M{x1},{y1} C{x1 + bend},{y1} {x2 - bend},{y2} {x2},{y2}";
+    }
+
+    private sealed record PaletteGroup(string Name, PaletteTool[] Tools);
+    private sealed record PaletteTool(string Name, string Description, WorkflowNodeKind Kind, string Icon, string Tone);
+    private sealed record DesignerEdge(string From, string To);
+    private sealed class DesignerNode(string id, WorkflowNodeKind kind, string name, string subtitle, string icon, string tone, string state, double x, double y)
+    {
+        public string Id { get; } = id; public WorkflowNodeKind Kind { get; } = kind; public string Name { get; set; } = name;
+        public string Subtitle { get; } = subtitle; public string Icon { get; } = icon; public string Tone { get; } = tone; public string State { get; } = state;
+        public double X { get; } = x; public double Y { get; } = y;
+    }
+}

@@ -1,0 +1,13 @@
+**/bin/
+**/obj/
+.vs/
+.idea/
+.playwright-cli/
+*.user
+*.suo
+*.nupkg
+TestResults/
+artifacts/
+output/
+.env
+appsettings.Local.json

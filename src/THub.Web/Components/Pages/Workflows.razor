@@ -1,0 +1,24 @@
+@page "/workflows"
+@attribute [Authorize(Policy = Permissions.WorkflowView)]
+
+<PageTitle>Workflows · THub</PageTitle>
+<div class="page-heading">
+    <div><div class="eyebrow">Workspace</div><h1>Workflows</h1><p>Design, version, publish, and monitor data movement.</p></div>
+    <div class="heading-actions"><RadzenButton Text="Import" Icon="upload_file" ButtonStyle="ButtonStyle.Light" /><RadzenButton Text="New workflow" Icon="add" ButtonStyle="ButtonStyle.Primary" Click="@NewWorkflow" /></div>
+</div>
+<section class="panel">
+    <div class="panel-head"><div><h2>All workflows</h2><p>12 total · 9 published · 2 drafts · 1 paused</p></div><a href="/designer">Open designer →</a></div>
+    <table class="activity-table"><thead><tr><th>Name</th><th>Status</th><th>Schedule</th><th>Last run</th><th>Owner</th></tr></thead><tbody>
+        @foreach (var workflow in Items)
+        {
+            <tr><td><div class="workflow-name"><span class="mini-flow-icon"><RadzenIcon Icon="account_tree" /></span>@workflow.Name</div></td><td><span class="status-chip @workflow.Status.ToLowerInvariant()">@workflow.Status</span></td><td>@workflow.Schedule</td><td class="muted">@workflow.LastRun</td><td class="muted">@workflow.Owner</td></tr>
+        }
+    </tbody></table>
+</section>
+@code {
+    [Inject] private NavigationManager Navigation { get; set; } = default!;
+    private void NewWorkflow() => Navigation.NavigateTo("/designer");
+    private static readonly Item[] Items = [new("Customer 360 sync", "Published", "Every 15 min", "4 min ago", "Ryan"), new("Order enrichment", "Published", "Hourly", "8 min ago", "Data Ops"), new("Finance export", "Draft", "Not scheduled", "Yesterday", "Avery"), new("Inventory snapshot", "Published", "0 2 * * *", "37 min ago", "Data Ops"), new("Partner CSV intake", "Paused", "File watch", "1 hr ago", "Morgan")];
+    private sealed record Item(string Name, string Status, string Schedule, string LastRun, string Owner);
+}
+

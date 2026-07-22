@@ -1,0 +1,17 @@
+<Router AppAssembly="typeof(Program).Assembly" NotFoundPage="typeof(Pages.NotFound)">
+    <Found Context="routeData">
+        <AuthorizeRouteView RouteData="routeData" DefaultLayout="typeof(Layout.MainLayout)">
+            <NotAuthorized>
+                <LayoutView Layout="typeof(Layout.MainLayout)">
+                    <div class="access-denied">
+                        <div class="eyebrow">ACCESS CONTROL</div>
+                        <h1>This workspace is outside your role.</h1>
+                        <p>Ask a THub administrator to map your Windows account or AD group to the required application role.</p>
+                    </div>
+                </LayoutView>
+            </NotAuthorized>
+        </AuthorizeRouteView>
+        <FocusOnNavigate RouteData="routeData" Selector="h1" />
+    </Found>
+</Router>
+

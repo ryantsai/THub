@@ -1,0 +1,8 @@
+@page "/settings"
+@attribute [Authorize(Policy = Permissions.Administration)]
+
+<PageTitle>Settings · THub</PageTitle>
+<div class="page-heading"><div><div class="eyebrow">Administration</div><h1>Platform settings</h1><p>Windows group mappings, worker policy, secrets, and execution guardrails.</p></div></div>
+<section class="panel"><div class="panel-head"><div><h2>Role mapping</h2><p>Application roles are resolved from Windows/AD groups</p></div></div><table class="activity-table"><thead><tr><th>Application role</th><th>Windows group</th><th>Capabilities</th></tr></thead><tbody>
+<tr><td><strong>Administrator</strong></td><td>CONTOSO\THub Admins</td><td class="muted">All platform operations</td></tr><tr><td><strong>Designer</strong></td><td>CONTOSO\THub Designers</td><td class="muted">Connections, workflows, publications</td></tr><tr><td><strong>Operator</strong></td><td>CONTOSO\THub Operators</td><td class="muted">Run, schedule, monitor</td></tr><tr><td><strong>Viewer</strong></td><td>CONTOSO\THub Viewers</td><td class="muted">Read-only access</td></tr>
+</tbody></table></section>

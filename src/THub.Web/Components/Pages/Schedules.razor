@@ -1,0 +1,11 @@
+@page "/schedules"
+@attribute [Authorize(Policy = Permissions.WorkflowView)]
+
+<PageTitle>Schedules · THub</PageTitle>
+<div class="page-heading"><div><div class="eyebrow">Automation</div><h1>Schedules</h1><p>Cron-based triggers evaluated by the durable Windows worker.</p></div><AuthorizeView Policy="@Permissions.ScheduleManage"><div class="heading-actions"><RadzenButton Text="New schedule" Icon="add_alarm" ButtonStyle="ButtonStyle.Primary" /></div></AuthorizeView></div>
+<section class="panel"><div class="panel-head"><div><h2>Upcoming triggers</h2><p>Displayed in Asia/Taipei</p></div><span class="status-chip">Scheduler healthy</span></div><table class="activity-table"><thead><tr><th>Workflow</th><th>Expression</th><th>Next run</th><th>Time zone</th><th>Status</th></tr></thead><tbody>
+<tr><td><strong>Customer 360 sync</strong></td><td><code>*/15 * * * *</code></td><td>Today, 10:00</td><td class="muted">Asia/Taipei</td><td><span class="status-chip">Active</span></td></tr>
+<tr><td><strong>Inventory snapshot</strong></td><td><code>0 2 * * *</code></td><td>Tomorrow, 02:00</td><td class="muted">Asia/Taipei</td><td><span class="status-chip">Active</span></td></tr>
+<tr><td><strong>Finance export</strong></td><td><code>0 18 * * 1-5</code></td><td>Not scheduled</td><td class="muted">Asia/Taipei</td><td><span class="status-chip draft">Paused</span></td></tr>
+</tbody></table></section>
+

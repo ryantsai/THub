@@ -1,0 +1,12 @@
+@page "/runs"
+@attribute [Authorize(Policy = Permissions.WorkflowView)]
+
+<PageTitle>Runs · THub</PageTitle>
+<div class="page-heading"><div><div class="eyebrow">Operations</div><h1>Run history</h1><p>Execution traces, row counts, timings, and errors from every worker.</p></div><div class="heading-actions"><RadzenButton Text="Refresh" Icon="refresh" ButtonStyle="ButtonStyle.Light" /></div></div>
+<section class="panel"><div class="panel-head"><div><h2>Latest executions</h2><p>Auto-refreshing every 15 seconds</p></div><span class="status-chip running">Live</span></div>
+<table class="activity-table"><thead><tr><th>Run ID</th><th>Workflow</th><th>Status</th><th>Started</th><th>Worker</th><th>Duration</th></tr></thead><tbody>
+<tr><td class="muted">74F2…98A1</td><td><strong>Order enrichment</strong></td><td><span class="status-chip running">Running</span></td><td>09:42:10</td><td class="muted">NODE-DATA-01</td><td>00:38</td></tr>
+<tr><td class="muted">AA83…107C</td><td><strong>Daily customer sync</strong></td><td><span class="status-chip">Succeeded</span></td><td>09:38:00</td><td class="muted">NODE-DATA-01</td><td>01:42</td></tr>
+<tr><td class="muted">C120…4D2B</td><td><strong>Finance export</strong></td><td><span class="status-chip failed">Failed</span></td><td>09:20:14</td><td class="muted">NODE-DATA-02</td><td>00:11</td></tr>
+</tbody></table></section>
+
