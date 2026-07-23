@@ -131,16 +131,43 @@ For local Development/debugging, all three executable hosts use `THub.Debug` on 
 
 Every non-Development host must receive the real SQL Server `ConnectionStrings:THub` through environment-specific external configuration or an organization-approved configuration provider. Web, Worker, and Publications register Infrastructure and fail startup when it is missing. Base settings intentionally contain no production fallback connection string.
 
-Configured source/target connections store only a credential reference such as `warehouse_reader` or `partner_ftp`. SQL Server independently selects Windows integrated or referenced username/password authentication. MySQL, PostgreSQL, Oracle, and FTP require a referenced username/password. Supply values to every host that uses the connection through external configuration:
+Configured source/target connections store only a credential reference such as
+`warehouse_reader` or `partner_ftp` in their metadata. SQL Server independently selects
+Windows integrated or referenced username/password authentication. MySQL, PostgreSQL,
+Oracle, and FTP require a referenced username/password. Administrators enter those
+values in the connection editor; THub stores the payload as AES-256-GCM ciphertext in
+`thub.EncryptedConnectionCredentials`.
+
+Generate a random 32-byte key once and provision it to every authorized Web, Worker, and
+Publications host through environment configuration:
 
 ```powershell
-$env:ConnectionCredentials__warehouse_reader__Username = 'thub_warehouse_reader'
-$env:ConnectionCredentials__warehouse_reader__Password = '<supply-through-approved-secret-system>'
-$env:ConnectionCredentials__partner_ftp__Username = 'thub_transfer'
-$env:ConnectionCredentials__partner_ftp__Password = '<supply-through-approved-secret-system>'
+$credentialKeyBytes = [byte[]]::new(32)
+[System.Security.Cryptography.RandomNumberGenerator]::Fill($credentialKeyBytes)
+$env:CredentialEncryption__CurrentKeyVersion = '1'
+$env:CredentialEncryption__Keys__1 = [Convert]::ToBase64String($credentialKeyBytes)
+[System.Security.Cryptography.CryptographicOperations]::ZeroMemory($credentialKeyBytes)
 ```
 
-The Web host needs a credential to test/discover its connection and the Worker needs it for workflow execution. Publications currently uses SQL Server connections only. Give each host only the references and grants it requires. The built-in `IConnectionCredentialResolver` uses `IConfiguration`, so environment variables are a portable baseline rather than a requirement; key-per-file and vault-backed .NET configuration providers can supply the same keys, or a deployment can replace the resolver. Missing references fail closed. Never place these values in checked-in `appsettings` files.
+The sample assigns only the current process environment; provision persistent
+IIS/Windows-Service environment settings through the deployment system and restart each
+host. Do not copy the generated example output into source control, shell history,
+deployment logs, or the THub database.
+
+The Web host needs the key to create/replace credentials and test/discover connections;
+the Worker needs it for workflow execution. Publications needs it only when an active
+SQL publication uses referenced authentication. Give each host only the table access,
+source-system grants, and key ring it requires. Missing references, missing key versions,
+invalid key lengths, and authentication failures fail closed. Existing installations
+must re-enter each externally provisioned credential in the connection editor after
+applying the migration.
+
+To rotate, add a new `CredentialEncryption__Keys__<version>` value to every authorized
+host while retaining old versions, change `CurrentKeyVersion`, and restart the hosts.
+New or replaced credentials use the current version. Replace every stored credential
+through the editor before removing an old key; automated bulk re-encryption is not yet
+implemented. Back up all still-required keys separately from SQL backups. Losing a key
+version makes its remaining rows unrecoverable.
 
 FTP connections select plain FTP, explicit FTPS, or implicit FTPS. Plain FTP exposes credentials and data in transit and must be restricted to explicitly approved legacy endpoints on a controlled network. Prefer FTPS with certificate validation. Size Worker temporary storage for the configured maximum FTP file size and monitor `%TEMP%\THub` for remnants after abrupt process termination.
 

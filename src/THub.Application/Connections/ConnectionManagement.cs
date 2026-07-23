@@ -22,6 +22,7 @@ public sealed record ConnectionDetails(
     string Name,
     ConnectionKind Kind,
     ConnectionConfiguration Configuration,
+    bool HasStoredCredential,
     bool IsEnabled,
     string CreatedBy,
     DateTimeOffset CreatedAtUtc,
@@ -45,14 +46,64 @@ public interface IDataConnectionStore
 
     Task<DataConnection?> FindAsync(Guid id, CancellationToken cancellationToken);
 
+    Task<bool> CredentialExistsAsync(
+        string secretReference,
+        CancellationToken cancellationToken) =>
+        Task.FromResult(false);
+
     Task<ConnectionSaveStatus> AddAsync(
         DataConnection connection,
         CancellationToken cancellationToken);
+
+    Task<ConnectionSaveStatus> AddAsync(
+        DataConnection connection,
+        ConnectionCredentialWrite? credentialWrite,
+        CancellationToken cancellationToken) =>
+        credentialWrite is null
+            ? AddAsync(connection, cancellationToken)
+            : throw new NotSupportedException(
+                "This connection store does not support encrypted credential writes.");
 
     Task<ConnectionSaveStatus> SaveAsync(
         DataConnection connection,
         DateTimeOffset expectedUpdatedAtUtc,
         CancellationToken cancellationToken);
+
+    Task<ConnectionSaveStatus> SaveAsync(
+        DataConnection connection,
+        DateTimeOffset expectedUpdatedAtUtc,
+        ConnectionCredentialWrite? credentialWrite,
+        CancellationToken cancellationToken) =>
+        credentialWrite is null
+            ? SaveAsync(connection, expectedUpdatedAtUtc, cancellationToken)
+            : throw new NotSupportedException(
+                "This connection store does not support encrypted credential writes.");
+}
+
+public sealed record ConnectionCredentialWrite
+{
+    public ConnectionCredentialWrite(
+        string secretReference,
+        ConnectionCredential credential,
+        DateTimeOffset changedAtUtc)
+    {
+        SecretReference = new DatabaseAuthenticationConfiguration(
+            DatabaseAuthenticationKind.UserPassword,
+            secretReference).CredentialSecretReference!;
+        Credential = credential ?? throw new ArgumentNullException(nameof(credential));
+        if (changedAtUtc == default)
+        {
+            throw new ArgumentOutOfRangeException(nameof(changedAtUtc));
+        }
+
+        ChangedAtUtc = changedAtUtc.ToUniversalTime();
+    }
+
+    public string SecretReference { get; }
+
+    public ConnectionCredential Credential { get; }
+
+    public DateTimeOffset ChangedAtUtc { get; }
 }
 
 public interface IDataConnectionProbe
@@ -84,7 +135,7 @@ public sealed class ConnectionManagementService(
     public async Task<ConnectionDetails?> GetAsync(Guid id, CancellationToken cancellationToken)
     {
         var connection = await store.FindAsync(id, cancellationToken);
-        return connection is null ? null : ToDetails(connection);
+        return connection is null ? null : await ToDetailsAsync(connection, cancellationToken);
     }
 
     public async Task<ConnectionCommandResult> CreateAsync(
@@ -93,17 +144,48 @@ public sealed class ConnectionManagementService(
         string actor,
         DateTimeOffset createdAtUtc,
         CancellationToken cancellationToken)
+        => await CreateAsync(
+            name,
+            configuration,
+            credential: null,
+            actor,
+            createdAtUtc,
+            cancellationToken);
+
+    public async Task<ConnectionCommandResult> CreateAsync(
+        string name,
+        ConnectionConfiguration configuration,
+        ConnectionCredential? credential,
+        string actor,
+        DateTimeOffset createdAtUtc,
+        CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(configuration);
+        var credentialWrite = CreateCredentialWrite(
+            configuration,
+            credential,
+            createdAtUtc,
+            isNewConnection: true,
+            previousConfiguration: null);
+        if (credentialWrite.RequiredCredentialMessage is not null)
+        {
+            return credentialWrite.RequiredCredentialMessage;
+        }
+
         var connection = new DataConnection(
             name,
             configuration.Kind,
             serializer.Serialize(configuration),
             actor,
             createdAtUtc);
-        var status = await store.AddAsync(connection, cancellationToken);
+        var status = await store.AddAsync(
+            connection,
+            credentialWrite.Write,
+            cancellationToken);
         return status == ConnectionSaveStatus.Saved
-            ? new ConnectionCommandResult(status, ToDetails(connection))
+            ? new ConnectionCommandResult(
+                status,
+                await ToDetailsAsync(connection, cancellationToken))
             : new ConnectionCommandResult(
                 status,
                 null,
@@ -115,6 +197,23 @@ public sealed class ConnectionManagementService(
         Guid id,
         string name,
         ConnectionConfiguration configuration,
+        DateTimeOffset expectedUpdatedAtUtc,
+        DateTimeOffset changedAtUtc,
+        CancellationToken cancellationToken)
+        => await UpdateAsync(
+            id,
+            name,
+            configuration,
+            credential: null,
+            expectedUpdatedAtUtc,
+            changedAtUtc,
+            cancellationToken);
+
+    public async Task<ConnectionCommandResult> UpdateAsync(
+        Guid id,
+        string name,
+        ConnectionConfiguration configuration,
+        ConnectionCredential? credential,
         DateTimeOffset expectedUpdatedAtUtc,
         DateTimeOffset changedAtUtc,
         CancellationToken cancellationToken)
@@ -141,16 +240,42 @@ public sealed class ConnectionManagementService(
         {
             return new ConnectionCommandResult(
                 ConnectionSaveStatus.Conflict,
-                ToDetails(connection),
+                await ToDetailsAsync(connection, cancellationToken),
                 "connection.concurrency",
                 "The connection was changed by another user. Reload before saving.");
         }
 
+        var previousConfiguration = serializer.Deserialize(connection);
+        var credentialWrite = CreateCredentialWrite(
+            configuration,
+            credential,
+            changedAtUtc,
+            isNewConnection: false,
+            previousConfiguration);
+        if (credentialWrite.RequiredCredentialMessage is not null)
+        {
+            return credentialWrite.RequiredCredentialMessage;
+        }
+
+        var newReference = GetCredentialReference(configuration);
+        if (newReference is not null &&
+            credentialWrite.Write is null &&
+            !await store.CredentialExistsAsync(newReference, cancellationToken))
+        {
+            return CredentialRequired();
+        }
+
         connection.Rename(name, changedAtUtc);
         connection.UpdateConfiguration(serializer.Serialize(configuration), changedAtUtc);
-        var status = await store.SaveAsync(connection, expectedUpdatedAtUtc, cancellationToken);
+        var status = await store.SaveAsync(
+            connection,
+            expectedUpdatedAtUtc,
+            credentialWrite.Write,
+            cancellationToken);
         return status == ConnectionSaveStatus.Saved
-            ? new ConnectionCommandResult(status, ToDetails(connection))
+            ? new ConnectionCommandResult(
+                status,
+                await ToDetailsAsync(connection, cancellationToken))
             : new ConnectionCommandResult(
                 status,
                 null,
@@ -178,7 +303,7 @@ public sealed class ConnectionManagementService(
         {
             return new ConnectionCommandResult(
                 ConnectionSaveStatus.Conflict,
-                ToDetails(connection),
+                await ToDetailsAsync(connection, cancellationToken),
                 "connection.concurrency");
         }
 
@@ -191,10 +316,16 @@ public sealed class ConnectionManagementService(
             connection.Disable(changedAtUtc);
         }
 
-        var status = await store.SaveAsync(connection, expectedUpdatedAtUtc, cancellationToken);
+        var status = await store.SaveAsync(
+            connection,
+            expectedUpdatedAtUtc,
+            credentialWrite: null,
+            cancellationToken);
         return new ConnectionCommandResult(
             status,
-            status == ConnectionSaveStatus.Saved ? ToDetails(connection) : null,
+            status == ConnectionSaveStatus.Saved
+                ? await ToDetailsAsync(connection, cancellationToken)
+                : null,
             status == ConnectionSaveStatus.Saved ? null : "connection.concurrency");
     }
 
@@ -221,13 +352,76 @@ public sealed class ConnectionManagementService(
         return await probe.ProbeAsync(connection, cancellationToken);
     }
 
-    private ConnectionDetails ToDetails(DataConnection connection) => new(
-        connection.Id,
-        connection.Name,
-        connection.Kind,
-        serializer.Deserialize(connection),
-        connection.IsEnabled,
-        connection.CreatedBy,
-        connection.CreatedAtUtc,
-        connection.UpdatedAtUtc);
+    private async Task<ConnectionDetails> ToDetailsAsync(
+        DataConnection connection,
+        CancellationToken cancellationToken)
+    {
+        var configuration = serializer.Deserialize(connection);
+        var reference = GetCredentialReference(configuration);
+        var hasStoredCredential = reference is not null &&
+            await store.CredentialExistsAsync(reference, cancellationToken);
+        return new ConnectionDetails(
+            connection.Id,
+            connection.Name,
+            connection.Kind,
+            configuration,
+            hasStoredCredential,
+            connection.IsEnabled,
+            connection.CreatedBy,
+            connection.CreatedAtUtc,
+            connection.UpdatedAtUtc);
+    }
+
+    private static (
+        ConnectionCredentialWrite? Write,
+        ConnectionCommandResult? RequiredCredentialMessage) CreateCredentialWrite(
+        ConnectionConfiguration configuration,
+        ConnectionCredential? credential,
+        DateTimeOffset changedAtUtc,
+        bool isNewConnection,
+        ConnectionConfiguration? previousConfiguration)
+    {
+        var reference = GetCredentialReference(configuration);
+        if (reference is null)
+        {
+            if (credential is not null)
+            {
+                throw new ArgumentException(
+                    "Integrated and local-file connections cannot store a username/password.",
+                    nameof(credential));
+            }
+
+            return (null, null);
+        }
+
+        if (credential is not null)
+        {
+            return (new ConnectionCredentialWrite(reference, credential, changedAtUtc), null);
+        }
+
+        var previousReference = previousConfiguration is null
+            ? null
+            : GetCredentialReference(previousConfiguration);
+        return isNewConnection ||
+            !string.Equals(reference, previousReference, StringComparison.Ordinal)
+                ? (null, CredentialRequired())
+                : (null, null);
+    }
+
+    private static string? GetCredentialReference(ConnectionConfiguration configuration) =>
+        configuration switch
+        {
+            SqlServerConnectionConfiguration sql =>
+                sql.Authentication.CredentialSecretReference,
+            RelationalDatabaseConnectionConfiguration database =>
+                database.Authentication.CredentialSecretReference,
+            FtpConnectionConfiguration ftp => ftp.CredentialSecretReference,
+            _ => null
+        };
+
+    private static ConnectionCommandResult CredentialRequired() => new(
+        ConnectionSaveStatus.Conflict,
+        null,
+        "connection.credential.required",
+        "Enter a username and password to store the referenced credential.");
 }

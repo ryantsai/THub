@@ -1,8 +1,9 @@
 # ADR-0013: Use provider-neutral referenced database credentials
 
-- Status: Accepted
+- Status: Superseded
 - Date: 2026-07-23
 - Deciders: Project maintainers
+- Superseded by: [ADR-0019](0019-encrypted-sql-connection-credentials.md)
 
 ## Context
 

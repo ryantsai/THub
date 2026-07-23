@@ -81,6 +81,21 @@ public interface IConnectionCredentialResolver
         CancellationToken cancellationToken);
 }
 
+public sealed class ConnectionCredentialProtectionException : Exception
+{
+    public ConnectionCredentialProtectionException(string message)
+        : base(message)
+    {
+    }
+
+    public ConnectionCredentialProtectionException(
+        string message,
+        Exception innerException)
+        : base(message, innerException)
+    {
+    }
+}
+
 public sealed record RelationalDatabaseConnectionConfiguration : ConnectionConfiguration
 {
     public RelationalDatabaseConnectionConfiguration(

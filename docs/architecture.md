@@ -264,8 +264,10 @@ Publication-management permission does not itself grant access to editor data. E
 ### Secrets and untrusted configuration
 
 - Persist secret references, not credentials, inside connection or node JSON.
-- Resolve database authentication through the provider-neutral Application contract from ADR-0013; SQL-specific connection-string construction remains in Infrastructure.
-- Resolve secrets only at the execution boundary and under the worker identity.
+- Resolve database/FTP authentication through the provider-neutral Application contract from ADR-0019. Infrastructure stores referenced credential payloads as AES-256-GCM ciphertext in SQL, obtains versioned master keys from external configuration, and retains provider-specific connection-string construction.
+- Decrypt connection credentials only immediately before an approved Web probe/schema
+  inspection, Worker execution/editor apply, or Publications source read. Never return a
+  stored value to the browser.
 - Treat all workflow JSON as untrusted, even when authored by an authenticated designer.
 - Never interpolate user-provided SQL identifiers or fragments without validation/allow-listing.
 - Canonicalize and validate file paths against configured roots.

@@ -6,6 +6,8 @@
 - Supersedes: [ADR-0006](0006-v1-sql-server-and-local-file-connectors.md)
 - Relational target write-mode restriction partially superseded by:
   [ADR-0018](0018-primary-key-relational-target-mutations.md)
+- Credential-storage decision amended by:
+  [ADR-0019](0019-encrypted-sql-connection-credentials.md)
 
 ## Context
 
@@ -23,7 +25,10 @@ Use provider-specific open-source or vendor-maintained .NET libraries:
 - FluentFTP for FTP and FTPS;
 - the existing CsvHelper and ClosedXML parsers after an FTP download has passed configured size bounds.
 
-All four connection types use the provider-neutral `IConnectionCredentialResolver`. Connection metadata and workflow JSON store only a secret reference. The built-in resolver reads the referenced username/password from external .NET configuration; a deployment may replace it with an approved vault adapter.
+All four connection types use the provider-neutral `IConnectionCredentialResolver`.
+Connection metadata and workflow JSON store only a secret reference. ADR-0019 now
+defines the built-in encrypted SQL credential store and external versioned master-key
+ring.
 
 Relational workflow nodes expose discovered table/view identifiers, bounded reads, and transactional parameterized inserts. They do not accept arbitrary SQL or implement update, merge, replace, or delete.
 

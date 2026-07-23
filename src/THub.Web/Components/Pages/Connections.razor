@@ -58,7 +58,7 @@ else
         @if (ShowEditor)
         {
             <section class="panel connection-editor" aria-label="Connection editor">
-                <div class="panel-head"><div><h2>@(Edit.Id is null ? "New connection" : "Edit connection")</h2><p>Credentials are never stored in connection metadata. Authentication uses a secret reference.</p></div><button class="close-editor" type="button" title="Close" @onclick="CloseEditor">×</button></div>
+                <div class="panel-head"><div><h2>@(Edit.Id is null ? "New connection" : "Edit connection")</h2><p>Credentials are encrypted before they are stored in the THub control plane.</p></div><button class="close-editor" type="button" title="Close" @onclick="CloseEditor">×</button></div>
                 <div class="connection-form">
                     <label><span>Name</span><input maxlength="200" @bind="Edit.Name" disabled="@Busy" /></label>
                     <label><span>Connector</span>
@@ -89,7 +89,9 @@ else
                         </label>
                         @if (Edit.AuthenticationKind == DatabaseAuthenticationKind.UserPassword)
                         {
-                            <label><span>Credential secret reference</span><input placeholder="warehouse_writer" maxlength="200" autocomplete="off" spellcheck="false" @bind="Edit.CredentialSecretReference" disabled="@Busy" /><small>Reference only; configure its Username and Password in each host's external secret provider.</small></label>
+                            <label><span>Credential reference</span><input placeholder="warehouse_writer" maxlength="200" autocomplete="off" spellcheck="false" @bind="Edit.CredentialSecretReference" disabled="@Busy" /><small>Stable identifier used by workflows and connection metadata.</small></label>
+                            <label><span>Database username</span><input maxlength="256" autocomplete="off" spellcheck="false" @bind="Edit.CredentialUserName" disabled="@Busy" /><small>@CredentialInputHint(Edit)</small></label>
+                            <label><span>Database password</span><input type="password" maxlength="4096" autocomplete="new-password" @bind="Edit.CredentialPassword" disabled="@Busy" /></label>
                         }
                         <label class="check"><input type="checkbox" @bind="Edit.Encrypt" disabled="@Busy" /><span>Require transport encryption</span></label>
                         <label class="check"><input type="checkbox" @bind="Edit.TrustServerCertificate" disabled="@Busy" /><span>Trust server certificate (development only)</span></label>
@@ -112,7 +114,9 @@ else
                         {
                             <div class="transport-warning" role="alert"><RadzenIcon Icon="warning_amber" /><span>Plain FTP is unencrypted. The username, password, and file contents are exposed in transit.</span></div>
                         }
-                        <label><span>Credential secret reference</span><input placeholder="ftp_partner" maxlength="200" autocomplete="off" spellcheck="false" @bind="Edit.CredentialSecretReference" disabled="@Busy" /></label>
+                        <label><span>Credential reference</span><input placeholder="ftp_partner" maxlength="200" autocomplete="off" spellcheck="false" @bind="Edit.CredentialSecretReference" disabled="@Busy" /></label>
+                        <label><span>FTP username</span><input maxlength="256" autocomplete="off" spellcheck="false" @bind="Edit.CredentialUserName" disabled="@Busy" /><small>@CredentialInputHint(Edit)</small></label>
+                        <label><span>FTP password</span><input type="password" maxlength="4096" autocomplete="new-password" @bind="Edit.CredentialPassword" disabled="@Busy" /></label>
                         <label class="check"><input type="checkbox" @bind="Edit.TrustServerCertificate" disabled="@(Busy || Edit.FtpEncryptionMode == FtpEncryptionMode.None)" /><span>Trust server certificate (development only)</span></label>
                         <label><span>Connect timeout (seconds)</span><input type="number" min="1" max="60" @bind="Edit.ConnectTimeoutSeconds" disabled="@Busy" /></label>
                         <label><span>Maximum file size (MiB)</span><input type="number" min="1" max="4096" @bind="Edit.MaximumFileMiB" disabled="@Busy" /></label>
@@ -283,6 +287,7 @@ else
                     id,
                     Edit.Name,
                     configuration,
+                    Edit.ToCredential(),
                     Edit.UpdatedAtUtc,
                     TimeProvider.GetUtcNow(),
                     cancellation.Token);
@@ -293,6 +298,7 @@ else
                 result = await ConnectionService.CreateAsync(
                     Edit.Name,
                     configuration,
+                    Edit.ToCredential(),
                     state.User.Identity?.Name ?? "unknown",
                     TimeProvider.GetUtcNow(),
                     cancellation.Token);
@@ -311,6 +317,10 @@ else
         catch (ArgumentException exception)
         {
             FormError = exception.Message;
+        }
+        catch (ConnectionCredentialProtectionException)
+        {
+            FormError = "Credential encryption is unavailable. Ask an administrator to configure the THub credential master key.";
         }
         catch (OverflowException)
         {
@@ -391,6 +401,11 @@ else
         or ConnectionKind.MySql or ConnectionKind.PostgreSql or ConnectionKind.Oracle;
 
     private static string KindIcon(ConnectionKind kind) => IsDatabase(kind) ? "database" : kind == ConnectionKind.Ftp ? "cloud" : "folder";
+    private static string CredentialInputHint(ConnectionEditModel edit) =>
+        edit.HasStoredCredential
+            ? "A credential is stored. Leave both fields blank to keep it, or enter both to rotate it."
+            : "Enter both fields to create the encrypted credential.";
+
     private static string KindLabel(ConnectionKind kind) => kind switch
     {
         ConnectionKind.SqlServer => "SQL Server",
@@ -444,6 +459,9 @@ else
         public FtpEncryptionMode FtpEncryptionMode { get; set; } = FtpEncryptionMode.Explicit;
         public DatabaseAuthenticationKind AuthenticationKind { get; set; } = DatabaseAuthenticationKind.Integrated;
         public string CredentialSecretReference { get; set; } = string.Empty;
+        public string CredentialUserName { get; set; } = string.Empty;
+        public string CredentialPassword { get; set; } = string.Empty;
+        public bool HasStoredCredential { get; set; }
         public bool Encrypt { get; set; } = true;
         public bool TrustServerCertificate { get; set; }
         public int ConnectTimeoutSeconds { get; set; } = 15;
@@ -464,6 +482,7 @@ else
                 Id = details.Id,
                 Name = details.Name,
                 Kind = details.Kind,
+                HasStoredCredential = details.HasStoredCredential,
                 IsEnabled = details.IsEnabled,
                 UpdatedAtUtc = details.UpdatedAtUtc
             };
@@ -514,6 +533,34 @@ else
             }
 
             return model;
+        }
+
+        public ConnectionCredential? ToCredential()
+        {
+            var usesCredential = Kind == ConnectionKind.Ftp ||
+                IsDatabase(Kind) &&
+                AuthenticationKind == DatabaseAuthenticationKind.UserPassword;
+            if (!usesCredential)
+            {
+                return null;
+            }
+
+            if (string.IsNullOrWhiteSpace(CredentialUserName) &&
+                string.IsNullOrEmpty(CredentialPassword))
+            {
+                return null;
+            }
+
+            if (string.IsNullOrWhiteSpace(CredentialUserName) ||
+                string.IsNullOrEmpty(CredentialPassword))
+            {
+                throw new ArgumentException(
+                    "Enter both the credential username and password.");
+            }
+
+            return new ConnectionCredential(
+                CredentialUserName,
+                CredentialPassword);
         }
 
         public ConnectionConfiguration ToConfiguration() => Kind switch

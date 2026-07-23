@@ -70,9 +70,30 @@ For UNC paths or Windows-integrated remote SQL connections, confirm SPNs, delega
 
 Connection configuration and workflow graphs contain a secret reference, never the secret value.
 
-Connection credentials follow [ADR-0013](adr/0013-provider-neutral-database-authentication.md) and [ADR-0014](adr/0014-expand-relational-and-ftp-connectors.md). Connection metadata stores an authentication kind and reference only. The provider-neutral asynchronous resolver reads the referenced username/password through `IConfiguration`, allowing environment, key-per-file, Azure Key Vault, or another approved provider to own secret storage. Database and FTP adapters receive the credential only while opening the connection. A deployment may replace the resolver with a Vault/OpenBao or other organization-approved adapter. Windows Credential Manager is not the default because Web, Worker, and Publications normally use separate Windows profiles.
+Connection credentials follow
+[ADR-0019](adr/0019-encrypted-sql-connection-credentials.md) and
+[ADR-0014](adr/0014-expand-relational-and-ftp-connectors.md). Connection metadata stores
+an authentication kind and reference only. The referenced username/password is
+AES-256-GCM ciphertext in `thub.EncryptedConnectionCredentials`; a fresh nonce,
+authentication tag, key version, and reference-bound associated data protect every
+payload. The versioned master-key ring remains external configuration and must not be
+stored in SQL. Database and FTP adapters receive plaintext only while opening a
+connection.
 
-Managed publication tokens are not stored as reversible secret references: THub returns the full random token once, then persists only its selector, display prefix, verifier algorithm/version, and one-way verifier. Publication SQL connections use either the host's Windows identity or a referenced database credential and never store a database password. Email profiles also store references rather than credential values. SMTP references are resolved only by the Worker immediately before a send under the Worker identity.
+The connection editor never reads an existing username or password back to Blazor. An
+authorized administrator either leaves the stored credential unchanged or supplies both
+fields to create/replace it. Missing key versions and failed authentication tags fail
+closed. Any host with both ciphertext-table access and the matching master key can
+decrypt credentials, so restrict SQL permissions, process environment access, service
+identities, and backups together.
+
+Managed publication tokens are not stored as reversible secret references: THub returns
+the full random token once, then persists only its selector, display prefix, verifier
+algorithm/version, and one-way verifier. Publication SQL connections use either the
+host's Windows identity or a referenced database credential and never store a plaintext
+database password. Email profiles also store references rather than credential values.
+SMTP references are resolved only by the Worker immediately before a send under the
+Worker identity.
 
 The Developer system role also receives `workflow.delete`. That permission authorizes
 archive and is required for permanent deletion, which is additionally limited to unused
@@ -94,6 +115,7 @@ Never:
 - commit credentials or tokens;
 - return secrets to Blazor components after creation;
 - write secrets to logs, run errors, audit details, data previews, import/export packages, or exception messages;
+- store credential master keys in SQL Server or checked-in configuration;
 - use reversible application-level obfuscation as secret storage.
 
 ## SQL connectors

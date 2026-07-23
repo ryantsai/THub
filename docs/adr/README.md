@@ -27,12 +27,13 @@ Accepted ADRs are not immutable. Supersede them when evidence changes; do not si
 | [0010](0010-durable-leased-workflow-execution.md) | Accepted | Immutable versions and leased durable workflow execution |
 | [0011](0011-isolated-governed-data-publications.md) | Accepted | Isolated REST publications and staged Spreadsheet editors |
 | [0012](0012-durable-email-alert-delivery.md) | Accepted | Durable Email alert outbox and SMTP delivery |
-| [0013](0013-provider-neutral-database-authentication.md) | Accepted | Provider-neutral referenced database credentials |
+| [0013](0013-provider-neutral-database-authentication.md) | Superseded | Initial external provider-neutral referenced database credentials |
 | [0014](0014-expand-relational-and-ftp-connectors.md) | Accepted | MySQL, PostgreSQL, Oracle, and FTP/FTPS workflow connectors |
 | [0015](0015-bounded-workflow-variables-and-javascript-expressions.md) | Accepted | Bounded workflow variables and JavaScript value expressions |
 | [0016](0016-sql-backed-custom-role-and-resource-authorization.md) | Accepted | SQL-backed custom roles and resource authorization |
 | [0017](0017-safe-workflow-lifecycle-and-package-portability.md) | Accepted | Safe workflow removal and redacted portable packages |
 | [0018](0018-primary-key-relational-target-mutations.md) | Accepted | Primary-key upsert and incoming-key delete for relational targets |
+| [0019](0019-encrypted-sql-connection-credentials.md) | Accepted | AES-GCM encrypted SQL-backed connection credentials with external versioned keys |
 
 ## Creating an ADR
 

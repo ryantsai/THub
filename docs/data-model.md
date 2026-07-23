@@ -105,6 +105,24 @@ Represents an approved connector configuration.
 
 Examples of safe configuration include database/server aliases, FTP host and transport mode, file bounds, sheet names, delimiters, an authentication kind, and a credential secret reference. SQL Server supports `Integrated` and `UserPassword`; MySQL, PostgreSQL, Oracle, and FTP use `UserPassword`. Raw passwords, tokens, or embedded connection strings containing credentials are not safe configuration.
 
+### `thub.EncryptedConnectionCredentials`
+
+Stores a referenced database or FTP username/password payload as authenticated
+ciphertext. It is deliberately separate from `Connections.ConfigurationJson`.
+
+| Field | Meaning |
+| --- | --- |
+| `SecretReference` | Primary key matching the non-secret reference in connection metadata |
+| `KeyVersion` | External master-key version needed to decrypt this row |
+| `Nonce` | Fresh 12-byte AES-GCM nonce |
+| `Ciphertext` | Encrypted credential payload |
+| `AuthenticationTag` | 16-byte AES-GCM authentication tag |
+| `UpdatedAtUtc` | Last create/replace instant |
+
+The reference and payload schema version are authenticated as associated data. The
+database never stores a master key. A reference may intentionally be shared by multiple
+connections; replacing it changes the credential resolved by all of them.
+
 ### `quartz.QRTZ_*`
 
 Quartz.NET owns the operational scheduler tables in the `quartz` schema. They contain durable jobs, one-shot triggers, fired-trigger state, cluster check-ins, and locks. THub creates and upgrades these tables through reviewed migrations, while runtime scheduling code accesses them only through Quartz APIs. Application and reporting code must not write directly to these tables.

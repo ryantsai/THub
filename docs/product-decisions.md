@@ -16,7 +16,7 @@ These choices materially affect security, deployment, execution semantics, or pe
 | PD-004 | Online-editor changes are staged and audited. A separately authorized approval/apply path performs constrained source writes; direct writes are not part of v1. | [ADR-0011](adr/0011-isolated-governed-data-publications.md) |
 | PD-005 | REST v1 is internal-network, read-only, and hosted separately from the Windows management app. Consumers use multiple managed opaque bearer tokens with independent revocation and accepted-request counts. | [ADR-0011](adr/0011-isolated-governed-data-publications.md) |
 | PD-006 | Runs use immutable versions and SQL leases. Occurrences queue with one active run per workflow by default; cancellation is durable; only transient retry-safe operations receive bounded automatic retry; recovery remains at-least-once. | [ADR-0010](adr/0010-durable-leased-workflow-execution.md) |
-| PD-008 | Database credentials use provider-neutral references resolved through external .NET configuration by default; deployments may replace the asynchronous resolver with an approved vault adapter. | [ADR-0013](adr/0013-provider-neutral-database-authentication.md) |
+| PD-008 | Database and FTP credentials retain provider-neutral references while their values are stored as AES-GCM ciphertext in SQL; a versioned 256-bit master-key ring remains external configuration. | [ADR-0019](adr/0019-encrypted-sql-connection-credentials.md) |
 | PD-002 | SQL-backed roles support Windows user/group assignments, global permissions, per-workflow/per-connection grants, and custom-role editor publication grants. | [ADR-0016](adr/0016-sql-backed-custom-role-and-resource-authorization.md) |
 
 ## Resolution process

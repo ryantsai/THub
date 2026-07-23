@@ -31,7 +31,7 @@ public static class DependencyInjection
         AddControlPlanePersistence(services, configuration);
 
         services.AddSingleton<ApprovedPathResolver>();
-        AddDatabaseAuthentication(services);
+        AddDatabaseAuthentication(services, configuration);
         services.AddSingleton<IDataConnectionStore, SqlDataConnectionStore>();
         services.AddSingleton<IDataConnectionProbe, DataConnectionProbe>();
         services.AddSingleton<IWorkflowSchemaInspector, InfrastructureWorkflowSchemaInspector>();
@@ -63,7 +63,7 @@ public static class DependencyInjection
         services.AddSingleton<IWorkflowScheduleSource, SqlWorkflowScheduleSource>();
         services.AddSingleton<IScheduledWorkflowRunEnqueuer, SqlScheduledWorkflowRunEnqueuer>();
         services.AddSingleton<ApprovedPathResolver>();
-        AddDatabaseAuthentication(services);
+        AddDatabaseAuthentication(services, configuration);
         services.AddSingleton<IWorkflowRunExecutionStore, SqlWorkflowRunExecutionStore>();
         services.AddSingleton<IWorkflowExecutionEventSinkFactory, SqlWorkflowExecutionEventSinkFactory>();
         services.AddSingleton<IWorkflowStepRunLocator, SqlWorkflowStepRunLocator>();
@@ -105,7 +105,7 @@ public static class DependencyInjection
     {
         ArgumentNullException.ThrowIfNull(services);
         AddControlPlanePersistence(services, configuration);
-        AddDatabaseAuthentication(services);
+        AddDatabaseAuthentication(services, configuration);
 
         services.AddScoped<IPublicationCatalogStore, SqlPublicationCatalogStore>();
         services.AddScoped<IPublicationTokenStore, SqlPublicationTokenStore>();
@@ -153,9 +153,19 @@ public static class DependencyInjection
         services.AddScoped<IAlertSender, MailKitAlertSender>();
     }
 
-    private static void AddDatabaseAuthentication(IServiceCollection services)
+    private static void AddDatabaseAuthentication(
+        IServiceCollection services,
+        IConfiguration configuration)
     {
-        services.AddSingleton<IConnectionCredentialResolver, ConfigurationConnectionCredentialResolver>();
+        services.AddSingleton(
+            ConnectionCredentialKeyRing.FromConfiguration(configuration));
+        services.AddSingleton<ConnectionCredentialProtector>();
+        services.AddSingleton<
+            IEncryptedConnectionCredentialReader,
+            SqlEncryptedConnectionCredentialReader>();
+        services.AddSingleton<
+            IConnectionCredentialResolver,
+            EncryptedConnectionCredentialResolver>();
         services.AddSingleton<SqlServerConnectionStringFactory>();
         services.AddSingleton<RelationalConnectionFactory>();
         services.AddSingleton<FtpClientFactory>();

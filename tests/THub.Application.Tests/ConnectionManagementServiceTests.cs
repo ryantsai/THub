@@ -77,6 +77,43 @@ public sealed class ConnectionManagementServiceTests
         Assert.Equal("connection.name.duplicate", duplicate.ErrorCode);
     }
 
+    [Fact]
+    public async Task UserPasswordConnectionRequiresAndStoresCredential()
+    {
+        var store = new FakeStore();
+        var service = CreateService(store);
+        var configuration = new SqlServerConnectionConfiguration(
+            "sql01",
+            "Warehouse",
+            authentication: new DatabaseAuthenticationConfiguration(
+                DatabaseAuthenticationKind.UserPassword,
+                "warehouse_writer"));
+
+        var missing = await service.CreateAsync(
+            "Warehouse",
+            configuration,
+            "DOMAIN\\admin",
+            Now,
+            CancellationToken.None);
+        var created = await service.CreateAsync(
+            "Warehouse",
+            configuration,
+            new ConnectionCredential("db_writer", "secret-value"),
+            "DOMAIN\\admin",
+            Now,
+            CancellationToken.None);
+
+        Assert.Equal(ConnectionSaveStatus.Conflict, missing.Status);
+        Assert.Equal("connection.credential.required", missing.ErrorCode);
+        Assert.Equal(ConnectionSaveStatus.Saved, created.Status);
+        Assert.True(created.Connection!.HasStoredCredential);
+        Assert.Equal("db_writer", store.CredentialWrites["warehouse_writer"].UserName);
+        Assert.DoesNotContain(
+            "secret-value",
+            new ConnectionConfigurationSerializer().Serialize(configuration),
+            StringComparison.Ordinal);
+    }
+
     private static ConnectionManagementService CreateService(FakeStore store) => new(
         store,
         new FakeProbe(),
@@ -86,11 +123,19 @@ public sealed class ConnectionManagementServiceTests
     {
         private readonly Dictionary<Guid, DataConnection> values = [];
 
+        public Dictionary<string, ConnectionCredential> CredentialWrites { get; } =
+            new(StringComparer.Ordinal);
+
         public Task<IReadOnlyList<DataConnection>> ListAsync(CancellationToken cancellationToken) =>
             Task.FromResult<IReadOnlyList<DataConnection>>(values.Values.ToArray());
 
         public Task<DataConnection?> FindAsync(Guid id, CancellationToken cancellationToken) =>
             Task.FromResult(values.GetValueOrDefault(id));
+
+        public Task<bool> CredentialExistsAsync(
+            string secretReference,
+            CancellationToken cancellationToken) =>
+            Task.FromResult(CredentialWrites.ContainsKey(secretReference));
 
         public Task<ConnectionSaveStatus> AddAsync(
             DataConnection connection,
@@ -106,11 +151,41 @@ public sealed class ConnectionManagementServiceTests
             return Task.FromResult(ConnectionSaveStatus.Saved);
         }
 
+        public async Task<ConnectionSaveStatus> AddAsync(
+            DataConnection connection,
+            ConnectionCredentialWrite? credentialWrite,
+            CancellationToken cancellationToken)
+        {
+            var status = await AddAsync(connection, cancellationToken);
+            if (status == ConnectionSaveStatus.Saved && credentialWrite is not null)
+            {
+                CredentialWrites[credentialWrite.SecretReference] =
+                    credentialWrite.Credential;
+            }
+
+            return status;
+        }
+
         public Task<ConnectionSaveStatus> SaveAsync(
             DataConnection connection,
             DateTimeOffset expectedUpdatedAtUtc,
             CancellationToken cancellationToken) =>
             Task.FromResult(ConnectionSaveStatus.Saved);
+
+        public Task<ConnectionSaveStatus> SaveAsync(
+            DataConnection connection,
+            DateTimeOffset expectedUpdatedAtUtc,
+            ConnectionCredentialWrite? credentialWrite,
+            CancellationToken cancellationToken)
+        {
+            if (credentialWrite is not null)
+            {
+                CredentialWrites[credentialWrite.SecretReference] =
+                    credentialWrite.Credential;
+            }
+
+            return Task.FromResult(ConnectionSaveStatus.Saved);
+        }
     }
 
     private sealed class FakeProbe : IDataConnectionProbe

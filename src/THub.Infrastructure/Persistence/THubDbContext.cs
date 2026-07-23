@@ -5,6 +5,7 @@ using THub.Domain.Publications;
 using THub.Domain.Runs;
 using THub.Domain.Security;
 using THub.Domain.Workflows;
+using THub.Infrastructure.Connections;
 
 namespace THub.Infrastructure.Persistence;
 
@@ -15,6 +16,8 @@ public sealed class THubDbContext(DbContextOptions<THubDbContext> options) : DbC
     public DbSet<WorkflowRun> WorkflowRuns => Set<WorkflowRun>();
     public DbSet<WorkflowStepRun> WorkflowStepRuns => Set<WorkflowStepRun>();
     public DbSet<DataConnection> Connections => Set<DataConnection>();
+    internal DbSet<EncryptedConnectionCredential> EncryptedConnectionCredentials =>
+        Set<EncryptedConnectionCredential>();
     public DbSet<EmailDeliveryProfile> EmailDeliveryProfiles => Set<EmailDeliveryProfile>();
     public DbSet<WorkflowAlertRule> WorkflowAlertRules => Set<WorkflowAlertRule>();
     public DbSet<AlertDelivery> AlertDeliveries => Set<AlertDelivery>();
