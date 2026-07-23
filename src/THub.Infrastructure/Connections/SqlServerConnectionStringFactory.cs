@@ -4,7 +4,7 @@ using THub.Application.Connections;
 namespace THub.Infrastructure.Connections;
 
 public sealed class SqlServerConnectionStringFactory(
-    IDatabaseCredentialResolver credentialResolver)
+    IConnectionCredentialResolver credentialResolver)
 {
     public async ValueTask<SqlConnectionStringBuilder> CreateAsync(
         SqlServerConnectionConfiguration configuration,
@@ -14,7 +14,7 @@ public sealed class SqlServerConnectionStringFactory(
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(configuration);
-        DatabaseCredential? credential = null;
+        ConnectionCredential? credential = null;
         if (configuration.Authentication.Kind == DatabaseAuthenticationKind.UserPassword)
         {
             credential = await credentialResolver.ResolveAsync(
@@ -23,7 +23,7 @@ public sealed class SqlServerConnectionStringFactory(
                 .ConfigureAwait(false);
             if (credential is null)
             {
-                throw new DatabaseCredentialUnavailableException();
+                throw new ConnectionCredentialUnavailableException();
             }
         }
 
@@ -37,7 +37,7 @@ public sealed class SqlServerConnectionStringFactory(
 
     internal static SqlConnectionStringBuilder Build(
         SqlServerConnectionConfiguration configuration,
-        DatabaseCredential? credential,
+        ConnectionCredential? credential,
         string applicationName,
         ApplicationIntent applicationIntent,
         bool enlist)
@@ -75,9 +75,9 @@ public sealed class SqlServerConnectionStringFactory(
     }
 }
 
-public sealed class DatabaseCredentialUnavailableException : Exception
+public sealed class ConnectionCredentialUnavailableException : Exception
 {
-    public DatabaseCredentialUnavailableException()
+    public ConnectionCredentialUnavailableException()
         : base("The referenced database credential is unavailable.")
     {
     }

@@ -17,6 +17,7 @@
 @inject WorkflowNodeSettingsValidator NodeSettingsValidator
 @inject WorkflowGraphSerializer GraphSerializer
 @inject WorkflowCatalogService WorkflowCatalog
+@inject WorkflowSchemaInspectionService SchemaInspection
 @inject AuthenticationStateProvider AuthenticationStateProvider
 @inject NotificationService Notifications
 @inject NavigationManager Navigation
@@ -94,7 +95,7 @@ else
 
             @if (Nodes.Count == 0)
             {
-                <div class="canvas-empty"><RadzenIcon Icon="account_tree" /><strong>Start with a source</strong><span>Add SQL Server, CSV, or Excel from the toolbox.</span></div>
+                <div class="canvas-empty"><RadzenIcon Icon="account_tree" /><strong>Start with a source</strong><span>Add a database, local file, or FTP source from the toolbox.</span></div>
             }
             <div class="canvas-hint"><RadzenIcon Icon="lightbulb" /><span>Steps are persisted as versioned JSON. Publishing freezes an immutable graph for every run.</span></div>
         </section>
@@ -112,7 +113,7 @@ else
                 <div class="empty-properties">
                     <span><RadzenIcon Icon="tune" /></span>
                     <h3>Nothing selected</h3>
-                    <p>Select a step to edit its JSON settings and incoming links.</p>
+                                <p>Select a step to configure its data operation and incoming links.</p>
                 </div>
             }
             else
@@ -148,9 +149,115 @@ else
                     {
                         <div class="join-input-summary"><span>Left input</span><code>@(GetSettingString(SelectedNode, "leftNodeId") ?? "Not connected")</code><span>Right input</span><code>@(GetSettingString(SelectedNode, "rightNodeId") ?? "Not connected")</code></div>
                     }
-                    <label>Settings JSON<textarea class="settings-json" rows="11" spellcheck="false" @bind="SelectedNode.SettingsJson"></textarea></label>
-                    <button class="format-settings" type="button" @onclick="FormatSelectedSettings"><RadzenIcon Icon="data_object" /> Format JSON</button>
-                    <small class="property-help">Settings are validated again at publication and execution boundaries. Connection identifiers and SQL object names must reference approved metadata.</small>
+                    @if (IsRelationalNode(SelectedNode.Kind))
+                    {
+                        <section class="schema-designer" aria-label="Database object schema">
+                            <div class="schema-object-fields">
+                                <label>Schema
+                                    <input value="@(GetSettingString(SelectedNode, "schema"))" @onchange="SetSchema" />
+                                </label>
+                                <label>Table or view
+                                    <input value="@(GetSettingString(SelectedNode, "object"))" @onchange="SetObject" />
+                                </label>
+                            </div>
+                            @if (IsSource(SelectedNode.Kind))
+                            {
+                                <label>Batch rows
+                                    <input type="number" min="1" max="10000" value="@GetSettingInt(SelectedNode, "batchSize", 1000)" @onchange="SetBatchSize" />
+                                </label>
+                            }
+                            <div class="schema-actions">
+                                <button type="button" @onclick="LoadSelectedSchemaAsync" disabled="@SchemaBusy"><RadzenIcon Icon="schema" /> @(SchemaBusy ? "Loading…" : "Open schema")</button>
+                                @if (IsRelationalTarget(SelectedNode.Kind))
+                                {
+                                    <button type="button" @onclick="LoadMappingSchemasAsync" disabled="@SchemaBusy"><RadzenIcon Icon="account_tree" /> Load source + target</button>
+                                }
+                            </div>
+                            @if (SchemaError is not null)
+                            {
+                                <div class="schema-message error" role="alert"><RadzenIcon Icon="error_outline" />@SchemaError</div>
+                            }
+                            @if (GetLoadedSchema(SelectedNode) is { } selectedSchema)
+                            {
+                                <div class="schema-browser">
+                                    <div class="schema-browser-head">
+                                        <div><strong>@selectedSchema.Schema.@selectedSchema.ObjectName</strong><span>@selectedSchema.Columns.Count columns</span></div>
+                                        <span class="schema-status">Live metadata</span>
+                                    </div>
+                                    @if (IsSource(SelectedNode.Kind))
+                                    {
+                                        <div class="schema-column-list" aria-label="Source columns">
+                                            @foreach (var column in selectedSchema.Columns)
+                                            {
+                                                <label class="schema-column">
+                                                    <input type="checkbox" checked="@IsSourceColumnSelected(SelectedNode, column.Name)" @onchange="eventArgs => ToggleSourceColumn(column.Name, eventArgs)" />
+                                                    <span class="column-name">@column.Name</span>
+                                                    <code>@column.SourceTypeName</code>
+                                                    <small>@(column.IsNullable ? "nullable" : "required")</small>
+                                                </label>
+                                            }
+                                        </div>
+                                    }
+                                    else
+                                    {
+                                        <div class="schema-column-list" aria-label="Target columns">
+                                            @foreach (var column in selectedSchema.Columns)
+                                            {
+                                                <div class="schema-column @(column.IsWritable ? null : "locked")">
+                                                    <RadzenIcon Icon="@(column.IsWritable ? "radio_button_unchecked" : "lock")" />
+                                                    <span class="column-name">@column.Name</span>
+                                                    <code>@column.SourceTypeName</code>
+                                                    <small>@(column.IsWritable ? column.IsNullable ? "nullable" : "required" : "generated")</small>
+                                                </div>
+                                            }
+                                        </div>
+                                    }
+                                </div>
+                            }
+
+                            @if (IsRelationalTarget(SelectedNode.Kind) &&
+                                GetLoadedSchema(SelectedNode) is { } targetSchema &&
+                                GetMappingSourceNode(SelectedNode) is { } sourceNode &&
+                                GetLoadedSchema(sourceNode) is { } sourceSchema)
+                            {
+                                <div class="mapping-designer" aria-label="Column mappings">
+                                    <div class="mapping-head">
+                                        <div><strong>Column mappings</strong><span>@sourceNode.Name → @SelectedNode.Name</span></div>
+                                        <div>
+                                            <button type="button" @onclick="AutoMapColumns"><RadzenIcon Icon="auto_fix_high" /> Match names</button>
+                                            <button type="button" @onclick="ClearMappings"><RadzenIcon Icon="clear_all" /> Clear</button>
+                                        </div>
+                                    </div>
+                                    <div class="mapping-labels"><span>Source column</span><span></span><span>Destination column</span></div>
+                                    @foreach (var sourceColumn in GetMappingSourceColumns(SelectedNode, sourceNode, sourceSchema))
+                                    {
+                                        <div class="mapping-row @(string.IsNullOrEmpty(GetMappedTarget(SelectedNode, sourceColumn.Name)) ? "unmapped" : "mapped")">
+                                            <div class="mapping-column"><strong>@sourceColumn.Name</strong><small>@sourceColumn.DataType</small></div>
+                                            <span class="mapping-arrow"><RadzenIcon Icon="east" /></span>
+                                            <select aria-label="Map @sourceColumn.Name" value="@GetMappedTarget(SelectedNode, sourceColumn.Name)" @onchange="eventArgs => SetColumnMapping(sourceColumn.Name, eventArgs)">
+                                                <option value="">Not mapped</option>
+                                                @foreach (var targetColumn in targetSchema.Columns.Where(column => column.IsWritable))
+                                                {
+                                                    <option value="@targetColumn.Name">@targetColumn.Name · @targetColumn.DataType</option>
+                                                }
+                                            </select>
+                                        </div>
+                                    }
+                                </div>
+                            }
+                        </section>
+                        <details class="advanced-settings">
+                            <summary><RadzenIcon Icon="data_object" /> Advanced settings JSON</summary>
+                            <label>Settings JSON<textarea class="settings-json" rows="11" spellcheck="false" @bind="SelectedNode.SettingsJson"></textarea></label>
+                            <button class="format-settings" type="button" @onclick="FormatSelectedSettings"><RadzenIcon Icon="data_object" /> Format JSON</button>
+                        </details>
+                    }
+                    else
+                    {
+                        <label>Settings JSON<textarea class="settings-json" rows="11" spellcheck="false" @bind="SelectedNode.SettingsJson"></textarea></label>
+                        <button class="format-settings" type="button" @onclick="FormatSelectedSettings"><RadzenIcon Icon="data_object" /> Format JSON</button>
+                    }
+                    <small class="property-help">Settings are validated again at publication and execution boundaries. Connections and database objects must reference approved metadata.</small>
                     @if (DependencyWarning is not null)
                     {
                         <small class="property-help warning">@DependencyWarning Raw JSON editing remains available.</small>
@@ -212,6 +319,10 @@ else
     private IReadOnlyList<ConnectionSummary> Connections { get; set; } = [];
     private IReadOnlyList<EmailDeliveryProfileDto> EmailProfiles { get; set; } = [];
     private string? DependencyWarning { get; set; }
+    private bool SchemaBusy { get; set; }
+    private string? SchemaError { get; set; }
+    private readonly Dictionary<string, WorkflowObjectSchemaDto> LoadedSchemas =
+        new(StringComparer.OrdinalIgnoreCase);
     private readonly List<DesignerNode> Nodes = [];
     private readonly List<DesignerEdge> Edges = [];
 
@@ -227,6 +338,10 @@ else
     [
         new("Sources", [
             new("SQL Server", "Read an approved table", WorkflowNodeKind.SqlSource, "database", "blue", true),
+            new("MySQL", "Read an approved table or view", WorkflowNodeKind.MySqlSource, "database", "blue", true),
+            new("PostgreSQL", "Read an approved table or view", WorkflowNodeKind.PostgreSqlSource, "database", "blue", true),
+            new("Oracle", "Read an approved table or view", WorkflowNodeKind.OracleSource, "database", "blue", true),
+            new("FTP file", "Read CSV, tab text, or Excel", WorkflowNodeKind.FtpSource, "cloud_download", "green", true),
             new("CSV file", "Read a bounded local CSV", WorkflowNodeKind.CsvSource, "description", "green", true),
             new("Excel workbook", "Read XLSX or XLSM", WorkflowNodeKind.ExcelSource, "grid_on", "green", true)]),
         new("Transform", [
@@ -235,6 +350,10 @@ else
             new("Join", "Combine exactly two streams", WorkflowNodeKind.Join, "join_inner", "violet", true)]),
         new("Destinations", [
             new("SQL target", "Insert into an approved table", WorkflowNodeKind.SqlTarget, "storage", "blue", true),
+            new("MySQL target", "Insert into an approved table", WorkflowNodeKind.MySqlTarget, "storage", "blue", true),
+            new("PostgreSQL target", "Insert into an approved table", WorkflowNodeKind.PostgreSqlTarget, "storage", "blue", true),
+            new("Oracle target", "Insert into an approved table", WorkflowNodeKind.OracleTarget, "storage", "blue", true),
+            new("FTP target", "Create CSV, tab text, or Excel", WorkflowNodeKind.FtpTarget, "cloud_upload", "green", true),
             new("CSV target", "Write beneath an approved root", WorkflowNodeKind.CsvTarget, "description", "green", true),
             new("Excel target", "Write an XLSX workbook", WorkflowNodeKind.ExcelTarget, "grid_on", "green", true)]),
         new("Actions", [
@@ -365,6 +484,7 @@ else
     {
         SelectedNode = node;
         ConnectFromNodeId = string.Empty;
+        SchemaError = null;
     }
 
     private void ClearSelection() => SelectedNode = null;
@@ -377,6 +497,7 @@ else
         }
         Nodes.Remove(SelectedNode);
         Edges.RemoveAll(edge => edge.From == SelectedNode.Id || edge.To == SelectedNode.Id);
+        LoadedSchemas.Remove(SelectedNode.Id);
         SelectedNode = null;
         ValidationIssues = [];
     }
@@ -483,7 +604,428 @@ else
         if (SelectedNode is not null)
         {
             SetSettingString(SelectedNode, "connectionId", eventArgs.Value?.ToString());
+            LoadedSchemas.Remove(SelectedNode.Id);
+            if (IsRelationalTarget(SelectedNode.Kind))
+            {
+                ClearMappings();
+            }
+            SchemaError = null;
         }
+    }
+
+    private void SetSchema(ChangeEventArgs eventArgs) =>
+        SetRelationalSetting("schema", eventArgs);
+
+    private void SetObject(ChangeEventArgs eventArgs) =>
+        SetRelationalSetting("object", eventArgs);
+
+    private void SetRelationalSetting(string propertyName, ChangeEventArgs eventArgs)
+    {
+        if (SelectedNode is null)
+        {
+            return;
+        }
+
+        SetSettingString(SelectedNode, propertyName, eventArgs.Value?.ToString());
+        LoadedSchemas.Remove(SelectedNode.Id);
+        if (IsRelationalTarget(SelectedNode.Kind))
+        {
+            ClearMappings();
+        }
+        SchemaError = null;
+    }
+
+    private void SetBatchSize(ChangeEventArgs eventArgs)
+    {
+        if (SelectedNode is null ||
+            !int.TryParse(
+                eventArgs.Value?.ToString(),
+                System.Globalization.NumberStyles.Integer,
+                System.Globalization.CultureInfo.InvariantCulture,
+                out var value))
+        {
+            return;
+        }
+
+        SetSettingInt(SelectedNode, "batchSize", Math.Clamp(value, 1, 10_000));
+    }
+
+    private async Task LoadSelectedSchemaAsync()
+    {
+        if (SelectedNode is null)
+        {
+            return;
+        }
+
+        SchemaBusy = true;
+        SchemaError = null;
+        try
+        {
+            _ = await LoadNodeSchemaAsync(SelectedNode);
+        }
+        finally
+        {
+            SchemaBusy = false;
+        }
+    }
+
+    private async Task LoadMappingSchemasAsync()
+    {
+        if (SelectedNode is null || !IsRelationalTarget(SelectedNode.Kind))
+        {
+            return;
+        }
+
+        SchemaBusy = true;
+        SchemaError = null;
+        try
+        {
+            var targetLoaded = await LoadNodeSchemaAsync(SelectedNode);
+            var sourceNode = GetMappingSourceNode(SelectedNode);
+            if (sourceNode is null)
+            {
+                SchemaError = "Connect one relational source through optional select/filter steps before opening the mapper.";
+                return;
+            }
+
+            var sourceLoaded = await LoadNodeSchemaAsync(sourceNode);
+            if (targetLoaded && sourceLoaded && GetMappings(SelectedNode).Count == 0)
+            {
+                AutoMapColumns();
+            }
+        }
+        finally
+        {
+            SchemaBusy = false;
+        }
+    }
+
+    private async Task<bool> LoadNodeSchemaAsync(DesignerNode node)
+    {
+        if (ExpectedConnectionKind(node.Kind) is not { } kind ||
+            !IsRelationalConnection(kind) ||
+            !Guid.TryParse(GetSettingString(node, "connectionId"), out var connectionId))
+        {
+            SchemaError = $"Select an enabled {ConnectionKindLabel(ExpectedConnectionKind(node.Kind) ?? ConnectionKind.SqlServer)} connection first.";
+            return false;
+        }
+
+        var result = await SchemaInspection.InspectAsync(
+            connectionId,
+            kind,
+            GetSettingString(node, "schema") ?? string.Empty,
+            GetSettingString(node, "object") ?? string.Empty,
+            IsRelationalTarget(node.Kind),
+            cancellation.Token);
+        if (!result.IsSuccess)
+        {
+            SchemaError = $"{node.Name}: {result.Message}";
+            return false;
+        }
+
+        LoadedSchemas[node.Id] = result.Schema!;
+        return true;
+    }
+
+    private WorkflowObjectSchemaDto? GetLoadedSchema(DesignerNode node) =>
+        LoadedSchemas.GetValueOrDefault(node.Id);
+
+    private DesignerNode? GetMappingSourceNode(DesignerNode target)
+    {
+        var current = target;
+        var visited = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { target.Id };
+        while (visited.Count <= Nodes.Count)
+        {
+            var incoming = Edges
+                .Where(edge => string.Equals(edge.To, current.Id, StringComparison.OrdinalIgnoreCase))
+                .Select(edge => edge.From)
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToArray();
+            if (incoming.Length != 1)
+            {
+                return null;
+            }
+
+            current = Nodes.FirstOrDefault(node =>
+                string.Equals(node.Id, incoming[0], StringComparison.OrdinalIgnoreCase));
+            if (current is null || !visited.Add(current.Id))
+            {
+                return null;
+            }
+
+            if (IsSource(current.Kind))
+            {
+                return IsRelationalNode(current.Kind) ? current : null;
+            }
+
+            if (current.Kind is not (WorkflowNodeKind.SelectColumns or WorkflowNodeKind.FilterRows))
+            {
+                return null;
+            }
+        }
+
+        return null;
+    }
+
+    private IReadOnlyList<WorkflowSchemaColumnDto> GetEffectiveSourceColumns(
+        DesignerNode sourceNode,
+        WorkflowObjectSchemaDto sourceSchema)
+    {
+        var selected = GetSettingStringArray(sourceNode, "columns");
+        return selected is null
+            ? sourceSchema.Columns
+            : sourceSchema.Columns
+                .Where(column => selected.Contains(column.Name, StringComparer.OrdinalIgnoreCase))
+                .ToArray();
+    }
+
+    private IReadOnlyList<WorkflowSchemaColumnDto> GetMappingSourceColumns(
+        DesignerNode target,
+        DesignerNode sourceNode,
+        WorkflowObjectSchemaDto sourceSchema)
+    {
+        IReadOnlyList<WorkflowSchemaColumnDto> columns =
+            GetEffectiveSourceColumns(sourceNode, sourceSchema);
+        var current = target;
+        var visited = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { target.Id };
+        while (!string.Equals(current.Id, sourceNode.Id, StringComparison.OrdinalIgnoreCase))
+        {
+            var incoming = Edges
+                .Where(edge => string.Equals(edge.To, current.Id, StringComparison.OrdinalIgnoreCase))
+                .Select(edge => edge.From)
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToArray();
+            if (incoming.Length != 1)
+            {
+                return [];
+            }
+
+            current = Nodes.First(node =>
+                string.Equals(node.Id, incoming[0], StringComparison.OrdinalIgnoreCase));
+            if (!visited.Add(current.Id))
+            {
+                return [];
+            }
+
+            if (current.Kind == WorkflowNodeKind.SelectColumns)
+            {
+                var selected = GetSettingStringArray(current, "columns") ?? [];
+                columns = columns
+                    .Where(column => selected.Contains(column.Name, StringComparer.OrdinalIgnoreCase))
+                    .ToArray();
+            }
+        }
+
+        return columns;
+    }
+
+    private bool IsSourceColumnSelected(DesignerNode node, string columnName)
+    {
+        var selected = GetSettingStringArray(node, "columns");
+        return selected is null || selected.Contains(columnName, StringComparer.OrdinalIgnoreCase);
+    }
+
+    private void ToggleSourceColumn(string columnName, ChangeEventArgs eventArgs)
+    {
+        if (SelectedNode is null || GetLoadedSchema(SelectedNode) is not { } schema)
+        {
+            return;
+        }
+
+        var isSelected = eventArgs.Value is true ||
+            string.Equals(eventArgs.Value?.ToString(), "true", StringComparison.OrdinalIgnoreCase);
+        var selected = GetSettingStringArray(SelectedNode, "columns")?.ToList()
+            ?? schema.Columns.Select(column => column.Name).ToList();
+        selected.RemoveAll(name => string.Equals(name, columnName, StringComparison.OrdinalIgnoreCase));
+        if (isSelected)
+        {
+            var ordinal = schema.Columns
+                .Select((column, index) => (column, index))
+                .First(item => string.Equals(item.column.Name, columnName, StringComparison.OrdinalIgnoreCase))
+                .index;
+            selected.Insert(Math.Min(ordinal, selected.Count), columnName);
+        }
+
+        SetSettingStringArray(SelectedNode, "columns", selected);
+    }
+
+    private string? GetMappedTarget(DesignerNode node, string sourceColumn) =>
+        GetMappings(node).GetValueOrDefault(sourceColumn);
+
+    private void SetColumnMapping(string sourceColumn, ChangeEventArgs eventArgs)
+    {
+        if (SelectedNode is null)
+        {
+            return;
+        }
+
+        var targetColumn = eventArgs.Value?.ToString();
+        var settings = ParseSettings(SelectedNode);
+        var mappings = settings["mappings"] as JsonObject ?? new JsonObject();
+        settings["mappings"] = mappings;
+        _ = mappings.Remove(sourceColumn);
+        if (!string.IsNullOrWhiteSpace(targetColumn))
+        {
+            foreach (var duplicate in mappings
+                         .Where(mapping =>
+                             mapping.Value is JsonValue jsonValue &&
+                             jsonValue.TryGetValue<string>(out var existingTarget) &&
+                             string.Equals(
+                                 existingTarget,
+                                 targetColumn,
+                                 StringComparison.OrdinalIgnoreCase))
+                         .Select(mapping => mapping.Key)
+                         .ToArray())
+            {
+                _ = mappings.Remove(duplicate);
+            }
+            mappings[sourceColumn] = targetColumn;
+        }
+
+        SelectedNode.SettingsJson = settings.ToJsonString();
+        ValidationIssues = [];
+    }
+
+    private void AutoMapColumns()
+    {
+        if (SelectedNode is null ||
+            GetLoadedSchema(SelectedNode) is not { } targetSchema ||
+            GetMappingSourceNode(SelectedNode) is not { } sourceNode ||
+            GetLoadedSchema(sourceNode) is not { } sourceSchema)
+        {
+            return;
+        }
+
+        var writableTargets = targetSchema.Columns
+            .Where(column => column.IsWritable)
+            .ToDictionary(column => column.Name, StringComparer.OrdinalIgnoreCase);
+        var settings = ParseSettings(SelectedNode);
+        var mappings = new JsonObject();
+        foreach (var source in GetMappingSourceColumns(SelectedNode, sourceNode, sourceSchema))
+        {
+            if (writableTargets.TryGetValue(source.Name, out var target) &&
+                source.DataType == target.DataType)
+            {
+                mappings[source.Name] = target.Name;
+            }
+        }
+
+        settings["mappings"] = mappings;
+        SelectedNode.SettingsJson = settings.ToJsonString();
+        ValidationIssues = [];
+    }
+
+    private void ClearMappings()
+    {
+        if (SelectedNode is null)
+        {
+            return;
+        }
+
+        var settings = ParseSettings(SelectedNode);
+        settings["mappings"] = new JsonObject();
+        SelectedNode.SettingsJson = settings.ToJsonString();
+        ValidationIssues = [];
+    }
+
+    private static IReadOnlyDictionary<string, string> GetMappings(DesignerNode node)
+    {
+        try
+        {
+            using var document = JsonDocument.Parse(node.SettingsJson);
+            if (!document.RootElement.TryGetProperty("mappings", out var mappings) ||
+                mappings.ValueKind != JsonValueKind.Object)
+            {
+                return new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            }
+
+            return mappings.EnumerateObject()
+                .Where(property => property.Value.ValueKind == JsonValueKind.String)
+                .ToDictionary(
+                    property => property.Name,
+                    property => property.Value.GetString() ?? string.Empty,
+                    StringComparer.OrdinalIgnoreCase);
+        }
+        catch (JsonException)
+        {
+            return new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        }
+    }
+
+    private static IReadOnlyList<string>? GetSettingStringArray(
+        DesignerNode node,
+        string propertyName)
+    {
+        try
+        {
+            using var document = JsonDocument.Parse(node.SettingsJson);
+            if (!document.RootElement.TryGetProperty(propertyName, out var value))
+            {
+                return null;
+            }
+
+            return value.ValueKind == JsonValueKind.Array
+                ? value.EnumerateArray()
+                    .Where(item => item.ValueKind == JsonValueKind.String)
+                    .Select(item => item.GetString() ?? string.Empty)
+                    .ToArray()
+                : null;
+        }
+        catch (JsonException)
+        {
+            return null;
+        }
+    }
+
+    private static int GetSettingInt(
+        DesignerNode node,
+        string propertyName,
+        int defaultValue)
+    {
+        try
+        {
+            using var document = JsonDocument.Parse(node.SettingsJson);
+            return document.RootElement.TryGetProperty(propertyName, out var value) &&
+                   value.TryGetInt32(out var parsed)
+                ? parsed
+                : defaultValue;
+        }
+        catch (JsonException)
+        {
+            return defaultValue;
+        }
+    }
+
+    private static JsonObject ParseSettings(DesignerNode node)
+    {
+        try
+        {
+            return JsonNode.Parse(node.SettingsJson) as JsonObject ?? new JsonObject();
+        }
+        catch (JsonException)
+        {
+            return new JsonObject();
+        }
+    }
+
+    private void SetSettingInt(DesignerNode node, string propertyName, int value)
+    {
+        var settings = ParseSettings(node);
+        settings[propertyName] = value;
+        node.SettingsJson = settings.ToJsonString();
+        ValidationIssues = [];
+    }
+
+    private void SetSettingStringArray(
+        DesignerNode node,
+        string propertyName,
+        IReadOnlyList<string> values)
+    {
+        var settings = ParseSettings(node);
+        settings[propertyName] = new JsonArray(
+            values.Select(value => JsonValue.Create(value)).ToArray<JsonNode?>());
+        node.SettingsJson = settings.ToJsonString();
+        ValidationIssues = [];
     }
 
     private void SetSelectedEmailProfile(ChangeEventArgs eventArgs)
@@ -497,6 +1039,10 @@ else
     private static ConnectionKind? ExpectedConnectionKind(WorkflowNodeKind kind) => kind switch
     {
         WorkflowNodeKind.SqlSource or WorkflowNodeKind.SqlTarget => ConnectionKind.SqlServer,
+        WorkflowNodeKind.MySqlSource or WorkflowNodeKind.MySqlTarget => ConnectionKind.MySql,
+        WorkflowNodeKind.PostgreSqlSource or WorkflowNodeKind.PostgreSqlTarget => ConnectionKind.PostgreSql,
+        WorkflowNodeKind.OracleSource or WorkflowNodeKind.OracleTarget => ConnectionKind.Oracle,
+        WorkflowNodeKind.FtpSource or WorkflowNodeKind.FtpTarget => ConnectionKind.Ftp,
         WorkflowNodeKind.CsvSource or WorkflowNodeKind.CsvTarget => ConnectionKind.CsvFile,
         WorkflowNodeKind.ExcelSource or WorkflowNodeKind.ExcelTarget => ConnectionKind.ExcelFile,
         _ => null
@@ -666,17 +1212,41 @@ else
         Nodes.FirstOrDefault(node => node.Id == id)?.Name ?? id;
 
     private static bool IsSource(WorkflowNodeKind kind) => kind is
-        WorkflowNodeKind.SqlSource or WorkflowNodeKind.CsvSource or WorkflowNodeKind.ExcelSource;
+        WorkflowNodeKind.SqlSource or WorkflowNodeKind.MySqlSource
+            or WorkflowNodeKind.PostgreSqlSource or WorkflowNodeKind.OracleSource
+            or WorkflowNodeKind.FtpSource or WorkflowNodeKind.CsvSource
+            or WorkflowNodeKind.ExcelSource;
+
+    private static bool IsRelationalNode(WorkflowNodeKind kind) => kind is
+        WorkflowNodeKind.SqlSource or WorkflowNodeKind.MySqlSource
+            or WorkflowNodeKind.PostgreSqlSource or WorkflowNodeKind.OracleSource
+            or WorkflowNodeKind.SqlTarget or WorkflowNodeKind.MySqlTarget
+            or WorkflowNodeKind.PostgreSqlTarget or WorkflowNodeKind.OracleTarget;
+
+    private static bool IsRelationalTarget(WorkflowNodeKind kind) =>
+        IsRelationalNode(kind) && !IsSource(kind);
+
+    private static bool IsRelationalConnection(ConnectionKind kind) => kind is
+        ConnectionKind.SqlServer or ConnectionKind.MySql
+            or ConnectionKind.PostgreSql or ConnectionKind.Oracle;
 
     private static string DefaultSettings(WorkflowNodeKind kind) => kind switch
     {
         WorkflowNodeKind.SqlSource => "{\"connectionId\":\"\",\"schema\":\"dbo\",\"object\":\"\",\"batchSize\":1000}",
+        WorkflowNodeKind.MySqlSource => "{\"connectionId\":\"\",\"schema\":\"warehouse\",\"object\":\"\",\"batchSize\":1000}",
+        WorkflowNodeKind.PostgreSqlSource => "{\"connectionId\":\"\",\"schema\":\"public\",\"object\":\"\",\"batchSize\":1000}",
+        WorkflowNodeKind.OracleSource => "{\"connectionId\":\"\",\"schema\":\"APP\",\"object\":\"\",\"batchSize\":1000}",
+        WorkflowNodeKind.FtpSource => "{\"connectionId\":\"\",\"remotePath\":\"/inbound/data.csv\",\"format\":\"csv\",\"hasHeader\":true,\"delimiter\":\",\"}",
         WorkflowNodeKind.CsvSource => "{\"connectionId\":\"\",\"relativePath\":\"inbound/data.csv\",\"hasHeader\":true,\"delimiter\":\",\"}",
         WorkflowNodeKind.ExcelSource => "{\"connectionId\":\"\",\"relativePath\":\"inbound/data.xlsx\",\"worksheet\":\"Sheet1\",\"hasHeader\":true}",
         WorkflowNodeKind.SelectColumns => "{\"columns\":[]}",
         WorkflowNodeKind.FilterRows => "{\"conditions\":[]}",
         WorkflowNodeKind.Join => "{\"leftNodeId\":\"\",\"rightNodeId\":\"\",\"leftKeys\":[],\"rightKeys\":[],\"type\":\"inner\",\"maximumBufferedRows\":100000}",
         WorkflowNodeKind.SqlTarget => "{\"connectionId\":\"\",\"schema\":\"dbo\",\"object\":\"\",\"mode\":\"insert\"}",
+        WorkflowNodeKind.MySqlTarget => "{\"connectionId\":\"\",\"schema\":\"warehouse\",\"object\":\"\",\"mode\":\"insert\"}",
+        WorkflowNodeKind.PostgreSqlTarget => "{\"connectionId\":\"\",\"schema\":\"public\",\"object\":\"\",\"mode\":\"insert\"}",
+        WorkflowNodeKind.OracleTarget => "{\"connectionId\":\"\",\"schema\":\"APP\",\"object\":\"\",\"mode\":\"insert\"}",
+        WorkflowNodeKind.FtpTarget => "{\"connectionId\":\"\",\"remotePath\":\"/outbound/result.csv\",\"format\":\"csv\",\"includeHeader\":true,\"delimiter\":\",\",\"mode\":\"createNew\"}",
         WorkflowNodeKind.CsvTarget => "{\"connectionId\":\"\",\"relativePath\":\"outbound/result.csv\",\"mode\":\"createNew\",\"includeHeader\":true}",
         WorkflowNodeKind.ExcelTarget => "{\"connectionId\":\"\",\"relativePath\":\"outbound/result.xlsx\",\"worksheet\":\"Results\",\"mode\":\"createNew\"}",
         WorkflowNodeKind.EmailAlert => "{\"profileId\":\"\",\"recipients\":[],\"subject\":\"THub workflow notification\",\"body\":\"The workflow reached this Email action.\",\"maximumAttempts\":5}",
@@ -686,12 +1256,20 @@ else
     private static string SubtitleFor(WorkflowNodeKind kind) => kind switch
     {
         WorkflowNodeKind.SqlSource => "Approved SQL table",
+        WorkflowNodeKind.MySqlSource => "Approved MySQL object",
+        WorkflowNodeKind.PostgreSqlSource => "Approved PostgreSQL object",
+        WorkflowNodeKind.OracleSource => "Approved Oracle object",
+        WorkflowNodeKind.FtpSource => "Bounded FTP file input",
         WorkflowNodeKind.CsvSource => "Bounded CSV input",
         WorkflowNodeKind.ExcelSource => "XLSX/XLSM input",
         WorkflowNodeKind.SelectColumns => "Column mapping",
         WorkflowNodeKind.FilterRows => "Typed conditions",
         WorkflowNodeKind.Join => "Two-input join",
         WorkflowNodeKind.SqlTarget => "SQL table output",
+        WorkflowNodeKind.MySqlTarget => "MySQL table output",
+        WorkflowNodeKind.PostgreSqlTarget => "PostgreSQL table output",
+        WorkflowNodeKind.OracleTarget => "Oracle table output",
+        WorkflowNodeKind.FtpTarget => "FTP file output",
         WorkflowNodeKind.CsvTarget => "CSV file output",
         WorkflowNodeKind.ExcelTarget => "Excel output",
         WorkflowNodeKind.EmailAlert => "Durable Email outbox",
@@ -701,6 +1279,11 @@ else
     private static string IconFor(WorkflowNodeKind kind) => kind switch
     {
         WorkflowNodeKind.SqlSource or WorkflowNodeKind.SqlTarget => "database",
+        WorkflowNodeKind.MySqlSource or WorkflowNodeKind.MySqlTarget
+            or WorkflowNodeKind.PostgreSqlSource or WorkflowNodeKind.PostgreSqlTarget
+            or WorkflowNodeKind.OracleSource or WorkflowNodeKind.OracleTarget => "database",
+        WorkflowNodeKind.FtpSource => "cloud_download",
+        WorkflowNodeKind.FtpTarget => "cloud_upload",
         WorkflowNodeKind.CsvSource or WorkflowNodeKind.CsvTarget => "description",
         WorkflowNodeKind.ExcelSource or WorkflowNodeKind.ExcelTarget => "grid_on",
         WorkflowNodeKind.SelectColumns => "schema",
@@ -714,6 +1297,10 @@ else
     private static string ToneFor(WorkflowNodeKind kind) => kind switch
     {
         WorkflowNodeKind.SqlSource or WorkflowNodeKind.SqlTarget => "blue",
+        WorkflowNodeKind.MySqlSource or WorkflowNodeKind.MySqlTarget
+            or WorkflowNodeKind.PostgreSqlSource or WorkflowNodeKind.PostgreSqlTarget
+            or WorkflowNodeKind.OracleSource or WorkflowNodeKind.OracleTarget => "blue",
+        WorkflowNodeKind.FtpSource or WorkflowNodeKind.FtpTarget => "green",
         WorkflowNodeKind.CsvSource or WorkflowNodeKind.CsvTarget or WorkflowNodeKind.ExcelSource or WorkflowNodeKind.ExcelTarget => "green",
         WorkflowNodeKind.SelectColumns or WorkflowNodeKind.Join => "violet",
         WorkflowNodeKind.FilterRows => "amber",

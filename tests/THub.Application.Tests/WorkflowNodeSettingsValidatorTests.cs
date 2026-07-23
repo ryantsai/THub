@@ -9,11 +9,19 @@ public sealed class WorkflowNodeSettingsValidatorTests
 
     [Theory]
     [InlineData(WorkflowNodeKind.SqlSource, """{"connectionId":"11111111-1111-1111-1111-111111111111","schema":"dbo","object":"Orders","batchSize":1000}""")]
+    [InlineData(WorkflowNodeKind.MySqlSource, """{"connectionId":"11111111-1111-1111-1111-111111111111","schema":"warehouse","object":"Orders","batchSize":1000}""")]
+    [InlineData(WorkflowNodeKind.PostgreSqlSource, """{"connectionId":"11111111-1111-1111-1111-111111111111","schema":"public","object":"Orders","batchSize":1000}""")]
+    [InlineData(WorkflowNodeKind.OracleSource, """{"connectionId":"11111111-1111-1111-1111-111111111111","schema":"APP","object":"ORDERS","batchSize":1000}""")]
+    [InlineData(WorkflowNodeKind.FtpSource, """{"connectionId":"11111111-1111-1111-1111-111111111111","remotePath":"/inbound/orders.txt","format":"tabDelimited","hasHeader":true}""")]
     [InlineData(WorkflowNodeKind.CsvSource, """{"connectionId":"11111111-1111-1111-1111-111111111111","relativePath":"inbound/orders.csv","hasHeader":true,"delimiter":","}""")]
     [InlineData(WorkflowNodeKind.ExcelSource, """{"connectionId":"11111111-1111-1111-1111-111111111111","relativePath":"inbound/orders.xlsx","worksheet":"Orders","hasHeader":true}""")]
     [InlineData(WorkflowNodeKind.SelectColumns, """{"columns":["Id","Name"]}""")]
     [InlineData(WorkflowNodeKind.FilterRows, """{"conditions":[{"column":"Id","operator":"greaterThan","value":0}]}""")]
     [InlineData(WorkflowNodeKind.SqlTarget, """{"connectionId":"11111111-1111-1111-1111-111111111111","schema":"dbo","object":"Orders","mode":"insert"}""")]
+    [InlineData(WorkflowNodeKind.MySqlTarget, """{"connectionId":"11111111-1111-1111-1111-111111111111","schema":"warehouse","object":"Orders","mode":"insert"}""")]
+    [InlineData(WorkflowNodeKind.PostgreSqlTarget, """{"connectionId":"11111111-1111-1111-1111-111111111111","schema":"public","object":"Orders","mode":"insert"}""")]
+    [InlineData(WorkflowNodeKind.OracleTarget, """{"connectionId":"11111111-1111-1111-1111-111111111111","schema":"APP","object":"ORDERS","mode":"insert"}""")]
+    [InlineData(WorkflowNodeKind.FtpTarget, """{"connectionId":"11111111-1111-1111-1111-111111111111","remotePath":"/outbound/orders.xlsx","format":"excel","worksheet":"Orders","includeHeader":true,"mode":"createNew"}""")]
     [InlineData(WorkflowNodeKind.CsvTarget, """{"connectionId":"11111111-1111-1111-1111-111111111111","relativePath":"outbound/orders.csv","includeHeader":true}""")]
     [InlineData(WorkflowNodeKind.ExcelTarget, """{"connectionId":"11111111-1111-1111-1111-111111111111","relativePath":"outbound/orders.xlsx","worksheet":"Orders"}""")]
     [InlineData(WorkflowNodeKind.EmailAlert, """{"profileId":"11111111-1111-1111-1111-111111111111","recipients":["ops@example.test"],"subject":"Run {{run.id}}","body":"Done"}""")]
@@ -77,6 +85,24 @@ public sealed class WorkflowNodeSettingsValidatorTests
         var exception = Assert.Throws<WorkflowNodeSettingsException>(() => _validator.Parse(node));
 
         Assert.Equal("node.csv.columns.required", exception.Code);
+    }
+
+    [Theory]
+    [InlineData("relative/orders.csv")]
+    [InlineData("/inbound/../orders.csv")]
+    public void FtpPathMustBeAbsoluteAndTraversalFree(string remotePath)
+    {
+        var node = new WorkflowNode(
+            "ftp",
+            WorkflowNodeKind.FtpSource,
+            "FTP",
+            0,
+            0,
+            $$"""{"connectionId":"11111111-1111-1111-1111-111111111111","remotePath":"{{remotePath}}","format":"csv","hasHeader":true,"delimiter":","}""");
+
+        var exception = Assert.Throws<WorkflowNodeSettingsException>(() => _validator.Parse(node));
+
+        Assert.Equal("node.ftp.path.invalid", exception.Code);
     }
 
     [Fact]

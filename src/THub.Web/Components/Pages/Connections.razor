@@ -14,7 +14,7 @@
     <div>
         <div class="eyebrow">Data plane</div>
         <h1>Connections</h1>
-        <p>Approved SQL Server identities and bounded local CSV or Excel roots.</p>
+        <p>Approved database, FTP/FTPS, and bounded local file connections.</p>
     </div>
     <div class="heading-actions">
         <RadzenButton Text="New connection" Icon="add" ButtonStyle="ButtonStyle.Primary" Click="@NewConnection" Disabled="@Busy" />
@@ -53,23 +53,31 @@ else
         @if (ShowEditor)
         {
             <section class="panel connection-editor" aria-label="Connection editor">
-                <div class="panel-head"><div><h2>@(Edit.Id is null ? "New connection" : "Edit connection")</h2><p>Credentials are never stored in connection metadata. Database authentication uses a secret reference.</p></div><button class="close-editor" type="button" title="Close" @onclick="CloseEditor">×</button></div>
+                <div class="panel-head"><div><h2>@(Edit.Id is null ? "New connection" : "Edit connection")</h2><p>Credentials are never stored in connection metadata. Authentication uses a secret reference.</p></div><button class="close-editor" type="button" title="Close" @onclick="CloseEditor">×</button></div>
                 <div class="connection-form">
                     <label><span>Name</span><input maxlength="200" @bind="Edit.Name" disabled="@Busy" /></label>
                     <label><span>Connector</span>
                         <select @bind="Edit.Kind" disabled="@(Busy || Edit.Id is not null)">
                             <option value="@ConnectionKind.SqlServer">SQL Server</option>
+                            <option value="@ConnectionKind.MySql">MySQL</option>
+                            <option value="@ConnectionKind.PostgreSql">PostgreSQL</option>
+                            <option value="@ConnectionKind.Oracle">Oracle</option>
+                            <option value="@ConnectionKind.Ftp">FTP / FTPS</option>
                             <option value="@ConnectionKind.CsvFile">CSV files</option>
                             <option value="@ConnectionKind.ExcelFile">Excel workbooks</option>
                         </select>
                     </label>
 
-                    @if (Edit.Kind == ConnectionKind.SqlServer)
+                    @if (IsDatabase(Edit.Kind))
                     {
-                        <label><span>Server</span><input placeholder="sql01.contoso.local" maxlength="253" @bind="Edit.Server" disabled="@Busy" /></label>
-                        <label><span>Database</span><input placeholder="Warehouse" maxlength="128" @bind="Edit.Database" disabled="@Busy" /></label>
+                        <label><span>Host / server</span><input placeholder="db01.contoso.local" maxlength="253" @bind="Edit.Server" disabled="@Busy" /></label>
+                        @if (Edit.Kind != ConnectionKind.SqlServer)
+                        {
+                            <label><span>Port</span><input type="number" min="1" max="65535" @bind="Edit.Port" disabled="@Busy" /></label>
+                        }
+                        <label><span>@(Edit.Kind == ConnectionKind.Oracle ? "Service name" : "Database")</span><input placeholder="Warehouse" maxlength="128" @bind="Edit.Database" disabled="@Busy" /></label>
                         <label><span>Authentication</span>
-                            <select @bind="Edit.AuthenticationKind" disabled="@Busy">
+                            <select @bind="Edit.AuthenticationKind" disabled="@(Busy || Edit.Kind != ConnectionKind.SqlServer)">
                                 <option value="@DatabaseAuthenticationKind.Integrated">Windows integrated</option>
                                 <option value="@DatabaseAuthenticationKind.UserPassword">Database username/password</option>
                             </select>
@@ -83,6 +91,28 @@ else
                         <label><span>Connect timeout (seconds)</span><input type="number" min="1" max="60" @bind="Edit.ConnectTimeoutSeconds" disabled="@Busy" /></label>
                         <label><span>Command timeout (seconds)</span><input type="number" min="1" max="300" @bind="Edit.CommandTimeoutSeconds" disabled="@Busy" /></label>
                         <label><span>Maximum batch rows</span><input type="number" min="1" max="10000" @bind="Edit.MaximumBatchRows" disabled="@Busy" /></label>
+                    }
+                    else if (Edit.Kind == ConnectionKind.Ftp)
+                    {
+                        <label><span>FTP host</span><input placeholder="ftp.contoso.local" maxlength="253" @bind="Edit.Server" disabled="@Busy" /></label>
+                        <label><span>Port</span><input type="number" min="1" max="65535" @bind="Edit.Port" disabled="@Busy" /></label>
+                        <label><span>Transport security</span>
+                            <select @bind="Edit.FtpEncryptionMode" disabled="@Busy">
+                                <option value="@FtpEncryptionMode.None">Plain FTP (unencrypted)</option>
+                                <option value="@FtpEncryptionMode.Explicit">Explicit FTPS</option>
+                                <option value="@FtpEncryptionMode.Implicit">Implicit FTPS</option>
+                            </select>
+                        </label>
+                        @if (Edit.FtpEncryptionMode == FtpEncryptionMode.None)
+                        {
+                            <div class="transport-warning" role="alert"><RadzenIcon Icon="warning_amber" /><span>Plain FTP is unencrypted. The username, password, and file contents are exposed in transit.</span></div>
+                        }
+                        <label><span>Credential secret reference</span><input placeholder="ftp_partner" maxlength="200" autocomplete="off" spellcheck="false" @bind="Edit.CredentialSecretReference" disabled="@Busy" /></label>
+                        <label class="check"><input type="checkbox" @bind="Edit.TrustServerCertificate" disabled="@(Busy || Edit.FtpEncryptionMode == FtpEncryptionMode.None)" /><span>Trust server certificate (development only)</span></label>
+                        <label><span>Connect timeout (seconds)</span><input type="number" min="1" max="60" @bind="Edit.ConnectTimeoutSeconds" disabled="@Busy" /></label>
+                        <label><span>Maximum file size (MiB)</span><input type="number" min="1" max="4096" @bind="Edit.MaximumFileMiB" disabled="@Busy" /></label>
+                        <label><span>Maximum rows</span><input type="number" min="1" max="10000000" @bind="Edit.MaximumRows" disabled="@Busy" /></label>
+                        <label><span>Maximum columns</span><input type="number" min="1" max="16384" @bind="Edit.MaximumColumns" disabled="@Busy" /></label>
                     }
                     else
                     {
@@ -301,10 +331,17 @@ else
         Duration = 5_000
     });
 
-    private static string KindIcon(ConnectionKind kind) => kind == ConnectionKind.SqlServer ? "database" : "folder";
+    private static bool IsDatabase(ConnectionKind kind) => kind is ConnectionKind.SqlServer
+        or ConnectionKind.MySql or ConnectionKind.PostgreSql or ConnectionKind.Oracle;
+
+    private static string KindIcon(ConnectionKind kind) => IsDatabase(kind) ? "database" : kind == ConnectionKind.Ftp ? "cloud" : "folder";
     private static string KindLabel(ConnectionKind kind) => kind switch
     {
         ConnectionKind.SqlServer => "SQL Server",
+        ConnectionKind.MySql => "MySQL",
+        ConnectionKind.PostgreSql => "PostgreSQL",
+        ConnectionKind.Oracle => "Oracle Database",
+        ConnectionKind.Ftp => "FTP / FTPS remote files",
         ConnectionKind.CsvFile => "Bounded CSV file root",
         ConnectionKind.ExcelFile => "Bounded XLSX/XLSM root",
         _ => kind.ToString()
@@ -318,13 +355,37 @@ else
 
     private sealed class ConnectionEditModel
     {
+        private ConnectionKind kind = ConnectionKind.SqlServer;
         public Guid? Id { get; set; }
         public string Name { get; set; } = string.Empty;
-        public ConnectionKind Kind { get; set; } = ConnectionKind.SqlServer;
+        public ConnectionKind Kind
+        {
+            get => kind;
+            set
+            {
+                if (kind == value) return;
+                kind = value;
+                if (Id is not null) return;
+                Port = value switch
+                {
+                    ConnectionKind.MySql => 3306,
+                    ConnectionKind.PostgreSql => 5432,
+                    ConnectionKind.Oracle => 1521,
+                    ConnectionKind.Ftp => 21,
+                    _ => Port
+                };
+                if (value is ConnectionKind.MySql or ConnectionKind.PostgreSql or ConnectionKind.Oracle)
+                {
+                    AuthenticationKind = DatabaseAuthenticationKind.UserPassword;
+                }
+            }
+        }
         public bool IsEnabled { get; set; } = true;
         public DateTimeOffset UpdatedAtUtc { get; set; }
         public string Server { get; set; } = string.Empty;
         public string Database { get; set; } = string.Empty;
+        public int Port { get; set; } = 5432;
+        public FtpEncryptionMode FtpEncryptionMode { get; set; } = FtpEncryptionMode.Explicit;
         public DatabaseAuthenticationKind AuthenticationKind { get; set; } = DatabaseAuthenticationKind.Integrated;
         public string CredentialSecretReference { get; set; } = string.Empty;
         public bool Encrypt { get; set; } = true;
@@ -362,6 +423,31 @@ else
                 model.CommandTimeoutSeconds = sql.CommandTimeoutSeconds;
                 model.MaximumBatchRows = sql.MaximumBatchRows;
             }
+            else if (details.Configuration is RelationalDatabaseConnectionConfiguration database)
+            {
+                model.Server = database.Host;
+                model.Port = database.Port;
+                model.Database = database.Database;
+                model.AuthenticationKind = database.Authentication.Kind;
+                model.CredentialSecretReference = database.Authentication.CredentialSecretReference ?? string.Empty;
+                model.Encrypt = database.Encrypt;
+                model.TrustServerCertificate = database.TrustServerCertificate;
+                model.ConnectTimeoutSeconds = database.ConnectTimeoutSeconds;
+                model.CommandTimeoutSeconds = database.CommandTimeoutSeconds;
+                model.MaximumBatchRows = database.MaximumBatchRows;
+            }
+            else if (details.Configuration is FtpConnectionConfiguration ftp)
+            {
+                model.Server = ftp.Host;
+                model.Port = ftp.Port;
+                model.FtpEncryptionMode = ftp.EncryptionMode;
+                model.TrustServerCertificate = ftp.TrustServerCertificate;
+                model.CredentialSecretReference = ftp.CredentialSecretReference;
+                model.ConnectTimeoutSeconds = ftp.ConnectTimeoutSeconds;
+                model.MaximumFileMiB = ftp.MaximumFileBytes / (1_024 * 1_024);
+                model.MaximumRows = ftp.MaximumRows;
+                model.MaximumColumns = ftp.MaximumColumns;
+            }
             else if (details.Configuration is FileConnectionConfiguration file)
             {
                 model.ApprovedRoot = file.ApprovedRoot;
@@ -374,8 +460,9 @@ else
             return model;
         }
 
-        public ConnectionConfiguration ToConfiguration() => Kind == ConnectionKind.SqlServer
-            ? new SqlServerConnectionConfiguration(
+        public ConnectionConfiguration ToConfiguration() => Kind switch
+        {
+            ConnectionKind.SqlServer => new SqlServerConnectionConfiguration(
                 Server,
                 Database,
                 Encrypt,
@@ -387,13 +474,38 @@ else
                     AuthenticationKind,
                     AuthenticationKind == DatabaseAuthenticationKind.UserPassword
                         ? CredentialSecretReference
-                        : null))
-            : new FileConnectionConfiguration(
+                        : null)),
+            ConnectionKind.MySql or ConnectionKind.PostgreSql or ConnectionKind.Oracle =>
+                new RelationalDatabaseConnectionConfiguration(
+                    Kind,
+                    Server,
+                    Port,
+                    Database,
+                    Encrypt,
+                    TrustServerCertificate,
+                    ConnectTimeoutSeconds,
+                    CommandTimeoutSeconds,
+                    MaximumBatchRows,
+                    new DatabaseAuthenticationConfiguration(
+                        DatabaseAuthenticationKind.UserPassword,
+                        CredentialSecretReference)),
+            ConnectionKind.Ftp => new FtpConnectionConfiguration(
+                Server,
+                Port,
+                FtpEncryptionMode,
+                TrustServerCertificate,
+                CredentialSecretReference,
+                ConnectTimeoutSeconds,
+                checked(MaximumFileMiB * 1_024 * 1_024),
+                MaximumRows,
+                MaximumColumns),
+            _ => new FileConnectionConfiguration(
                 Kind,
                 ApprovedRoot,
                 AllowUncRoot,
                 checked(MaximumFileMiB * 1_024 * 1_024),
                 MaximumRows,
-                MaximumColumns);
+                MaximumColumns)
+        };
     }
 }

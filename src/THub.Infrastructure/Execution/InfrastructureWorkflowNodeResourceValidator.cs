@@ -17,6 +17,8 @@ namespace THub.Infrastructure.Execution;
 public sealed class InfrastructureWorkflowNodeResourceValidator(
     ExecutionConnectionResolver connectionResolver,
     SqlServerConnectionStringFactory connectionStringFactory,
+    RelationalConnectionFactory relationalConnectionFactory,
+    FtpClientFactory ftpClientFactory,
     ApprovedPathResolver pathResolver,
     IEmailAlertAdministrationStore emailProfiles) : IWorkflowNodeResourceValidator
 {
@@ -42,10 +44,16 @@ public sealed class InfrastructureWorkflowNodeResourceValidator(
         switch (settings)
         {
             case SqlSourceNodeSettings sqlSource:
-                await ValidateSqlSourceAsync(sqlSource, cancellationToken).ConfigureAwait(false);
+                await ValidateDatabaseSourceAsync(node.Kind, sqlSource, cancellationToken).ConfigureAwait(false);
                 break;
             case SqlTargetNodeSettings sqlTarget:
-                await ValidateSqlTargetAsync(sqlTarget, cancellationToken).ConfigureAwait(false);
+                await ValidateDatabaseTargetAsync(node.Kind, sqlTarget, cancellationToken).ConfigureAwait(false);
+                break;
+            case FtpSourceNodeSettings ftpSource:
+                await ValidateFtpSourceAsync(ftpSource, cancellationToken).ConfigureAwait(false);
+                break;
+            case FtpTargetNodeSettings ftpTarget:
+                await ValidateFtpTargetAsync(ftpTarget, cancellationToken).ConfigureAwait(false);
                 break;
             case CsvSourceNodeSettings csvSource:
                 await ValidateCsvSourceAsync(csvSource, limits, cancellationToken).ConfigureAwait(false);
@@ -79,10 +87,16 @@ public sealed class InfrastructureWorkflowNodeResourceValidator(
         }
     }
 
-    private async Task ValidateSqlSourceAsync(
+    private async Task ValidateDatabaseSourceAsync(
+        WorkflowNodeKind nodeKind,
         SqlSourceNodeSettings settings,
         CancellationToken cancellationToken)
     {
+        if (nodeKind != WorkflowNodeKind.SqlSource)
+        {
+            await ValidateRelationalAsync(nodeKind, settings.Schema, settings.Object, settings.ConnectionId, cancellationToken);
+            return;
+        }
         var connection = await _connectionResolver.ResolveAsync<SqlServerConnectionConfiguration>(
             settings.ConnectionId,
             ConnectionKind.SqlServer,
@@ -102,10 +116,16 @@ public sealed class InfrastructureWorkflowNodeResourceValidator(
         _ = SqlExecutionSupport.SelectColumns(metadata, settings.Columns);
     }
 
-    private async Task ValidateSqlTargetAsync(
+    private async Task ValidateDatabaseTargetAsync(
+        WorkflowNodeKind nodeKind,
         SqlTargetNodeSettings settings,
         CancellationToken cancellationToken)
     {
+        if (nodeKind != WorkflowNodeKind.SqlTarget)
+        {
+            await ValidateRelationalAsync(nodeKind, settings.Schema, settings.Object, settings.ConnectionId, cancellationToken);
+            return;
+        }
         var connection = await _connectionResolver.ResolveAsync<SqlServerConnectionConfiguration>(
             settings.ConnectionId,
             ConnectionKind.SqlServer,
@@ -123,6 +143,68 @@ public sealed class InfrastructureWorkflowNodeResourceValidator(
             allowView: false,
             cancellationToken).ConfigureAwait(false);
         ValidateConfiguredTargetColumns(metadata, settings.Mappings);
+    }
+
+    private async Task ValidateRelationalAsync(
+        WorkflowNodeKind nodeKind,
+        string schema,
+        string objectName,
+        Guid connectionId,
+        CancellationToken cancellationToken)
+    {
+        var connectionKind = nodeKind switch
+        {
+            WorkflowNodeKind.MySqlSource or WorkflowNodeKind.MySqlTarget => ConnectionKind.MySql,
+            WorkflowNodeKind.PostgreSqlSource or WorkflowNodeKind.PostgreSqlTarget => ConnectionKind.PostgreSql,
+            WorkflowNodeKind.OracleSource or WorkflowNodeKind.OracleTarget => ConnectionKind.Oracle,
+            _ => throw new ArgumentOutOfRangeException(nameof(nodeKind))
+        };
+        var configuration = await _connectionResolver.ResolveAsync<RelationalDatabaseConnectionConfiguration>(
+            connectionId,
+            connectionKind,
+            cancellationToken);
+        await using var connection = await relationalConnectionFactory.CreateAsync(configuration, cancellationToken);
+        _ = await RelationalExecutionSupport.LoadMetadataAsync(
+            connection,
+            configuration,
+            schema,
+            objectName,
+            cancellationToken);
+    }
+
+    private async Task ValidateFtpSourceAsync(
+        FtpSourceNodeSettings settings,
+        CancellationToken cancellationToken)
+    {
+        var configuration = await _connectionResolver.ResolveAsync<FtpConnectionConfiguration>(
+            settings.ConnectionId,
+            ConnectionKind.Ftp,
+            cancellationToken);
+        await using var client = await ftpClientFactory.CreateConnectedAsync(configuration, cancellationToken);
+        var size = await client.GetFileSize(settings.RemotePath, -1, cancellationToken);
+        if (size < 0 || size > configuration.MaximumFileBytes)
+        {
+            throw ExecutionFailure.Configuration(
+                "execution.ftp.source.invalid",
+                "The FTP source is unavailable or exceeds its configured byte limit.");
+        }
+    }
+
+    private async Task ValidateFtpTargetAsync(
+        FtpTargetNodeSettings settings,
+        CancellationToken cancellationToken)
+    {
+        var configuration = await _connectionResolver.ResolveAsync<FtpConnectionConfiguration>(
+            settings.ConnectionId,
+            ConnectionKind.Ftp,
+            cancellationToken);
+        await using var client = await ftpClientFactory.CreateConnectedAsync(configuration, cancellationToken);
+        if (await client.FileExists(settings.RemotePath, cancellationToken))
+        {
+            throw ExecutionFailure.Configuration(
+                "execution.ftp.target.exists",
+                "The FTP target already exists and createNew mode cannot overwrite it.");
+        }
     }
 
     private async Task ValidateCsvSourceAsync(

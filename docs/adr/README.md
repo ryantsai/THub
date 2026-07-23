@@ -20,7 +20,7 @@ Accepted ADRs are not immutable. Supersede them when evidence changes; do not si
 | [0003](0003-windows-authentication-and-permission-policies.md) | Accepted | Windows Authentication and permission policies |
 | [0004](0004-sql-server-control-plane-and-windows-worker.md) | Superseded | Initial SQL polling scheduler and Windows worker |
 | [0005](0005-versioned-dag-workflow-model.md) | Accepted | Versioned DAG workflow model |
-| [0006](0006-v1-sql-server-and-local-file-connectors.md) | Accepted | v1 SQL Server and local-file connector scope |
+| [0006](0006-v1-sql-server-and-local-file-connectors.md) | Superseded | Initial SQL Server and local-file connector scope |
 | [0007](0007-governed-data-publications.md) | Superseded | Initial governed REST and data-editor publication proposal |
 | [0008](0008-gate-webhooks-and-executables.md) | Accepted | Gate webhook and executable actions behind explicit policies |
 | [0009](0009-quartz-scheduling-and-serilog-observability.md) | Accepted | Quartz scheduling with THub run ownership and Serilog observability |
@@ -28,6 +28,7 @@ Accepted ADRs are not immutable. Supersede them when evidence changes; do not si
 | [0011](0011-isolated-governed-data-publications.md) | Accepted | Isolated REST publications and staged Spreadsheet editors |
 | [0012](0012-durable-email-alert-delivery.md) | Accepted | Durable Email alert outbox and SMTP delivery |
 | [0013](0013-provider-neutral-database-authentication.md) | Accepted | Provider-neutral referenced database credentials |
+| [0014](0014-expand-relational-and-ftp-connectors.md) | Accepted | MySQL, PostgreSQL, Oracle, and FTP/FTPS workflow connectors |
 
 ## Creating an ADR
 

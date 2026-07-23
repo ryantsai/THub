@@ -590,7 +590,7 @@ public sealed class SqlPublicationChangeSetProcessor(
         or ArgumentException
         or JsonException
         or OverflowException
-        or DatabaseCredentialUnavailableException
+        or ConnectionCredentialUnavailableException
         or ConnectionConfigurationException;
 
     private sealed record PublicationApplyContext(

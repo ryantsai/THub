@@ -82,7 +82,7 @@ public sealed class CsvSourceNodeExecutor(
         return new TabularSchema(columns);
     }
 
-    private static async IAsyncEnumerable<TabularBatch> ReadCsvAsync(
+    internal static async IAsyncEnumerable<TabularBatch> ReadCsvAsync(
         string path,
         long fileLength,
         TabularSchema schema,
@@ -301,7 +301,7 @@ public sealed class ExcelSourceNodeExecutor(
             limits));
     }
 
-    private static async IAsyncEnumerable<TabularBatch> ReadExcelAsync(
+    internal static async IAsyncEnumerable<TabularBatch> ReadExcelAsync(
         string path,
         TabularSchema schema,
         ExcelSourceNodeSettings settings,
@@ -405,7 +405,7 @@ public sealed class CsvTargetNodeExecutor(
         return WorkflowNodeExecutionResult.WithoutOutput;
     }
 
-    private static async Task WriteCsvAsync(
+    internal static async Task WriteCsvAsync(
         string target,
         ITabularDataSet input,
         CsvTargetNodeSettings settings,
@@ -502,6 +502,18 @@ public sealed class ExcelTargetNodeExecutor(
             ConnectionKind.ExcelFile,
             cancellationToken);
         var target = pathResolver.ResolveFile(connection.ApprovedRoot, settings.RelativePath, connection.AllowUncRoot);
+        await WriteExcelAsync(target, input.DataSet, settings, connection, context, cancellationToken);
+        return WorkflowNodeExecutionResult.WithoutOutput;
+    }
+
+    internal static async Task WriteExcelAsync(
+        string target,
+        ITabularDataSet dataSet,
+        ExcelTargetNodeSettings settings,
+        FileConnectionConfiguration connection,
+        WorkflowNodeExecutionContext context,
+        CancellationToken cancellationToken)
+    {
         FileTargetSupport.EnsureNewTarget(target);
         var temporary = FileTargetSupport.CreateTemporaryPath(
             target,
@@ -515,15 +527,15 @@ public sealed class ExcelTargetNodeExecutor(
             var rowIndex = 1;
             if (settings.IncludeHeader)
             {
-                for (var columnIndex = 0; columnIndex < input.DataSet.Schema.Columns.Count; columnIndex++)
+                for (var columnIndex = 0; columnIndex < dataSet.Schema.Columns.Count; columnIndex++)
                 {
-                    worksheet.Cell(rowIndex, columnIndex + 1).Value = input.DataSet.Schema.Columns[columnIndex].Name;
+                    worksheet.Cell(rowIndex, columnIndex + 1).Value = dataSet.Schema.Columns[columnIndex].Name;
                 }
                 rowIndex++;
             }
 
             long rowsWritten = 0;
-            await foreach (var batch in input.DataSet.ReadBatchesAsync(cancellationToken).ConfigureAwait(false))
+            await foreach (var batch in dataSet.ReadBatchesAsync(cancellationToken).ConfigureAwait(false))
             {
                 await using (batch.ConfigureAwait(false))
                 {
@@ -553,7 +565,6 @@ public sealed class ExcelTargetNodeExecutor(
             workbook.SaveAs(temporary);
             FileTargetSupport.EnsureFileLimit(new FileInfo(temporary).Length, connection.MaximumFileBytes);
             File.Move(temporary, target);
-            return WorkflowNodeExecutionResult.WithoutOutput;
         }
         catch
         {

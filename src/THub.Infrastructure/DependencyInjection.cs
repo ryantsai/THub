@@ -7,6 +7,7 @@ using THub.Application.Execution;
 using THub.Application.Scheduling;
 using THub.Application.Publications;
 using THub.Application.Workflows.Management;
+using THub.Application.Workflows;
 using THub.Infrastructure.Connections;
 using THub.Infrastructure.Alerts;
 using THub.Infrastructure.Execution;
@@ -31,6 +32,7 @@ public static class DependencyInjection
         AddDatabaseAuthentication(services);
         services.AddSingleton<IDataConnectionStore, SqlDataConnectionStore>();
         services.AddSingleton<IDataConnectionProbe, DataConnectionProbe>();
+        services.AddSingleton<IWorkflowSchemaInspector, InfrastructureWorkflowSchemaInspector>();
         services.AddScoped<IWorkflowManagementRepository, SqlWorkflowManagementRepository>();
         services.AddScoped<IWorkflowRunHistoryStore, SqlWorkflowRunHistoryStore>();
         services.AddSingleton<IEmailAlertAdministrationStore, SqlEmailAlertAdministrationStore>();
@@ -68,12 +70,20 @@ public static class DependencyInjection
         ConfigureSmtpDelivery(services, configuration);
         services.AddSingleton<ExecutionConnectionResolver>();
         services.AddScoped<IWorkflowNodeExecutor, SqlSourceNodeExecutor>();
+        services.AddScoped<IWorkflowNodeExecutor, MySqlSourceNodeExecutor>();
+        services.AddScoped<IWorkflowNodeExecutor, PostgreSqlSourceNodeExecutor>();
+        services.AddScoped<IWorkflowNodeExecutor, OracleSourceNodeExecutor>();
+        services.AddScoped<IWorkflowNodeExecutor, FtpSourceNodeExecutor>();
         services.AddScoped<IWorkflowNodeExecutor, CsvSourceNodeExecutor>();
         services.AddScoped<IWorkflowNodeExecutor, ExcelSourceNodeExecutor>();
         services.AddScoped<IWorkflowNodeExecutor, SelectColumnsNodeExecutor>();
         services.AddScoped<IWorkflowNodeExecutor, FilterRowsNodeExecutor>();
         services.AddScoped<IWorkflowNodeExecutor, JoinNodeExecutor>();
         services.AddScoped<IWorkflowNodeExecutor, SqlTargetNodeExecutor>();
+        services.AddScoped<IWorkflowNodeExecutor, MySqlTargetNodeExecutor>();
+        services.AddScoped<IWorkflowNodeExecutor, PostgreSqlTargetNodeExecutor>();
+        services.AddScoped<IWorkflowNodeExecutor, OracleTargetNodeExecutor>();
+        services.AddScoped<IWorkflowNodeExecutor, FtpTargetNodeExecutor>();
         services.AddScoped<IWorkflowNodeExecutor, CsvTargetNodeExecutor>();
         services.AddScoped<IWorkflowNodeExecutor, ExcelTargetNodeExecutor>();
         services.AddScoped<IWorkflowNodeExecutor, EmailAlertNodeExecutor>();
@@ -139,7 +149,9 @@ public static class DependencyInjection
 
     private static void AddDatabaseAuthentication(IServiceCollection services)
     {
-        services.AddSingleton<IDatabaseCredentialResolver, ConfigurationDatabaseCredentialResolver>();
+        services.AddSingleton<IConnectionCredentialResolver, ConfigurationConnectionCredentialResolver>();
         services.AddSingleton<SqlServerConnectionStringFactory>();
+        services.AddSingleton<RelationalConnectionFactory>();
+        services.AddSingleton<FtpClientFactory>();
     }
 }

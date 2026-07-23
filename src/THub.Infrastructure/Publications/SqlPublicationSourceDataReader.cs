@@ -652,7 +652,7 @@ public sealed class SqlPublicationSourceDataReader(
         or InvalidOperationException
         or ArgumentException
         or ConnectionConfigurationException
-        or DatabaseCredentialUnavailableException
+        or ConnectionCredentialUnavailableException
         or OverflowException;
 
     private static PublicationSourceReadResult<PublicationSourceRowPage> UnavailableRows() =>

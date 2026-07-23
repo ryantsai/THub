@@ -206,7 +206,9 @@ public sealed class WorkflowNodeExecutionContext
         int attempt,
         IReadOnlyList<WorkflowNodeInput> inputs,
         TabularExecutionLimits limits,
-        IWorkflowNodeProgressReporter progress)
+        IWorkflowNodeProgressReporter progress,
+        IReadOnlyDictionary<string, TabularValue>? variables = null,
+        IReadOnlyList<WorkflowFunction>? functions = null)
     {
         if (workflowRunId == Guid.Empty)
         {
@@ -225,6 +227,9 @@ public sealed class WorkflowNodeExecutionContext
         Inputs = inputs;
         Limits = limits;
         Progress = progress;
+        Variables = variables
+            ?? new Dictionary<string, TabularValue>(StringComparer.OrdinalIgnoreCase);
+        Functions = functions ?? [];
 
         using var settings = JsonDocument.Parse(node.SettingsJson);
         if (settings.RootElement.ValueKind != JsonValueKind.Object)
@@ -252,6 +257,10 @@ public sealed class WorkflowNodeExecutionContext
     public TabularExecutionLimits Limits { get; }
 
     public IWorkflowNodeProgressReporter Progress { get; }
+
+    public IReadOnlyDictionary<string, TabularValue> Variables { get; }
+
+    public IReadOnlyList<WorkflowFunction> Functions { get; }
 }
 
 public sealed class WorkflowNodeOutput

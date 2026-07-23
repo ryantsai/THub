@@ -17,7 +17,7 @@ Database connection metadata contains a provider-neutral authentication kind and
 - `Integrated`, which uses the executing host identity;
 - `UserPassword`, which resolves a referenced user name and password at use time.
 
-Application owns `IDatabaseCredentialResolver` and the authentication configuration contract. Infrastructure owns SQL Server connection-string construction and the initial resolver. The initial resolver reads `ConnectionCredentials:{reference}:Username` and `Password` through `IConfiguration`; deployments supply those values through environment variables, key-per-file, Azure Key Vault, or another approved .NET configuration provider. Raw secret values are never returned to Blazor or serialized into `DataConnection.ConfigurationJson`.
+Application owns `IConnectionCredentialResolver` and the authentication configuration contract. Infrastructure owns provider connection construction and the initial resolver. The initial resolver reads `ConnectionCredentials:{reference}:Username` and `Password` through `IConfiguration`; deployments supply those values through environment variables, key-per-file, Azure Key Vault, or another approved .NET configuration provider. Raw secret values are never returned to Blazor or serialized into `DataConnection.ConfigurationJson`.
 
 Resolution is asynchronous so a future Vault, OpenBao, Key Vault, or dynamic database-credential adapter can replace the initial resolver without changing connector configuration or execution contracts. A missing referenced credential fails closed.
 

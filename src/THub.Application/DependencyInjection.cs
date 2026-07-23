@@ -18,6 +18,7 @@ public static class DependencyInjection
         AddWorkflowDefinitionServices(services);
         services.AddSingleton<ConnectionConfigurationSerializer>();
         services.AddScoped<ConnectionManagementService>();
+        services.AddScoped<WorkflowSchemaInspectionService>();
         services.AddSingleton<PublicationTokenGenerator>();
         services.AddScoped<PublicationCatalogService>();
         services.AddScoped<PublicationTokenService>();
@@ -49,6 +50,7 @@ public static class DependencyInjection
         services.AddSingleton<INodeRetryPolicyProvider, DefaultNodeRetryPolicyProvider>();
         services.AddSingleton<IWorkflowRetryScheduler, ExponentialJitterRetryScheduler>();
         services.AddSingleton<IExecutionErrorClassifier, DefaultExecutionErrorClassifier>();
+        services.AddSingleton<IWorkflowVariableResolver, WorkflowVariableResolver>();
         services.AddSingleton<WorkflowExecutionTimeoutOptions>();
         services.AddSingleton<INodeExecutionTimeoutProvider, DefaultNodeExecutionTimeoutProvider>();
         services.AddScoped<EmailActionOutboxService>();

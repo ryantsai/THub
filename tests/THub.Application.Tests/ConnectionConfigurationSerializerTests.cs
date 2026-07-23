@@ -46,6 +46,54 @@ public sealed class ConnectionConfigurationSerializerTests
     }
 
     [Theory]
+    [InlineData(ConnectionKind.MySql, 3306)]
+    [InlineData(ConnectionKind.PostgreSql, 5432)]
+    [InlineData(ConnectionKind.Oracle, 1521)]
+    public void RelationalConfigurationRoundTripsWithoutSecretValues(
+        ConnectionKind kind,
+        int port)
+    {
+        var input = new RelationalDatabaseConnectionConfiguration(
+            kind,
+            "db.contoso.test",
+            port,
+            "Warehouse",
+            encrypt: true,
+            trustServerCertificate: false,
+            authentication: new DatabaseAuthenticationConfiguration(
+                DatabaseAuthenticationKind.UserPassword,
+                "warehouse_reader"));
+
+        var json = serializer.Serialize(input);
+        var output = Assert.IsType<RelationalDatabaseConnectionConfiguration>(
+            serializer.Deserialize(kind, json));
+
+        Assert.Equal(input, output);
+        Assert.DoesNotContain("\"password\":", json, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Theory]
+    [InlineData(FtpEncryptionMode.None)]
+    [InlineData(FtpEncryptionMode.Explicit)]
+    [InlineData(FtpEncryptionMode.Implicit)]
+    public void FtpConfigurationRoundTrips(FtpEncryptionMode encryptionMode)
+    {
+        var input = new FtpConnectionConfiguration(
+            "ftp.contoso.test",
+            21,
+            encryptionMode,
+            trustServerCertificate: false,
+            "partner_ftp");
+
+        var json = serializer.Serialize(input);
+        var output = Assert.IsType<FtpConnectionConfiguration>(
+            serializer.Deserialize(ConnectionKind.Ftp, json));
+
+        Assert.Equal(input, output);
+        Assert.DoesNotContain("\"password\":", json, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Theory]
     [InlineData("{\"schemaVersion\":2}")]
     [InlineData("{\"schemaVersion\":1,\"server\":\"sql01\",\"database\":\"db\",\"integratedSecurity\":false,\"encrypt\":true,\"trustServerCertificate\":false,\"connectTimeoutSeconds\":15,\"commandTimeoutSeconds\":30,\"maximumBatchRows\":1000}")]
     [InlineData("{\"schemaVersion\":1,\"server\":\"sql01\",\"database\":\"db\",\"authenticationKind\":\"userPassword\",\"credentialSecretReference\":\"safe\",\"encrypt\":true,\"trustServerCertificate\":false,\"connectTimeoutSeconds\":15,\"commandTimeoutSeconds\":30,\"maximumBatchRows\":1000,\"password\":\"x\"}")]

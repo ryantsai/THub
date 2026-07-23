@@ -3,7 +3,7 @@ using THub.Infrastructure.Connections;
 
 namespace THub.Infrastructure.Tests;
 
-public sealed class ConfigurationDatabaseCredentialResolverTests
+public sealed class ConfigurationConnectionCredentialResolverTests
 {
     [Fact]
     public async Task ResolveAsync_ReadsReferencedCredentialWithoutPersistingIt()
@@ -15,7 +15,7 @@ public sealed class ConfigurationDatabaseCredentialResolverTests
                 ["ConnectionCredentials:warehouse_reader:Password"] = "secret-value"
             })
             .Build();
-        var resolver = new ConfigurationDatabaseCredentialResolver(configuration);
+        var resolver = new ConfigurationConnectionCredentialResolver(configuration);
 
         var credential = await resolver.ResolveAsync(
             "warehouse_reader",
@@ -29,7 +29,7 @@ public sealed class ConfigurationDatabaseCredentialResolverTests
     [Fact]
     public async Task ResolveAsync_ReturnsNullWhenReferenceIsNotProvisioned()
     {
-        var resolver = new ConfigurationDatabaseCredentialResolver(
+        var resolver = new ConfigurationConnectionCredentialResolver(
             new ConfigurationBuilder().Build());
 
         var credential = await resolver.ResolveAsync(

@@ -611,7 +611,7 @@ public sealed class SqlPublicationSourceSchemaInspector(
         or InvalidOperationException
         or ArgumentException
         or ConnectionConfigurationException
-        or DatabaseCredentialUnavailableException
+        or ConnectionCredentialUnavailableException
         or OverflowException;
 
     private sealed record DiscoveredObject(

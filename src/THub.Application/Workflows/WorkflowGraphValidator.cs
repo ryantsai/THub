@@ -8,15 +8,26 @@ public sealed class WorkflowGraphValidator
     public const int MaximumNodes = 200;
     public const int MaximumEdges = 1_000;
     public const int MaximumNodeSettingsCharacters = 100_000;
+    public const int MaximumVariables = 64;
+    public const int MaximumFunctions = 32;
+    public const int MaximumVariableValueCharacters = 4_096;
+    public const int MaximumFunctionExpressionCharacters = 4_096;
+    public const int MaximumFunctionParameters = 8;
 
     public IReadOnlyList<GraphValidationIssue> Validate(WorkflowGraph graph)
     {
         ArgumentNullException.ThrowIfNull(graph);
         var issues = new List<GraphValidationIssue>();
-        if (graph.Nodes is null || graph.Edges is null)
+        if (graph.Nodes is null || graph.Edges is null
+            || graph.Variables is null || graph.Functions is null)
         {
-            return [new("graph.collections.required", "Workflow nodes and edges are required.")];
+            return [new(
+                "graph.collections.required",
+                "Workflow variables, functions, nodes, and edges are required.")];
         }
+
+        ValidateVariables(graph.Variables, issues);
+        ValidateFunctions(graph.Functions, issues);
 
         if (graph.Nodes.Count == 0)
         {
@@ -139,6 +150,114 @@ public sealed class WorkflowGraphValidator
         return issues;
     }
 
+    private static void ValidateVariables(
+        IReadOnlyList<WorkflowVariable> variables,
+        ICollection<GraphValidationIssue> issues)
+    {
+        if (variables.Count > MaximumVariables)
+        {
+            issues.Add(new(
+                "graph.variables.limit",
+                $"A workflow cannot define more than {MaximumVariables} variables."));
+        }
+
+        var names = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var variable in variables)
+        {
+            if (!IsValidSymbol(variable.Name))
+            {
+                issues.Add(new(
+                    "variable.name.invalid",
+                    "Variable names must be 1-64 character JavaScript identifiers."));
+                continue;
+            }
+
+            if (!names.Add(variable.Name)
+                || variable.Name is "row" or "vars" or "run" or "time")
+            {
+                issues.Add(new(
+                    "variable.name.duplicate",
+                    $"Variable name '{variable.Name}' is duplicated or reserved."));
+            }
+
+            if (!Enum.IsDefined(variable.Kind) || !Enum.IsDefined(variable.DataType))
+            {
+                issues.Add(new(
+                    "variable.type.invalid",
+                    $"Variable '{variable.Name}' has an unsupported kind or data type."));
+                continue;
+            }
+
+            if (variable.Kind == WorkflowVariableKind.Literal)
+            {
+                if (variable.Value is null
+                    || variable.Value.Length > MaximumVariableValueCharacters)
+                {
+                    issues.Add(new(
+                        "variable.literal.invalid",
+                        $"Literal variable '{variable.Name}' requires a value no longer than {MaximumVariableValueCharacters} characters."));
+                }
+                continue;
+            }
+
+            if (variable.ConnectionId is null or { } id && id == Guid.Empty
+                || !IsBoundedIdentifier(variable.Schema)
+                || !IsBoundedIdentifier(variable.Object)
+                || !IsBoundedIdentifier(variable.ValueColumn)
+                || !IsBoundedIdentifier(variable.FilterColumn)
+                || variable.FilterValue is null
+                || variable.FilterValue.Length > MaximumVariableValueCharacters)
+            {
+                issues.Add(new(
+                    "variable.database.invalid",
+                    $"Database variable '{variable.Name}' requires an approved connection, object, value column, filter column, and bounded filter value."));
+            }
+        }
+    }
+
+    private static void ValidateFunctions(
+        IReadOnlyList<WorkflowFunction> functions,
+        ICollection<GraphValidationIssue> issues)
+    {
+        if (functions.Count > MaximumFunctions)
+        {
+            issues.Add(new(
+                "graph.functions.limit",
+                $"A workflow cannot define more than {MaximumFunctions} functions."));
+        }
+
+        var names = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var function in functions)
+        {
+            if (!IsValidSymbol(function.Name)
+                || !names.Add(function.Name)
+                || function.Name is "row" or "vars" or "run" or "time")
+            {
+                issues.Add(new(
+                    "function.name.invalid",
+                    $"Function name '{function.Name}' must be a unique, non-reserved JavaScript identifier."));
+            }
+
+            if (function.Parameters.Count > MaximumFunctionParameters
+                || function.Parameters.Any(parameter => !IsValidSymbol(parameter))
+                || function.Parameters.Distinct(StringComparer.Ordinal).Count()
+                    != function.Parameters.Count)
+            {
+                issues.Add(new(
+                    "function.parameters.invalid",
+                    $"Function '{function.Name}' has invalid or duplicate parameters."));
+            }
+
+            if (string.IsNullOrWhiteSpace(function.Expression)
+                || function.Expression.Length > MaximumFunctionExpressionCharacters)
+            {
+                issues.Add(new(
+                    "function.expression.invalid",
+                    $"Function '{function.Name}' requires an expression no longer than {MaximumFunctionExpressionCharacters} characters."));
+            }
+        }
+    }
+
     private static void ValidateSettings(
         WorkflowNode node,
         ICollection<GraphValidationIssue> issues)
@@ -254,7 +373,10 @@ public sealed class WorkflowGraphValidator
     }
 
     private static bool IsSource(WorkflowNodeKind kind) => kind is
-        WorkflowNodeKind.SqlSource or WorkflowNodeKind.CsvSource or WorkflowNodeKind.ExcelSource;
+        WorkflowNodeKind.SqlSource or WorkflowNodeKind.MySqlSource
+            or WorkflowNodeKind.PostgreSqlSource or WorkflowNodeKind.OracleSource
+            or WorkflowNodeKind.FtpSource or WorkflowNodeKind.CsvSource
+            or WorkflowNodeKind.ExcelSource;
 
     private static bool IsValidNodeId(string id)
     {
@@ -266,6 +388,18 @@ public sealed class WorkflowGraphValidator
         return id.All(character => char.IsLetterOrDigit(character)
             || character is '.' or '_' or '-');
     }
+
+    private static bool IsValidSymbol(string? value) =>
+        !string.IsNullOrWhiteSpace(value)
+        && value.Length <= 64
+        && (char.IsLetter(value[0]) || value[0] is '_' or '$')
+        && value.Skip(1).All(character =>
+            char.IsLetterOrDigit(character) || character is '_' or '$');
+
+    private static bool IsBoundedIdentifier(string? value) =>
+        !string.IsNullOrWhiteSpace(value)
+        && value.Length <= 128
+        && value.All(character => !char.IsControl(character));
 
     private static bool ContainsCycle(
         IReadOnlyList<WorkflowEdge> edges,

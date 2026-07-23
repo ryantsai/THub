@@ -121,14 +121,18 @@ For local Development/debugging, all three executable hosts use `THub.Debug` on 
 
 Every non-Development host must receive the real SQL Server `ConnectionStrings:THub` through environment-specific external configuration or an organization-approved configuration provider. Web, Worker, and Publications register Infrastructure and fail startup when it is missing. Base settings intentionally contain no production fallback connection string.
 
-Configured source/target SQL connections independently select Windows integrated authentication or database username/password authentication. For database authentication, the Connections UI stores only a reference such as `warehouse_reader`. Supply its values to every host that uses that connection through external configuration:
+Configured source/target connections store only a credential reference such as `warehouse_reader` or `partner_ftp`. SQL Server independently selects Windows integrated or referenced username/password authentication. MySQL, PostgreSQL, Oracle, and FTP require a referenced username/password. Supply values to every host that uses the connection through external configuration:
 
 ```powershell
 $env:ConnectionCredentials__warehouse_reader__Username = 'thub_warehouse_reader'
 $env:ConnectionCredentials__warehouse_reader__Password = '<supply-through-approved-secret-system>'
+$env:ConnectionCredentials__partner_ftp__Username = 'thub_transfer'
+$env:ConnectionCredentials__partner_ftp__Password = '<supply-through-approved-secret-system>'
 ```
 
-The Web host needs the credential to test/discover the connection, the Worker needs it for workflow execution and approved editor writes, and Publications needs it for active REST reads. Give each host only the credential references and database grants it requires. The built-in resolver uses `IConfiguration`, so environment variables are a portable baseline rather than a requirement; key-per-file and vault-backed .NET configuration providers can supply the same keys. Missing references fail closed. Never place these values in checked-in `appsettings` files.
+The Web host needs a credential to test/discover its connection and the Worker needs it for workflow execution. Publications currently uses SQL Server connections only. Give each host only the references and grants it requires. The built-in `IConnectionCredentialResolver` uses `IConfiguration`, so environment variables are a portable baseline rather than a requirement; key-per-file and vault-backed .NET configuration providers can supply the same keys, or a deployment can replace the resolver. Missing references fail closed. Never place these values in checked-in `appsettings` files.
+
+FTP connections select plain FTP, explicit FTPS, or implicit FTPS. Plain FTP exposes credentials and data in transit and must be restricted to explicitly approved legacy endpoints on a controlled network. Prefer FTPS with certificate validation. Size Worker temporary storage for the configured maximum FTP file size and monitor `%TEMP%\THub` for remnants after abrupt process termination.
 
 The worker supports:
 
@@ -142,7 +146,7 @@ The worker supports:
     "ClusterCheckinMisfireThresholdSeconds": 20
   },
   "Execution": {
-    "MaximumConcurrency": 2,
+    "MaximumConcurrency": 32,
     "PollIntervalMilliseconds": 1000,
     "LeaseDurationSeconds": 60,
     "HeartbeatIntervalSeconds": 15,
@@ -168,7 +172,7 @@ The worker supports:
 
 | Setting | Default | Valid range | Purpose |
 | --- | ---: | ---: | --- |
-| `Execution:MaximumConcurrency` | 2 | 1–32 | Concurrent leased workflow runs in this process; nodes inside one run remain topologically sequential |
+| `Execution:MaximumConcurrency` | 32 | 1–32 | Concurrent leased workflow runs in this process; nodes inside one run remain topologically sequential |
 | `Execution:PollIntervalMilliseconds` | 1,000 | 100–60,000 ms | Wait when no additional run is claimable |
 | `Execution:LeaseDurationSeconds` | 60 | 15–3,600 seconds | SQL ownership period for one run |
 | `Execution:HeartbeatIntervalSeconds` | 15 | 5–1,200 seconds | Lease renewal and durable cancellation observation interval; must be less than half the lease duration |
@@ -182,7 +186,7 @@ The worker supports:
 | `Execution:MaximumRetainedRowsPerWorkflow` | 3,000,000 | 1–10,000,000 | Combined live intermediate-row budget for a run |
 | `Execution:MaximumRetainedBytesPerWorkflow` | 1.5 GiB | 1 byte–4 GiB | Combined live intermediate-byte budget for a run |
 
-Startup validates all ranges and the heartbeat/lease relationship. Intermediate outputs are currently materialized in Worker memory, so absolute maxima are safety ceilings rather than recommended production values; size them to the service account's memory budget and expected branch fan-out. Connection profiles independently cap SQL command/batch sizes and file bytes/rows/columns. Read-only source/transform attempts retry at most three times for classified transient failures with exponential jitter. SQL/file targets and Email actions have no automatic node retry; an expired whole-run lease can still restart the graph, so every external effect must tolerate at-least-once recovery.
+Startup validates all ranges and the heartbeat/lease relationship. Intermediate outputs are currently materialized in Worker memory, so absolute maxima are safety ceilings rather than recommended production values; size them to the service account's memory budget and expected branch fan-out. Connection profiles independently cap relational command/batch sizes and local/FTP file bytes/rows/columns. Read-only source/transform attempts retry at most three times for classified transient failures with exponential jitter. Database/file/FTP targets and Email actions have no automatic node retry; an expired whole-run lease can still restart the graph, so every external effect must tolerate at-least-once recovery.
 
 Publication limits are immutable version metadata, not `PublicationApi` host settings. The management UI supplies the defaults below, and domain construction rejects values outside the hard ranges:
 

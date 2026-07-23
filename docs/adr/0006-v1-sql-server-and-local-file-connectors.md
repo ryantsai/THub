@@ -1,6 +1,6 @@
 # ADR-0006: Limit v1 connectors to SQL Server and local CSV/XLSX files
 
-- Status: Accepted
+- Status: Superseded by [ADR-0014](0014-expand-relational-and-ftp-connectors.md)
 - Date: 2026-07-22
 - Deciders: Project maintainers
 
@@ -47,4 +47,3 @@ Webhook and executable nodes are action nodes, not tabular connectors; each requ
 - Define tabular schema and batch interfaces in Application.
 - Add size, memory, timeout, and path-root policies.
 - Add connector contract and SQL Server integration tests.
-

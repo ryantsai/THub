@@ -2,13 +2,15 @@
 
 ## 1. Purpose and scope
 
-THub is a Windows/intranet-oriented data workflow orchestration platform. Users persist and manage directed workflows in a Blazor application; an out-of-process Worker schedules and executes their immutable published versions. Microsoft SQL Server is both a supported v1 data connector and the durable THub control-plane store.
+THub is a Windows/intranet-oriented data workflow orchestration platform. Users persist and manage directed workflows in a Blazor application; an out-of-process Worker schedules and executes their immutable published versions. Microsoft SQL Server is both a supported data connector and the durable THub control-plane store.
 
-The v1 connector boundary is:
+The workflow connector boundary is:
 
 - Microsoft SQL Server;
+- MySQL, PostgreSQL, and Oracle Database;
 - local or service-accessible CSV files;
-- local or service-accessible `.xlsx`/`.xlsm` workbooks.
+- local or service-accessible `.xlsx`/`.xlsm` workbooks;
+- FTP or FTPS CSV, tab-delimited, and modern Excel files.
 
 Webhook calls and external executables remain gated. Durable Email profiles, workflow-event rules, canvas actions, SQL outbox persistence, leased dispatch, MailKit SMTP delivery, and the management UI implement [ADR-0012](adr/0012-durable-email-alert-delivery.md). The initial internal, single-host publication and staged-editor slice implements [ADR-0011](adr/0011-isolated-governed-data-publications.md): it includes durable publication metadata, a separate managed-bearer REST host, bounded SQL reads, role-granted Spreadsheet editing, and worker-applied approved change sets. Immutable versioning and leased workflow execution implement [ADR-0010](adr/0010-durable-leased-workflow-execution.md), with the current node/runtime limits described below.
 
@@ -16,11 +18,11 @@ Webhook calls and external executables remain gated. Durable Email profiles, wor
 
 | Area | Current implementation | Target direction |
 | --- | --- | --- |
-| Web | Global Interactive Server Blazor app, Radzen shell, Windows auth/RBAC, persisted workflow catalog/designer, run controls/history, publication administration, and bounded staged Spreadsheet editor | Richer visual schema mapping, complete audit/retention, and deeper live-run telemetry |
+| Web | Global Interactive Server Blazor app, Radzen shell, Windows auth/RBAC, persisted workflow catalog/designer with live relational schema mapping, run controls/history, publication administration, and bounded staged Spreadsheet editor | Complete audit/retention and deeper live-run telemetry |
 | Publications host | Separate managed-bearer ASP.NET Core host with bounded read-only `/schema` and `/rows` routes, atomic accepted-use metering, process-local admission, Problem Details, logging, and `/healthz` | SQL readiness/metrics and a gateway or distributed limiter before scale-out |
 | Worker | Windows Service host, persistent Quartz scheduling, atomic run claims/heartbeats/recovery, bounded graph execution, durable step attempts, Email-outbox dispatch, and claimed approved editor apply | Checkpoint/resume decisions, optional bounded spill, and expanded telemetry |
 | Database | `thub` control-plane schema including immutable workflow versions, leased runs/step attempts, Email, and publication versions/tokens/grants/change sets plus `quartz` operational scheduler schema | Expanded audit/retention |
-| Connectors | Bounded SQL/CSV/Excel sources and targets, select/filter/join transforms, and Email action | Richer mapping, additional explicitly governed operations, and optional pushdown/spill |
+| Connectors | Bounded SQL Server/MySQL/PostgreSQL/Oracle sources and insert targets, local and FTP/FTPS delimited/Excel sources and create-new targets, transforms, and Email action | Live interoperability matrix, richer mapping, explicitly governed operations, and optional pushdown/spill |
 | Publications | Governed immutable REST versions, managed tokens/counters, SQL discovery/readers, role grants, Spreadsheet staging/review, and leased apply | Production readiness, live relational/browser coverage, retention, and multi-host admission decision |
 | Email alerts | Durable workflow-event and canvas-action outbox delivery through governed SMTP profiles, with administrator management, a redacted delivery monitor, and MailKit sender | Approved production secret-provider integration and a reviewed dead-letter recovery operation |
 
@@ -46,8 +48,8 @@ flowchart LR
     Publications -->|metadata and accepted-use metering| Sql
     Publications -->|approved bounded read-only object| SourceSql
     Worker[THub.Worker\nWindows Service + Quartz] -->|schedule, claim, heartbeat, and record runs/steps| Sql
-    Worker -->|read/write data and approved editor changes| SourceSql[(Connected SQL Server)]
-    Worker -->|read/write approved paths| Files[CSV / XLSX files]
+    Worker -->|bounded reads/inserts and approved editor changes| SourceSql[(SQL Server / MySQL / PostgreSQL / Oracle)]
+    Worker -->|read/write approved paths| Files[Local or FTP/FTPS delimited / XLSX files]
     Worker -->|durable SMTP outbox| Relay[Approved SMTP relay]
     Worker -. future, allow-listed .-> External[Webhooks / executables]
 ```
@@ -90,7 +92,7 @@ Responsibilities now:
 - enqueue idempotent THub run records when Quartz fires and advance the next occurrence;
 - atomically claim queued or abandoned runs, renew their leases, and prevent overlapping active runs for one workflow;
 - reload and verify the exact immutable version identity/checksum before executing its validated DAG;
-- execute bounded SQL/CSV/Excel sources and targets, select/filter/join transforms, and Email actions with cancellation, timeouts, retry-safety policy, and normalized errors;
+- execute bounded relational, local-file, and FTP/FTPS sources and targets, select/filter/join transforms, and Email actions with cancellation, timeouts, retry-safety policy, and normalized errors;
 - persist node attempts, progress counters, skips/failures, durable cancellation, and terminal run state;
 - claim and apply approved editor change sets with a least-privilege source-write identity;
 - claim and dispatch durable Email outbox rows through approved SMTP profiles;
@@ -193,12 +195,15 @@ The execution engine uses a bounded tabular contract with:
 
 The current replayable data-set store materializes each bounded node output in Worker memory and releases it after its last consumer. It does not use `DataTable`, spill to disk, checkpoint a partial graph, or resume from a completed step. Configure limits below the service account's memory budget; workflows that require larger joins or global operations need SQL pushdown or a future controlled spill design.
 
+The Web designer resolves relational schema metadata through an Application port and provider-specific Infrastructure adapter. A user selects an approved enabled connection plus schema/object, opens bounded live column metadata, chooses source columns, and maps source-to-target columns through side-by-side rows. Auto-map accepts only equal names with equal logical types. The resulting strict `columns` and `mappings` JSON is still the durable workflow contract; raw JSON is collapsed as an advanced view rather than the primary relational editing experience. Schema inspection does not read row values.
+
 Implemented v1 node behavior:
 
-- **SQL source:** validates schema/object/column identifier syntax, discovers the exact object and column types, uses Windows integrated security and configured command/batch bounds, and streams the selected table/view rows into bounded batches. V1 has no arbitrary SQL text or source predicate pushdown.
-- **SQL target:** validates/discovers the target and uses parameters inside one source transaction. V1 supports explicit `insert` only; per-column mappings are optional and merge/update/replace are not implied.
+- **Relational source:** SQL Server, MySQL, PostgreSQL, and Oracle nodes validate schema/object/column identifier syntax, discover exact object and column types, apply configured command/batch bounds, and stream selected table/view rows into bounded batches. They accept no arbitrary SQL text or source predicate pushdown.
+- **Relational target:** validates/discovers the provider-specific target and uses parameters inside one transaction. Only explicit `insert` is supported; per-column mappings are optional and merge/update/replace/delete are not implied.
 - **CSV source/target:** resolves a relative `.csv` path beneath an approved root, enforces file/row/column limits, supports explicit header/delimiter/typed-column settings, and writes only `createNew` through a temporary file followed by a move.
 - **Excel source/target:** applies the same approved-root and size/shape bounds to `.xlsx`/`.xlsm`, reads an approved worksheet/range, and writes only a new workbook target.
+- **FTP/FTPS source/target:** transfers only an absolute traversal-free remote path after applying connection file/time bounds, then reuses the bounded delimited/Excel parser or writer in a unique Worker temporary directory. Targets are create-new without overwrite. Plain FTP is an explicit unencrypted compatibility mode; FTPS is preferred. SFTP and remote watchers are not implemented.
 - **Transforms:** select projects configured columns; filter applies up to 32 typed scalar predicates; inner/left join binds exactly two named incoming nodes and bounds the buffered right side.
 - **Email action:** enqueues durable delivery intent through the governed Email profile/outbox boundary; recovered graph attempts reuse its stable run/node deduplication identity.
 - **Webhook/executable:** draft concepts exist, but publication validation and execution preflight reject them until ADR-0008 policies and executors exist.
@@ -350,12 +355,11 @@ Internet exposure, additional publication instances, alternate JWT/Entra authent
 
 ## 15. Evolution plan
 
-1. Add richer visual source-to-target schema mapping and connection-backed schema selection to the workflow designer.
-2. Add live SQL/file connector and multi-Worker lease/recovery coverage, failure injection, and operator-facing execution metrics/readiness.
-3. Decide checkpoint/resume and bounded disk-spill semantics before supporting workflows larger than the current in-memory budgets.
-4. Integrate an organization-approved SMTP secret provider and add Email outbox monitoring and operator recovery surfaces.
-5. Add publication-host SQL readiness, centralized metrics, live SQL Server/browser coverage, and operator reconciliation for ambiguous editor applies.
-6. Resolve publication before/after classification and retention under PD-009; require a new ADR before internet exposure, alternate authentication, direct writes, or multi-host admission.
-7. Add complete audit/retention, import/export with secret redaction, readiness, and production monitoring.
+1. Add live SQL/file connector and multi-Worker lease/recovery coverage, failure injection, and operator-facing execution metrics/readiness.
+2. Decide checkpoint/resume and bounded disk-spill semantics before supporting workflows larger than the current in-memory budgets.
+3. Integrate an organization-approved SMTP secret provider and add Email outbox monitoring and operator recovery surfaces.
+4. Add publication-host SQL readiness, centralized metrics, live SQL Server/browser coverage, and operator reconciliation for ambiguous editor applies.
+5. Resolve publication before/after classification and retention under PD-009; require a new ADR before internet exposure, alternate authentication, direct writes, or multi-host admission.
+6. Add complete audit/retention, import/export with secret redaction, readiness, and production monitoring.
 
 Architecture changes must be captured by a new or superseding ADR and reflected here.

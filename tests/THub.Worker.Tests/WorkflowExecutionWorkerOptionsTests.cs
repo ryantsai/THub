@@ -11,6 +11,7 @@ public sealed class WorkflowExecutionWorkerOptionsTests
 
         options.ValidateCrossFieldBounds();
 
+        Assert.Equal(32, options.MaximumConcurrency);
         Assert.True(options.HeartbeatInterval < options.LeaseDuration / 2);
         Assert.NotNull(options.CreateLimits());
         Assert.NotNull(options.CreateTimeouts());

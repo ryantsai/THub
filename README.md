@@ -1,8 +1,8 @@
 # THub
 
-THub is an intranet-first data workflow orchestration and visual-design platform inspired by SSIS, n8n, DolphinScheduler, Kestra, and Azure Data Factory. The v1 product boundary is Microsoft SQL Server plus local CSV and Excel files.
+THub is an intranet-first data workflow orchestration and visual-design platform inspired by SSIS, n8n, DolphinScheduler, Kestra, and Azure Data Factory. Its workflow connector boundary includes SQL Server, MySQL, PostgreSQL, Oracle Database, local CSV/Excel files, and FTP/FTPS CSV, tab-delimited, and Excel files.
 
-> **Repository status:** functional v1 foundation. The persisted designer/catalog, schema-versioned graph validation, immutable checksummed workflow versions, manual and scheduled run queues, SQL-leased Worker execution, durable step attempts, bounded SQL/CSV/Excel nodes, select/filter/join transforms, Email alerts, and governed publications are implemented. Webhook, executable, and publication canvas nodes remain intentionally non-operational; production readiness still requires deployment-specific identities, secrets, and connector verification, plus readiness/metrics, audit, and retention work.
+> **Repository status:** functional v1 foundation. The persisted designer/catalog, schema-versioned graph validation, immutable checksummed workflow versions, manual and scheduled run queues, SQL-leased Worker execution, durable step attempts, bounded relational/local-file/FTP nodes, select/filter/join transforms, Email alerts, and governed SQL Server publications are implemented. Webhook, executable, and publication canvas nodes remain intentionally non-operational; production readiness still requires deployment-specific identities, secrets, live connector verification, plus readiness/metrics, audit, and retention work.
 
 ## Architecture at a glance
 
@@ -29,9 +29,9 @@ Quartz owns schedule timing, persistence, misfire handling, and scheduler cluste
 | Cron/time-zone scheduling | Implemented | Quartz persists one trigger per published schedule; THub transactionally owns queued runs |
 | Designer save/load/publish | Implemented | Draft graph JSON is canonicalized and saved with optimistic revision checks; publish creates and selects an immutable checksummed version transactionally |
 | Immutable workflow versions and execution leases | Implemented | Runs reference exact versions; Workers atomically claim/heartbeat runs, recover expired leases, honor durable cancellation, and persist lease-checked step attempts |
-| SQL/CSV/XLSX execution | Implemented v1 | SQL sources and transactional insert targets, CSV/Excel sources, and create-new CSV/Excel targets use bounded, cancellation-aware execution |
-| Database authentication | Implemented v1 | Configured SQL connections support Windows integrated or referenced username/password credentials through an external .NET configuration provider |
-| Schema mapping and transforms | Implemented v1 | Explicit SQL target mappings plus select, typed filter, and bounded inner/left join nodes; configuration is still a power-user settings experience |
+| Relational/file execution | Implemented v1 | SQL Server, MySQL, PostgreSQL, and Oracle table/view sources and transactional insert targets; bounded local and FTP/FTPS CSV, tab-delimited, and modern Excel sources plus create-new targets |
+| Connection authentication | Implemented v1 | SQL Server supports Windows integrated or referenced credentials; other databases and FTP use referenced username/password credentials through a replaceable external configuration resolver |
+| Schema mapping and transforms | Implemented v1 | The designer opens live SQL Server/MySQL/PostgreSQL/Oracle source and target schemas, selects source columns, and edits target mappings graphically; advanced JSON remains available for import/troubleshooting |
 | Email alerts/actions | Implemented | Administrator-managed profiles/rules, terminal-event and `EmailAlert` action enqueueing, deduplicated SQL outbox, leased Worker dispatch, bounded retries/dead letters, and MailKit SMTP delivery; credential-backed SMTP requires an approved `ISecretResolver` deployment integration |
 | Webhook/executable execution | Gated | Draft node concepts remain visible, but publish and execution reject them until administrator allow-list, secret, timeout, identity, and audit policies exist |
 | Publication canvas nodes | Gated and separated | `PublishRestApi` and `PublishDataEditor` cannot run in a workflow; create the implemented governed resources under Publications instead |
@@ -50,6 +50,8 @@ Quartz owns schedule timing, persistence, misfire handling, and scheduler cluste
 - MailKit for bounded TLS-protected SMTP delivery
 - Cronos for the product's five-field cron calculation
 - Serilog structured console and rolling JSON file logging
+- MySqlConnector, Npgsql, and Oracle Managed Data Access Core for relational connectors
+- FluentFTP for FTP/FTPS transfers
 - CsvHelper and ClosedXML for bounded CSV and modern Excel connector execution
 - xUnit for unit tests
 
@@ -205,7 +207,7 @@ The migration creates both THub metadata in the `thub` schema and Quartz operati
 - Production logs default to `%PROGRAMDATA%\THub\Logs`. Grant each host identity write access or override `Serilog:FilePath` through deployment configuration.
 - Configure real AD groups under `Authorization:RoleMappings`; the checked-in production arrays are intentionally empty.
 - Production currently gives an authenticated unmapped account the configured default role (`Viewer`). Use an invalid/empty default when explicit group membership must be mandatory.
-- Never put source-system passwords or tokens in `DataConnection.ConfigurationJson`; store a protected secret reference.
+- Never put source-system passwords or tokens in `DataConnection.ConfigurationJson`; store a protected secret reference. Plain FTP is supported only as an explicit compatibility mode and exposes both credentials and data in transit; prefer explicit or implicit FTPS.
 - For a database-authenticated connection reference such as `warehouse_reader`, supply `ConnectionCredentials__warehouse_reader__Username` and `ConnectionCredentials__warehouse_reader__Password` to each authorized host through external deployment configuration or a vault-backed .NET configuration provider.
 - Managed publication tokens are returned once and stored only as one-way verifiers; their list view exposes status, expiry/revocation, accepted-use count, and last-used time but never the bearer secret. Email delivery profiles store SMTP credential references, never secret values; the checked-in resolver fails closed for referenced credentials until deployment replaces it with an organization-approved provider. Profiles without a reference use only an explicitly approved anonymous relay.
 - Treat workflow JSON, file paths, SQL object names, webhook URLs, and executable settings as untrusted input at execution boundaries.

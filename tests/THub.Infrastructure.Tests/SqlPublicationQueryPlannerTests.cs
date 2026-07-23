@@ -75,7 +75,7 @@ public sealed class SqlPublicationQueryPlannerTests
 
         var builder = SqlServerConnectionStringFactory.Build(
             configuration,
-            new DatabaseCredential("db_reader", "not-logged"),
+            new ConnectionCredential("db_reader", "not-logged"),
             "THub governed publication reader",
             Microsoft.Data.SqlClient.ApplicationIntent.ReadOnly,
             enlist: false);

@@ -3,10 +3,10 @@ using THub.Application.Connections;
 
 namespace THub.Infrastructure.Connections;
 
-public sealed class ConfigurationDatabaseCredentialResolver(IConfiguration configuration)
-    : IDatabaseCredentialResolver
+public sealed class ConfigurationConnectionCredentialResolver(IConfiguration configuration)
+    : IConnectionCredentialResolver
 {
-    public ValueTask<DatabaseCredential?> ResolveAsync(
+    public ValueTask<ConnectionCredential?> ResolveAsync(
         string secretReference,
         CancellationToken cancellationToken)
     {
@@ -21,6 +21,6 @@ public sealed class ConfigurationDatabaseCredentialResolver(IConfiguration confi
         return ValueTask.FromResult(
             string.IsNullOrWhiteSpace(userName) || string.IsNullOrEmpty(password)
                 ? null
-                : new DatabaseCredential(userName, password));
+                : new ConnectionCredential(userName, password));
     }
 }

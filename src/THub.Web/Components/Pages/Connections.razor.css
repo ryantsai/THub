@@ -22,6 +22,7 @@
 .connection-form input:not([type="checkbox"]), .connection-form select { width: 100%; min-height: 38px; padding: 8px 10px; border: 1px solid #d7e1de; border-radius: 7px; background: #fff; color: #263532; font-size: 11px; }
 .connection-form .check { grid-template-columns: auto 1fr; align-items: center; align-content: center; }
 .connection-form .check input { width: 15px; height: 15px; accent-color: #17775f; }
+.transport-warning { grid-column: 1 / -1; padding: 10px 12px; display: flex; gap: 8px; align-items: center; border-radius: 7px; background: #fff2e5; color: #9b5c24; font-size: 10px; }
 .form-error { margin: 0 19px 15px; padding: 11px; display: flex; gap: 8px; align-items: center; border-radius: 7px; background: #fff0ed; color: #a3483d; font-size: 10px; }
 .probe-result { margin: 0 19px 15px; padding: 11px; display: flex; gap: 9px; align-items: center; border-radius: 7px; background: #eaf7f1; color: #27775e; }
 .probe-result.failed { background: #fff3e8; color: #a86427; }

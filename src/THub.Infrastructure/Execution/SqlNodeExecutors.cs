@@ -414,7 +414,7 @@ internal static class SqlExecutionSupport
                     sqlType,
                     ToTabularType(sqlType),
                     reader.GetBoolean(2),
-                    !reader.GetBoolean(3) && !reader.GetBoolean(4) && reader.GetInt32(5) == 0,
+                    !reader.GetBoolean(3) && !reader.GetBoolean(4) && reader.GetByte(5) == 0,
                     reader.GetBoolean(6),
                     reader.GetInt16(7),
                     reader.GetByte(8),
@@ -428,7 +428,7 @@ internal static class SqlExecutionSupport
                     "The configured SQL object does not exist or has no accessible columns.");
             }
 
-            if (!allowView && objectType != "U")
+            if (!allowView && !string.Equals(objectType?.Trim(), "U", StringComparison.Ordinal))
             {
                 throw ExecutionFailure.Configuration(
                     "execution.sql.target.table",

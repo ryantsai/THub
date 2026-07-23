@@ -33,6 +33,22 @@ public sealed record ExcelSourceNodeSettings(
     bool HasHeader,
     IReadOnlyList<DelimitedColumnSettings>? Columns) : WorkflowNodeSettings;
 
+public enum FtpFileFormat
+{
+    Csv,
+    TabDelimited,
+    Excel
+}
+
+public sealed record FtpSourceNodeSettings(
+    Guid ConnectionId,
+    string RemotePath,
+    FtpFileFormat Format,
+    bool HasHeader,
+    char Delimiter,
+    string? Worksheet,
+    IReadOnlyList<DelimitedColumnSettings>? Columns) : WorkflowNodeSettings;
+
 public sealed record SelectColumnsNodeSettings(
     IReadOnlyList<string> Columns) : WorkflowNodeSettings;
 
@@ -52,12 +68,24 @@ public sealed record JoinNodeSettings(
     string JoinType,
     int MaximumBufferedRows) : WorkflowNodeSettings;
 
+public enum WorkflowValueBindingKind
+{
+    Column,
+    Variable,
+    JavaScript
+}
+
+public sealed record WorkflowValueBinding(
+    string TargetColumn,
+    WorkflowValueBindingKind Kind,
+    string Value);
+
 public sealed record SqlTargetNodeSettings(
     Guid ConnectionId,
     string Schema,
     string Object,
     string Mode,
-    IReadOnlyDictionary<string, string> Mappings) : WorkflowNodeSettings;
+    IReadOnlyList<WorkflowValueBinding> Bindings) : WorkflowNodeSettings;
 
 public sealed record CsvTargetNodeSettings(
     Guid ConnectionId,
@@ -71,6 +99,15 @@ public sealed record ExcelTargetNodeSettings(
     string RelativePath,
     string Worksheet,
     bool IncludeHeader,
+    string Mode) : WorkflowNodeSettings;
+
+public sealed record FtpTargetNodeSettings(
+    Guid ConnectionId,
+    string RemotePath,
+    FtpFileFormat Format,
+    bool IncludeHeader,
+    char Delimiter,
+    string? Worksheet,
     string Mode) : WorkflowNodeSettings;
 
 public sealed record EmailAlertNodeSettings(
@@ -105,6 +142,8 @@ public sealed class WorkflowNodeSettingsValidator
         ["connectionId", "relativePath", "hasHeader", "delimiter", "columns"];
     private static readonly HashSet<string> ExcelSourceProperties =
         ["connectionId", "relativePath", "worksheet", "range", "hasHeader", "columns"];
+    private static readonly HashSet<string> FtpSourceProperties =
+        ["connectionId", "remotePath", "format", "hasHeader", "delimiter", "worksheet", "columns"];
     private static readonly HashSet<string> SelectProperties = ["columns"];
     private static readonly HashSet<string> FilterProperties = ["conditions"];
     private static readonly HashSet<string> FilterConditionProperties =
@@ -112,11 +151,15 @@ public sealed class WorkflowNodeSettingsValidator
     private static readonly HashSet<string> JoinProperties =
         ["leftNodeId", "rightNodeId", "leftKeys", "rightKeys", "type", "maximumBufferedRows"];
     private static readonly HashSet<string> SqlTargetProperties =
-        ["connectionId", "schema", "object", "mode", "mappings"];
+        ["connectionId", "schema", "object", "mode", "bindings"];
+    private static readonly HashSet<string> BindingProperties =
+        ["targetColumn", "kind", "value"];
     private static readonly HashSet<string> CsvTargetProperties =
         ["connectionId", "relativePath", "includeHeader", "delimiter", "mode"];
     private static readonly HashSet<string> ExcelTargetProperties =
         ["connectionId", "relativePath", "worksheet", "includeHeader", "mode"];
+    private static readonly HashSet<string> FtpTargetProperties =
+        ["connectionId", "remotePath", "format", "includeHeader", "delimiter", "worksheet", "mode"];
     private static readonly HashSet<string> EmailProperties =
         ["profileId", "recipients", "subject", "body", "maximumAttempts"];
     private static readonly HashSet<string> ColumnProperties = ["name", "type", "nullable"];
@@ -137,6 +180,10 @@ public sealed class WorkflowNodeSettingsValidator
                 {
                     ValidateJoinInputs(graph, node, join);
                 }
+                else if (settings is SqlTargetNodeSettings target)
+                {
+                    ValidateTargetVariables(graph, node, target);
+                }
             }
             catch (WorkflowNodeSettingsException exception)
             {
@@ -145,6 +192,27 @@ public sealed class WorkflowNodeSettingsValidator
         }
 
         return issues;
+    }
+
+    private static void ValidateTargetVariables(
+        WorkflowGraph graph,
+        WorkflowNode node,
+        SqlTargetNodeSettings settings)
+    {
+        var variables = graph.Variables
+            .Select(variable => variable.Name)
+            .Concat(["runId", "runStartedAtUtc", "utcToday"])
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        foreach (var binding in settings.Bindings.Where(binding =>
+                     binding.Kind == WorkflowValueBindingKind.Variable))
+        {
+            if (!variables.Contains(binding.Value))
+            {
+                throw Invalid(
+                    "node.target.variable.missing",
+                    $"Target node '{node.Name}' references unknown workflow variable '{binding.Value}'.");
+            }
+        }
     }
 
     private static void ValidateJoinInputs(
@@ -190,13 +258,19 @@ public sealed class WorkflowNodeSettingsValidator
 
             return node.Kind switch
             {
-                WorkflowNodeKind.SqlSource => ReadSqlSource(root),
+                WorkflowNodeKind.SqlSource or WorkflowNodeKind.MySqlSource
+                    or WorkflowNodeKind.PostgreSqlSource or WorkflowNodeKind.OracleSource =>
+                    ReadSqlSource(root),
+                WorkflowNodeKind.FtpSource => ReadFtpSource(root),
                 WorkflowNodeKind.CsvSource => ReadCsvSource(root),
                 WorkflowNodeKind.ExcelSource => ReadExcelSource(root),
                 WorkflowNodeKind.SelectColumns => ReadSelect(root),
                 WorkflowNodeKind.FilterRows => ReadFilter(root),
                 WorkflowNodeKind.Join => ReadJoin(root),
-                WorkflowNodeKind.SqlTarget => ReadSqlTarget(root),
+                WorkflowNodeKind.SqlTarget or WorkflowNodeKind.MySqlTarget
+                    or WorkflowNodeKind.PostgreSqlTarget or WorkflowNodeKind.OracleTarget =>
+                    ReadSqlTarget(root),
+                WorkflowNodeKind.FtpTarget => ReadFtpTarget(root),
                 WorkflowNodeKind.CsvTarget => ReadCsvTarget(root),
                 WorkflowNodeKind.ExcelTarget => ReadExcelTarget(root),
                 WorkflowNodeKind.EmailAlert => ReadEmail(root),
@@ -276,6 +350,28 @@ public sealed class WorkflowNodeSettingsValidator
             ReadText(root, "worksheet", 128),
             ReadOptionalText(root, "range", 128),
             hasHeader,
+            columns);
+    }
+
+    private static FtpSourceNodeSettings ReadFtpSource(JsonElement root)
+    {
+        EnsureOnly(root, FtpSourceProperties);
+        var format = ReadFtpFormat(root);
+        var hasHeader = ReadBoolean(root, "hasHeader");
+        var columns = ReadOptionalColumns(root);
+        if (!hasHeader && columns is null)
+        {
+            throw Invalid(
+                "node.ftp.columns.required",
+                "FTP sources without a header require an explicit typed columns array.");
+        }
+        return new(
+            ReadGuid(root, "connectionId"),
+            ReadRemotePath(root),
+            format,
+            hasHeader,
+            format == FtpFileFormat.TabDelimited ? '\t' : ReadDelimiter(root, "delimiter", ','),
+            format == FtpFileFormat.Excel ? ReadText(root, "worksheet", 128) : null,
             columns);
     }
 
@@ -374,7 +470,7 @@ public sealed class WorkflowNodeSettingsValidator
             ReadIdentifier(root, "schema"),
             ReadIdentifier(root, "object"),
             mode,
-            ReadMappings(root));
+            ReadBindings(root));
     }
 
     private static CsvTargetNodeSettings ReadCsvTarget(JsonElement root)
@@ -409,6 +505,49 @@ public sealed class WorkflowNodeSettingsValidator
             ReadText(root, "worksheet", 128),
             ReadOptionalBoolean(root, "includeHeader") ?? true,
             mode);
+    }
+
+    private static FtpTargetNodeSettings ReadFtpTarget(JsonElement root)
+    {
+        EnsureOnly(root, FtpTargetProperties);
+        var mode = ReadOptionalText(root, "mode", 32) ?? "createNew";
+        if (mode != "createNew")
+        {
+            throw Invalid("node.ftp-target.mode.invalid", "FTP target v1 supports only createNew mode.");
+        }
+        var format = ReadFtpFormat(root);
+        return new(
+            ReadGuid(root, "connectionId"),
+            ReadRemotePath(root),
+            format,
+            ReadOptionalBoolean(root, "includeHeader") ?? true,
+            format == FtpFileFormat.TabDelimited ? '\t' : ReadDelimiter(root, "delimiter", ','),
+            format == FtpFileFormat.Excel ? ReadText(root, "worksheet", 128) : null,
+            mode);
+    }
+
+    private static FtpFileFormat ReadFtpFormat(JsonElement root) =>
+        ReadText(root, "format", 32) switch
+        {
+            "csv" => FtpFileFormat.Csv,
+            "tabDelimited" => FtpFileFormat.TabDelimited,
+            "excel" => FtpFileFormat.Excel,
+            _ => throw Invalid(
+                "node.ftp.format.invalid",
+                "FTP format must be 'csv', 'tabDelimited', or 'excel'.")
+        };
+
+    private static string ReadRemotePath(JsonElement root)
+    {
+        var path = ReadText(root, "remotePath", 1_024).Replace('\\', '/');
+        if (!path.StartsWith("/", StringComparison.Ordinal) ||
+            path.Split('/', StringSplitOptions.RemoveEmptyEntries).Any(segment => segment is "." or ".."))
+        {
+            throw Invalid(
+                "node.ftp.path.invalid",
+                "FTP paths must be absolute and cannot contain traversal segments.");
+        }
+        return path;
     }
 
     private static EmailAlertNodeSettings ReadEmail(JsonElement root)
@@ -462,43 +601,52 @@ public sealed class WorkflowNodeSettingsValidator
         return columns.Count == 0 ? null : columns.AsReadOnly();
     }
 
-    private static IReadOnlyDictionary<string, string> ReadMappings(JsonElement root)
+    private static IReadOnlyList<WorkflowValueBinding> ReadBindings(JsonElement root)
     {
-        if (!root.TryGetProperty("mappings", out var element))
+        if (!root.TryGetProperty("bindings", out var element))
         {
-            return new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            return [];
         }
 
-        if (element.ValueKind != JsonValueKind.Object)
+        if (element.ValueKind != JsonValueKind.Array)
         {
-            throw Invalid("node.target.mappings.invalid", "Target mappings must be an object.");
+            throw Invalid("node.target.bindings.invalid", "Target bindings must be an array.");
         }
 
-        var mappings = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-        foreach (var property in element.EnumerateObject())
+        var bindings = new List<WorkflowValueBinding>();
+        var targets = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var item in element.EnumerateArray())
         {
-            if (mappings.Count == TabularSchema.AbsoluteMaximumColumns)
+            if (bindings.Count == TabularSchema.AbsoluteMaximumColumns)
             {
-                throw Invalid("node.target.mappings.limit", "The target mapping count exceeds the supported limit.");
+                throw Invalid("node.target.bindings.limit", "The target binding count exceeds the supported limit.");
             }
 
-            var source = ValidateText(property.Name, "mapping source", TabularColumn.MaximumNameLength);
-            if (property.Value.ValueKind != JsonValueKind.String)
+            EnsureOnly(item, BindingProperties);
+            var target = ReadText(item, "targetColumn", TabularColumn.MaximumNameLength);
+            if (!targets.Add(target))
             {
-                throw Invalid("node.target.mapping.invalid", "Every target mapping value must be a column name.");
+                throw Invalid(
+                    "node.target.binding.duplicate",
+                    $"Target column '{target}' is bound more than once.");
             }
 
-            var target = ValidateText(
-                property.Value.GetString() ?? string.Empty,
-                "mapping target",
-                TabularColumn.MaximumNameLength);
-            if (!mappings.TryAdd(source, target))
+            var kindText = ReadText(item, "kind", 32);
+            if (!Enum.TryParse<WorkflowValueBindingKind>(kindText, ignoreCase: true, out var kind)
+                || int.TryParse(kindText, out _))
             {
-                throw Invalid("node.target.mapping.duplicate", $"Source column '{source}' is mapped more than once.");
+                throw Invalid(
+                    "node.target.binding.kind",
+                    $"Target binding kind '{kindText}' is not supported.");
             }
+
+            var maximumLength = kind == WorkflowValueBindingKind.JavaScript
+                ? WorkflowGraphValidator.MaximumFunctionExpressionCharacters
+                : TabularColumn.MaximumNameLength;
+            bindings.Add(new(target, kind, ReadText(item, "value", maximumLength)));
         }
 
-        return mappings;
+        return bindings.AsReadOnly();
     }
 
     private static IReadOnlyList<string>? ReadOptionalStringArray(

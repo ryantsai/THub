@@ -32,6 +32,20 @@ public sealed class ConnectionConfigurationSerializer
         "maximumColumns"
     ];
 
+    private static readonly HashSet<string> RelationalProperties =
+    [
+        "schemaVersion", "host", "port", "database", "authenticationKind",
+        "credentialSecretReference", "encrypt", "trustServerCertificate",
+        "connectTimeoutSeconds", "commandTimeoutSeconds", "maximumBatchRows"
+    ];
+
+    private static readonly HashSet<string> FtpProperties =
+    [
+        "schemaVersion", "host", "port", "encryptionMode", "trustServerCertificate",
+        "credentialSecretReference", "connectTimeoutSeconds", "maximumFileBytes",
+        "maximumRows", "maximumColumns"
+    ];
+
     public string Serialize(ConnectionConfiguration configuration)
     {
         ArgumentNullException.ThrowIfNull(configuration);
@@ -57,6 +71,31 @@ public sealed class ConnectionConfigurationSerializer
                     writer.WriteNumber("connectTimeoutSeconds", sql.ConnectTimeoutSeconds);
                     writer.WriteNumber("commandTimeoutSeconds", sql.CommandTimeoutSeconds);
                     writer.WriteNumber("maximumBatchRows", sql.MaximumBatchRows);
+                    break;
+
+                case RelationalDatabaseConnectionConfiguration database:
+                    writer.WriteString("host", database.Host);
+                    writer.WriteNumber("port", database.Port);
+                    writer.WriteString("database", database.Database);
+                    writer.WriteString("authenticationKind", ToWireValue(database.Authentication.Kind));
+                    writer.WriteString("credentialSecretReference", database.Authentication.CredentialSecretReference);
+                    writer.WriteBoolean("encrypt", database.Encrypt);
+                    writer.WriteBoolean("trustServerCertificate", database.TrustServerCertificate);
+                    writer.WriteNumber("connectTimeoutSeconds", database.ConnectTimeoutSeconds);
+                    writer.WriteNumber("commandTimeoutSeconds", database.CommandTimeoutSeconds);
+                    writer.WriteNumber("maximumBatchRows", database.MaximumBatchRows);
+                    break;
+
+                case FtpConnectionConfiguration ftp:
+                    writer.WriteString("host", ftp.Host);
+                    writer.WriteNumber("port", ftp.Port);
+                    writer.WriteString("encryptionMode", ToWireValue(ftp.EncryptionMode));
+                    writer.WriteBoolean("trustServerCertificate", ftp.TrustServerCertificate);
+                    writer.WriteString("credentialSecretReference", ftp.CredentialSecretReference);
+                    writer.WriteNumber("connectTimeoutSeconds", ftp.ConnectTimeoutSeconds);
+                    writer.WriteNumber("maximumFileBytes", ftp.MaximumFileBytes);
+                    writer.WriteNumber("maximumRows", ftp.MaximumRows);
+                    writer.WriteNumber("maximumColumns", ftp.MaximumColumns);
                     break;
 
                 case FileConnectionConfiguration file:
@@ -113,6 +152,9 @@ public sealed class ConnectionConfigurationSerializer
             return kind switch
             {
                 ConnectionKind.SqlServer => ReadSql(root),
+                ConnectionKind.MySql or ConnectionKind.PostgreSql or ConnectionKind.Oracle =>
+                    ReadRelational(kind, root),
+                ConnectionKind.Ftp => ReadFtp(root),
                 ConnectionKind.CsvFile or ConnectionKind.ExcelFile => ReadFile(kind, root),
                 _ => throw new ConnectionConfigurationException(
                     $"Connection kind '{kind}' is not supported.")
@@ -154,6 +196,41 @@ public sealed class ConnectionConfigurationSerializer
             authentication);
     }
 
+    private static RelationalDatabaseConnectionConfiguration ReadRelational(
+        ConnectionKind kind,
+        JsonElement root)
+    {
+        EnsureOnlyProperties(root, RelationalProperties);
+        return new RelationalDatabaseConnectionConfiguration(
+            kind,
+            Require(root, "host").GetString() ?? string.Empty,
+            Require(root, "port").GetInt32(),
+            Require(root, "database").GetString() ?? string.Empty,
+            Require(root, "encrypt").GetBoolean(),
+            Require(root, "trustServerCertificate").GetBoolean(),
+            Require(root, "connectTimeoutSeconds").GetInt32(),
+            Require(root, "commandTimeoutSeconds").GetInt32(),
+            Require(root, "maximumBatchRows").GetInt32(),
+            new DatabaseAuthenticationConfiguration(
+                ParseAuthenticationKind(Require(root, "authenticationKind").GetString()),
+                Require(root, "credentialSecretReference").GetString()));
+    }
+
+    private static FtpConnectionConfiguration ReadFtp(JsonElement root)
+    {
+        EnsureOnlyProperties(root, FtpProperties);
+        return new FtpConnectionConfiguration(
+            Require(root, "host").GetString() ?? string.Empty,
+            Require(root, "port").GetInt32(),
+            ParseFtpEncryptionMode(Require(root, "encryptionMode").GetString()),
+            Require(root, "trustServerCertificate").GetBoolean(),
+            Require(root, "credentialSecretReference").GetString() ?? string.Empty,
+            Require(root, "connectTimeoutSeconds").GetInt32(),
+            Require(root, "maximumFileBytes").GetInt64(),
+            Require(root, "maximumRows").GetInt32(),
+            Require(root, "maximumColumns").GetInt32());
+    }
+
     private static string ToWireValue(DatabaseAuthenticationKind kind) => kind switch
     {
         DatabaseAuthenticationKind.Integrated => "integrated",
@@ -167,6 +244,22 @@ public sealed class ConnectionConfigurationSerializer
         "userPassword" => DatabaseAuthenticationKind.UserPassword,
         _ => throw new ConnectionConfigurationException(
             "The database authentication kind is not supported.")
+    };
+
+    private static string ToWireValue(FtpEncryptionMode mode) => mode switch
+    {
+        FtpEncryptionMode.None => "none",
+        FtpEncryptionMode.Explicit => "explicit",
+        FtpEncryptionMode.Implicit => "implicit",
+        _ => throw new ArgumentOutOfRangeException(nameof(mode))
+    };
+
+    private static FtpEncryptionMode ParseFtpEncryptionMode(string? value) => value switch
+    {
+        "none" => FtpEncryptionMode.None,
+        "explicit" => FtpEncryptionMode.Explicit,
+        "implicit" => FtpEncryptionMode.Implicit,
+        _ => throw new ConnectionConfigurationException("The FTP encryption mode is not supported.")
     };
 
     private static FileConnectionConfiguration ReadFile(ConnectionKind kind, JsonElement root)

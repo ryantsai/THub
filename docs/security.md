@@ -10,7 +10,7 @@ Primary boundaries:
 2. Internal API consumer to the separate `THub.Publications` HTTPS hostname.
 3. Web, publication host, and worker to the THub control-plane database under distinct least-privilege identities.
 4. Publication host to approved read-only SQL Server result objects.
-5. Worker to source/target SQL Server instances and file locations, including approved staged editor writes.
+5. Worker to approved source/target relational databases, local file locations, and FTP/FTPS servers, including approved staged editor writes.
 6. Worker to an approved SMTP relay and, later, external webhooks or executables.
 7. Browser editor sessions to bounded staged publication data in `THub.Web`.
 
@@ -70,7 +70,7 @@ For UNC paths or Windows-integrated remote SQL connections, confirm SPNs, delega
 
 Connection configuration and workflow graphs contain a secret reference, never the secret value.
 
-Database credentials follow [ADR-0013](adr/0013-provider-neutral-database-authentication.md). Connection metadata stores an authentication kind and reference only. The initial asynchronous resolver reads the referenced username/password through `IConfiguration`, allowing environment, key-per-file, Azure Key Vault, or another approved provider to own secret storage. A deployment may replace the resolver with a Vault/OpenBao or other organization-approved adapter. Windows Credential Manager is not the default because Web, Worker, and Publications normally use separate Windows profiles.
+Connection credentials follow [ADR-0013](adr/0013-provider-neutral-database-authentication.md) and [ADR-0014](adr/0014-expand-relational-and-ftp-connectors.md). Connection metadata stores an authentication kind and reference only. The provider-neutral asynchronous resolver reads the referenced username/password through `IConfiguration`, allowing environment, key-per-file, Azure Key Vault, or another approved provider to own secret storage. Database and FTP adapters receive the credential only while opening the connection. A deployment may replace the resolver with a Vault/OpenBao or other organization-approved adapter. Windows Credential Manager is not the default because Web, Worker, and Publications normally use separate Windows profiles.
 
 Managed publication tokens are not stored as reversible secret references: THub returns the full random token once, then persists only its selector, display prefix, verifier algorithm/version, and one-way verifier. Publication SQL connections use either the host's Windows identity or a referenced database credential and never store a database password. Email profiles also store references rather than credential values. SMTP references are resolved only by the Worker immediately before a send under the Worker identity.
 
@@ -89,6 +89,19 @@ Never:
 - Apply command timeouts, cancellation, row/batch limits, and least-privilege database accounts.
 - Keep preview queries bounded.
 - Treat merge/upsert/delete/replace modes as separately authorized, auditable capabilities.
+
+Provider-specific database connectors use their own maintained provider, identifier quoting, and metadata instead of a generic string-selected provider. MySQL, PostgreSQL, and Oracle connections require referenced database credentials. TLS certificate validation may be bypassed only through an explicit administrator setting; encryption with normal certificate validation is preferred.
+
+Workflow schema mapping uses the Web identity and the selected connection's referenced credential to load column metadata only. It requires an enabled connection of the node's exact provider kind, bounds schema/object identifiers, quotes or parameterizes them through the provider adapter, and never previews row values. Grant the Web identity or referenced schema-inspection credential metadata/read permissions only where designers are allowed to inspect objects.
+
+## FTP connectors
+
+- Prefer explicit or implicit FTPS with normal certificate validation.
+- Plain FTP is an explicit compatibility mode. It provides no confidentiality or server authentication and exposes the username, password, and file contents to network observers.
+- Require absolute traversal-free remote file paths, apply configured file/time/row/column bounds, and never treat remote names as local paths.
+- Download into a unique bounded Worker temporary directory before parsing; remove temporary data on completion on a best-effort basis and monitor crash remnants.
+- Create new targets only. Do not overwrite a remote file, create arbitrary directory trees, or enable watchers without a separate policy.
+- SFTP is not FTP and is not implemented by this connector.
 
 ## Local files
 

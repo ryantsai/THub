@@ -99,11 +99,11 @@ Represents an approved connector configuration.
 | --- | --- |
 | `Id` | Connection identity |
 | `Name` | Unique display name |
-| `Kind` | SQL Server, CSV file, or Excel file |
+| `Kind` | SQL Server, MySQL, PostgreSQL, Oracle, FTP, CSV file, or Excel file |
 | `ConfigurationJson` | Non-secret, connector-versioned configuration |
 | `CreatedBy`, `CreatedAtUtc` | Audit metadata |
 
-Examples of safe configuration include database/server aliases, sheet names, delimiters, an authentication kind, and a credential secret reference. SQL connection schema v1 supports `Integrated` and `UserPassword`. Raw passwords, tokens, or embedded connection strings containing credentials are not safe configuration.
+Examples of safe configuration include database/server aliases, FTP host and transport mode, file bounds, sheet names, delimiters, an authentication kind, and a credential secret reference. SQL Server supports `Integrated` and `UserPassword`; MySQL, PostgreSQL, Oracle, and FTP use `UserPassword`. Raw passwords, tokens, or embedded connection strings containing credentials are not safe configuration.
 
 ### `quartz.QRTZ_*`
 

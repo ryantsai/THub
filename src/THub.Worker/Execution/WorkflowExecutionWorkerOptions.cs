@@ -8,7 +8,7 @@ public sealed class WorkflowExecutionWorkerOptions
     public const string SectionName = "Execution";
 
     [Range(1, 32)]
-    public int MaximumConcurrency { get; set; } = 2;
+    public int MaximumConcurrency { get; set; } = 32;
 
     [Range(100, 60_000)]
     public int PollIntervalMilliseconds { get; set; } = 1_000;

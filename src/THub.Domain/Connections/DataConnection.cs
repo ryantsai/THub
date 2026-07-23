@@ -5,6 +5,10 @@ namespace THub.Domain.Connections;
 public enum ConnectionKind
 {
     SqlServer,
+    MySql,
+    PostgreSql,
+    Oracle,
+    Ftp,
     CsvFile,
     ExcelFile
 }

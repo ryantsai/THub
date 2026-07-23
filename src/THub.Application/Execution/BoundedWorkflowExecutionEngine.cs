@@ -27,6 +27,7 @@ public sealed class BoundedWorkflowExecutionEngine
     private readonly WorkflowGraphSerializer _graphSerializer;
     private readonly INodeExecutionTimeoutProvider _timeoutProvider;
     private readonly WorkflowExecutionTimeoutOptions _timeoutOptions;
+    private readonly IWorkflowVariableResolver _variableResolver;
 
     public BoundedWorkflowExecutionEngine(
         WorkflowExecutionPlanner planner,
@@ -41,7 +42,8 @@ public sealed class BoundedWorkflowExecutionEngine
         TimeProvider? timeProvider = null,
         WorkflowGraphSerializer? graphSerializer = null,
         INodeExecutionTimeoutProvider? timeoutProvider = null,
-        WorkflowExecutionTimeoutOptions? timeoutOptions = null)
+        WorkflowExecutionTimeoutOptions? timeoutOptions = null,
+        IWorkflowVariableResolver? variableResolver = null)
     {
         _planner = planner ?? throw new ArgumentNullException(nameof(planner));
         _executors = executors ?? throw new ArgumentNullException(nameof(executors));
@@ -57,6 +59,8 @@ public sealed class BoundedWorkflowExecutionEngine
         _graphSerializer = graphSerializer ?? new WorkflowGraphSerializer();
         _timeoutOptions = timeoutOptions ?? new WorkflowExecutionTimeoutOptions();
         _timeoutProvider = timeoutProvider ?? new DefaultNodeExecutionTimeoutProvider(_timeoutOptions);
+        _variableResolver = variableResolver
+            ?? new WorkflowVariableResolver(new UnavailableWorkflowDatabaseVariableProvider());
     }
 
     public ValueTask<WorkflowExecutionResult> ExecuteSerializedAsync(
@@ -196,6 +200,7 @@ public sealed class BoundedWorkflowExecutionEngine
         using var runDeadline = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         runDeadline.CancelAfter(_timeoutOptions.MaximumRunDuration);
         var executionToken = runDeadline.Token;
+        var runStartedAtUtc = GetUtcNow();
 
         try
         {
@@ -203,7 +208,12 @@ public sealed class BoundedWorkflowExecutionEngine
                 new WorkflowExecutionEvent(
                     workflowRunId,
                     WorkflowExecutionEventKind.ExecutionStarted,
-                    GetUtcNow()),
+                    runStartedAtUtc),
+                executionToken).ConfigureAwait(false);
+            var variables = await _variableResolver.ResolveAsync(
+                workflowRunId,
+                runStartedAtUtc,
+                graph,
                 executionToken).ConfigureAwait(false);
 
             foreach (var layer in plan.Layers)
@@ -268,6 +278,8 @@ public sealed class BoundedWorkflowExecutionEngine
                         executor,
                         inputs,
                         resourceBudget,
+                        variables,
+                        graph.Functions,
                         executionToken,
                         cancellationToken,
                         () => runDeadline.IsCancellationRequested
@@ -447,6 +459,8 @@ public sealed class BoundedWorkflowExecutionEngine
         IWorkflowNodeExecutor executor,
         IReadOnlyList<WorkflowNodeInput> inputs,
         WorkflowResourceBudget resourceBudget,
+        IReadOnlyDictionary<string, TabularValue> variables,
+        IReadOnlyList<WorkflowFunction> functions,
         CancellationToken executionToken,
         CancellationToken callerCancellationToken,
         Func<bool> runTimeoutObserved)
@@ -494,7 +508,9 @@ public sealed class BoundedWorkflowExecutionEngine
                     attempt,
                     contextInputs,
                     _limits,
-                    reporter);
+                    reporter,
+                    variables,
+                    functions);
                 var result = await executor.ExecuteAsync(context, attemptToken)
                     .AsTask()
                     .WaitAsync(attemptToken)
@@ -850,11 +866,17 @@ public sealed class BoundedWorkflowExecutionEngine
 
     private static bool MatchesExpectedRole(WorkflowNodeKind kind, WorkflowNodeRole role) => kind switch
     {
-        WorkflowNodeKind.SqlSource or WorkflowNodeKind.CsvSource or WorkflowNodeKind.ExcelSource =>
+        WorkflowNodeKind.SqlSource or WorkflowNodeKind.MySqlSource
+            or WorkflowNodeKind.PostgreSqlSource or WorkflowNodeKind.OracleSource
+            or WorkflowNodeKind.FtpSource or WorkflowNodeKind.CsvSource
+            or WorkflowNodeKind.ExcelSource =>
             role == WorkflowNodeRole.Source,
         WorkflowNodeKind.SelectColumns or WorkflowNodeKind.FilterRows or WorkflowNodeKind.Join =>
             role == WorkflowNodeRole.Transform,
-        WorkflowNodeKind.SqlTarget or WorkflowNodeKind.CsvTarget or WorkflowNodeKind.ExcelTarget =>
+        WorkflowNodeKind.SqlTarget or WorkflowNodeKind.MySqlTarget
+            or WorkflowNodeKind.PostgreSqlTarget or WorkflowNodeKind.OracleTarget
+            or WorkflowNodeKind.FtpTarget or WorkflowNodeKind.CsvTarget
+            or WorkflowNodeKind.ExcelTarget =>
             role == WorkflowNodeRole.Target,
         WorkflowNodeKind.EmailAlert => role == WorkflowNodeRole.Action,
         _ => false
