@@ -1,3 +1,4 @@
+using THub.Application.Actions;
 using THub.Application.Execution;
 using THub.Application.Scheduling;
 using THub.Domain.Workflows;
@@ -12,6 +13,7 @@ public sealed class WorkflowCatalogService
     private readonly IWorkflowManagementRepository _repository;
     private readonly WorkflowInputValidator _inputValidator;
     private readonly TimeProvider _timeProvider;
+    private readonly TrustedActionWorkflowAuthorization? _trustedActionAuthorization;
 
     public WorkflowCatalogService(
         IWorkflowManagementRepository repository,
@@ -19,7 +21,8 @@ public sealed class WorkflowCatalogService
         WorkflowGraphValidator graphValidator,
         ScheduleCalculator scheduleCalculator,
         TimeProvider timeProvider,
-        WorkflowNodeSettingsValidator? nodeSettingsValidator = null)
+        WorkflowNodeSettingsValidator? nodeSettingsValidator = null,
+        TrustedActionWorkflowAuthorization? trustedActionAuthorization = null)
     {
         ArgumentNullException.ThrowIfNull(repository);
         ArgumentNullException.ThrowIfNull(graphSerializer);
@@ -34,6 +37,7 @@ public sealed class WorkflowCatalogService
             scheduleCalculator,
             nodeSettingsValidator);
         _timeProvider = timeProvider;
+        _trustedActionAuthorization = trustedActionAuthorization;
     }
 
     public async Task<WorkflowOperationResult<WorkflowListPageDto>> ListAsync(
@@ -315,6 +319,24 @@ public sealed class WorkflowCatalogService
             return WorkflowOperationResult<PublishedWorkflowDto>.Failure(
                 WorkflowOperationStatus.ValidationFailed,
                 graph.Issues);
+        }
+
+        if (_trustedActionAuthorization is not null)
+        {
+            var actionIssues = await _trustedActionAuthorization.ValidatePublishAsync(
+                graph.Graph!,
+                command.AuthorizedRoleIds ?? new HashSet<Guid>(),
+                cancellationToken).ConfigureAwait(false);
+            if (actionIssues.Count > 0)
+            {
+                return WorkflowOperationResult<PublishedWorkflowDto>.Failure(
+                    WorkflowOperationStatus.ValidationFailed,
+                    actionIssues.Select(issue => new WorkflowIssue(
+                        issue.Code,
+                        issue.Message,
+                        "workflow.graphJson",
+                        issue.NodeId)).ToArray());
+            }
         }
 
         var now = _timeProvider.GetUtcNow();

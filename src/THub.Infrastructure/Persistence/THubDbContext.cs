@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using THub.Domain.Actions;
 using THub.Domain.Alerts;
 using THub.Domain.Connections;
 using THub.Domain.Publications;
@@ -32,6 +33,7 @@ public sealed class THubDbContext(DbContextOptions<THubDbContext> options) : DbC
     public DbSet<AccessRolePermission> AccessRolePermissions => Set<AccessRolePermission>();
     public DbSet<AccessRoleAssignment> AccessRoleAssignments => Set<AccessRoleAssignment>();
     public DbSet<AccessResourceGrant> AccessResourceGrants => Set<AccessResourceGrant>();
+    public DbSet<TrustedAction> TrustedActions => Set<TrustedAction>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

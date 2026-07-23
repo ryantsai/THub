@@ -99,6 +99,19 @@ public sealed class SqlAccessControlStore(
             return AccessRoleWriteStatus.NotFound;
         }
 
+        var trustedActionIds = resourceGrants
+            .Where(grant => grant.ResourceKind == AccessResourceKind.TrustedAction)
+            .Select(grant => grant.ResourceId)
+            .Distinct()
+            .ToArray();
+        var existingTrustedActionCount = await db.TrustedActions
+            .CountAsync(action => trustedActionIds.Contains(action.Id), cancellationToken)
+            .ConfigureAwait(false);
+        if (existingTrustedActionCount != trustedActionIds.Length)
+        {
+            return AccessRoleWriteStatus.NotFound;
+        }
+
         var existing = await db.AccessRoles
             .SingleOrDefaultAsync(item => item.Id == role.Id, cancellationToken)
             .ConfigureAwait(false);

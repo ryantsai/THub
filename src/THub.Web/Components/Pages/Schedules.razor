@@ -161,11 +161,15 @@
         try
         {
             var state = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+            var roleIds = await AccessControl.ResolveRoleIdsAsync(
+                state.User,
+                cancellation.Token);
             var result = await WorkflowCatalog.PublishAsync(
                 new PublishWorkflowCommand(
                     workflow.Id,
                     workflow.DraftRevision,
-                    state.User.Identity?.Name ?? "unknown"),
+                    state.User.Identity?.Name ?? "unknown",
+                    roleIds),
                 cancellation.Token);
             Notify(result.IsSuccess, result.Issues.FirstOrDefault()?.Message ?? "The schedule was resumed.");
             await LoadAsync();

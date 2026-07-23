@@ -162,6 +162,20 @@ invalid key lengths, and authentication failures fail closed. Existing installat
 must re-enter each externally provisioned credential in the connection editor after
 applying the migration.
 
+Trusted webhook authentication and executable run-as accounts use the same encrypted
+credential table and `CredentialEncryption` key ring. The Web needs the current key to
+create or replace these credentials; the Worker needs every referenced key version to
+invoke them. For executable impersonation, provision the target Windows account's
+required local logon right and only the filesystem/network ACLs needed by that trusted
+definition. Keep the Worker non-interactive. THub clears the inherited child environment,
+does not invoke a shell, and never passes the credential through arguments or environment
+variables.
+
+After creating a definition under `/trusted-actions`, assign `trusted-action.use` on its
+resource ID to the intended custom role under `/settings`. System Administrator has
+implicit access to every trusted action. Disabling a trusted action blocks new Worker
+invocations, including invocations from already-published workflow versions.
+
 To rotate, add a new `CredentialEncryption__Keys__<version>` value to every authorized
 host while retaining old versions, change `CurrentKeyVersion`, and restart the hosts.
 New or replaced credentials use the current version. Replace every stored credential

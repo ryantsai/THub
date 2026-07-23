@@ -12,7 +12,7 @@ The workflow connector boundary is:
 - local or service-accessible `.xlsx`/`.xlsm` workbooks;
 - FTP or FTPS CSV, tab-delimited, and modern Excel files.
 
-Webhook calls and external executables remain gated. Durable Email profiles, workflow-event rules, canvas actions, SQL outbox persistence, leased dispatch, MailKit SMTP delivery, and the management UI implement [ADR-0012](adr/0012-durable-email-alert-delivery.md). The initial internal, single-host publication and staged-editor slice implements [ADR-0011](adr/0011-isolated-governed-data-publications.md): it includes durable publication metadata, a separate managed-bearer REST host, bounded SQL reads, role-granted Spreadsheet editing, and worker-applied approved change sets. Immutable versioning and leased workflow execution implement [ADR-0010](adr/0010-durable-leased-workflow-execution.md), with the current node/runtime limits described below.
+Webhook calls and external executables run only through SQL-backed, role-granted trusted actions under [ADR-0020](adr/0020-sql-backed-trusted-workflow-actions.md). Durable Email profiles, workflow-event rules, canvas actions, SQL outbox persistence, leased dispatch, MailKit SMTP delivery, and the management UI implement [ADR-0012](adr/0012-durable-email-alert-delivery.md). The initial internal, single-host publication and staged-editor slice implements [ADR-0011](adr/0011-isolated-governed-data-publications.md): it includes durable publication metadata, a separate managed-bearer REST host, bounded SQL reads, role-granted Spreadsheet editing, and worker-applied approved change sets. Immutable versioning and leased workflow execution implement [ADR-0010](adr/0010-durable-leased-workflow-execution.md), with the current node/runtime limits described below.
 
 ## 2. Current, foundation, and target state
 
@@ -51,7 +51,7 @@ flowchart LR
     Worker -->|bounded reads/inserts and approved editor changes| SourceSql[(SQL Server / MySQL / PostgreSQL / Oracle)]
     Worker -->|read/write approved paths| Files[Local or FTP/FTPS delimited / XLSX files]
     Worker -->|durable SMTP outbox| Relay[Approved SMTP relay]
-    Worker -. future, allow-listed .-> External[Webhooks / executables]
+    Worker -->|trusted action policy| External[Approved webhooks / executables]
 ```
 
 ### THub.Web
@@ -208,7 +208,8 @@ Implemented v1 node behavior:
 - **FTP/FTPS source/target:** transfers only an absolute traversal-free remote path after applying connection file/time bounds, then reuses the bounded delimited/Excel parser or writer in a unique Worker temporary directory. Targets are create-new without overwrite. Plain FTP is an explicit unencrypted compatibility mode; FTPS is preferred. SFTP and remote watchers are not implemented.
 - **Transforms:** select projects configured columns; filter applies up to 32 typed scalar predicates; inner/left join binds exactly two named incoming nodes and bounds the buffered right side.
 - **Email action:** enqueues durable delivery intent through the governed Email profile/outbox boundary; recovered graph attempts reuse its stable run/node deduplication identity.
-- **Webhook/executable:** draft concepts exist, but publication validation and execution preflight reject them until ADR-0008 policies and executors exist.
+- **Webhook:** sends one bounded workflow-authored non-secret body to an exact administrator-owned destination through a redirect-free, DNS/IP-validated HTTP client. Fixed headers, authentication reference, private-network decision, timeout, and request/response limits belong to the trusted action.
+- **Executable:** starts one administrator-owned canonical local path with fixed `ArgumentList` templates and environment. It may run as the Worker or an encrypted referenced Windows account; timeout, cancellation, combined output limit, reparse-point checks, and process-tree termination are enforced. THub is not an operating-system sandbox.
 - **REST/editor publication nodes:** intentionally rejected as workflow operations; their implemented lifecycle is the separately governed Publications surface.
 
 Nodes execute in deterministic topological order. A failed/cancelled dependency causes downstream nodes to be durably skipped. `Execution:MaximumConcurrency` bounds concurrently claimed runs, not parallel nodes inside one run.

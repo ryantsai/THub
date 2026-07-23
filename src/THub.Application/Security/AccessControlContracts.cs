@@ -16,6 +16,7 @@ public static class SecurityPermissions
     public const string ScheduleManage = "schedule.manage";
     public const string ConnectionView = "connection.view";
     public const string ConnectionManage = "connection.manage";
+    public const string TrustedActionUse = "trusted-action.use";
     public const string PublicationView = "publication.view";
     public const string PublicationManage = "publication.manage";
     public const string PublicationInsert = "publication.insert";
@@ -39,6 +40,7 @@ public static class SecurityPermissions
         ScheduleManage,
         ConnectionView,
         ConnectionManage,
+        TrustedActionUse,
         PublicationView,
         PublicationManage,
         PublicationInsert,
@@ -86,6 +88,10 @@ public static class SecurityPermissions
             [
                 ConnectionView,
                 ConnectionManage,
+            ], StringComparer.Ordinal),
+            [AccessResourceKind.TrustedAction] = new HashSet<string>(
+            [
+                TrustedActionUse,
             ], StringComparer.Ordinal),
         };
 

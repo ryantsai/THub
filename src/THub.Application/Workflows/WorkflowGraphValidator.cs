@@ -334,14 +334,6 @@ public sealed class WorkflowGraphValidator
         WorkflowNode node,
         ICollection<GraphValidationIssue> issues)
     {
-        if (node.Kind is WorkflowNodeKind.Webhook or WorkflowNodeKind.Executable)
-        {
-            issues.Add(new(
-                "node.kind.disabled",
-                $"{node.Kind} execution is disabled until an administrator policy authorizes it.",
-                node.Id));
-        }
-
         if (node.Kind is WorkflowNodeKind.PublishRestApi or WorkflowNodeKind.PublishDataEditor)
         {
             issues.Add(new(

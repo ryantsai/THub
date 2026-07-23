@@ -120,7 +120,8 @@ public sealed record SaveWorkflowCommand(
 public sealed record PublishWorkflowCommand(
     Guid WorkflowId,
     int ExpectedDraftRevision,
-    string PublishedBy);
+    string PublishedBy,
+    IReadOnlySet<Guid>? AuthorizedRoleIds = null);
 
 public sealed record PauseWorkflowCommand(
     Guid WorkflowId,

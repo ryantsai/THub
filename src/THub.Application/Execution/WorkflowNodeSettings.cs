@@ -118,6 +118,13 @@ public sealed record EmailAlertNodeSettings(
     string Body,
     int MaximumAttempts) : WorkflowNodeSettings;
 
+public sealed record WebhookNodeSettings(
+    Guid TrustedActionId,
+    string Body) : WorkflowNodeSettings;
+
+public sealed record ExecutableNodeSettings(
+    Guid TrustedActionId) : WorkflowNodeSettings;
+
 public sealed class WorkflowNodeSettingsException : Exception
 {
     public WorkflowNodeSettingsException(string code, string message)
@@ -171,6 +178,10 @@ public sealed class WorkflowNodeSettingsValidator
         ["connectionId", "remotePath", "format", "includeHeader", "delimiter", "worksheet", "mode"];
     private static readonly HashSet<string> EmailProperties =
         ["profileId", "recipients", "subject", "body", "maximumAttempts"];
+    private static readonly HashSet<string> WebhookProperties =
+        ["trustedActionId", "body"];
+    private static readonly HashSet<string> ExecutableProperties =
+        ["trustedActionId"];
     private static readonly HashSet<string> ColumnProperties = ["name", "type", "nullable"];
     private static readonly HashSet<string> FilterOperators = new(
         ["equals", "notEquals", "greaterThan", "greaterThanOrEqual", "lessThan", "lessThanOrEqual", "contains", "startsWith", "endsWith", "isNull", "isNotNull"],
@@ -307,8 +318,8 @@ public sealed class WorkflowNodeSettingsValidator
                 WorkflowNodeKind.CsvTarget => ReadCsvTarget(root),
                 WorkflowNodeKind.ExcelTarget => ReadExcelTarget(root),
                 WorkflowNodeKind.EmailAlert => ReadEmail(root),
-                WorkflowNodeKind.Webhook or WorkflowNodeKind.Executable =>
-                    throw Invalid("node.kind.disabled", $"{node.Kind} execution is disabled by policy."),
+                WorkflowNodeKind.Webhook => ReadWebhook(root),
+                WorkflowNodeKind.Executable => ReadExecutable(root),
                 WorkflowNodeKind.PublishRestApi or WorkflowNodeKind.PublishDataEditor =>
                     throw Invalid(
                         "node.publication.separate",
@@ -642,6 +653,20 @@ public sealed class WorkflowNodeSettingsValidator
             ReadText(root, "subject", 500),
             ReadMultilineText(root, "body", 100_000),
             ReadOptionalInt(root, "maximumAttempts", 1, 20) ?? 5);
+    }
+
+    private static WebhookNodeSettings ReadWebhook(JsonElement root)
+    {
+        EnsureOnly(root, WebhookProperties);
+        return new(
+            ReadGuid(root, "trustedActionId"),
+            ReadMultilineText(root, "body", 1_048_576));
+    }
+
+    private static ExecutableNodeSettings ReadExecutable(JsonElement root)
+    {
+        EnsureOnly(root, ExecutableProperties);
+        return new(ReadGuid(root, "trustedActionId"));
     }
 
     private static IReadOnlyList<DelimitedColumnSettings>? ReadOptionalColumns(JsonElement root)

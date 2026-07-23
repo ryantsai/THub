@@ -29,6 +29,8 @@ public sealed class WorkflowNodeSettingsValidatorTests
     [InlineData(WorkflowNodeKind.CsvTarget, """{"connectionId":"11111111-1111-1111-1111-111111111111","relativePath":"outbound/orders.csv","includeHeader":true}""")]
     [InlineData(WorkflowNodeKind.ExcelTarget, """{"connectionId":"11111111-1111-1111-1111-111111111111","relativePath":"outbound/orders.xlsx","worksheet":"Orders"}""")]
     [InlineData(WorkflowNodeKind.EmailAlert, """{"profileId":"11111111-1111-1111-1111-111111111111","recipients":["ops@example.test"],"subject":"Run {{run.id}}","body":"Done"}""")]
+    [InlineData(WorkflowNodeKind.Webhook, """{"trustedActionId":"11111111-1111-1111-1111-111111111111","body":"{}"}""")]
+    [InlineData(WorkflowNodeKind.Executable, """{"trustedActionId":"11111111-1111-1111-1111-111111111111"}""")]
     public void ParseAcceptsStrictOperationalContract(WorkflowNodeKind kind, string settingsJson)
     {
         var parsed = _validator.Parse(new WorkflowNode("node", kind, "Node", 0, 0, settingsJson));

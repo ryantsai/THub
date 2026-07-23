@@ -161,26 +161,24 @@ Workflow schema mapping uses the Web identity and the selected connection's refe
 
 ## Webhooks
 
-- Use `IHttpClientFactory` with explicit timeouts and bounded request/response sizes.
-- Allow only approved schemes and destinations; defend against SSRF, redirects to private endpoints, and DNS rebinding as appropriate to the environment.
-- Resolve authentication headers from secret references.
-- Redact sensitive headers and bodies from logs.
-- Define retry/idempotency behavior per webhook node.
+- System Administrators define exact SQL-backed trusted destinations; workflow authors select only definitions granted to their roles.
+- `IHttpClientFactory` uses explicit timeouts, bounded request/response sizes, disabled redirects, and a connection callback that validates and connects to the resolved IP.
+- Loopback, link-local, multicast, and unspecified addresses are always denied. RFC1918/unique-local addresses require the administrator's explicit private-address decision.
+- Basic or bearer authentication resolves an AES-GCM encrypted credential reference. Workflow JSON cannot set Authorization or destination headers.
+- Sensitive headers, bodies, resolved addresses, and credentials are not logged. Webhooks are external side effects and receive no automatic node retry.
 
 ## External executables
 
-Executable nodes are a privileged feature and must remain disabled until policy is implemented.
+Executable nodes resolve one enabled SQL-backed trusted action. System Administrators own the canonical local executable path, working directory, fixed argument templates, fixed environment, timeout, profile setting, combined stdout/stderr limit, and optional encrypted Windows run-as credential. Custom roles receive `trusted-action.use` on individual definitions.
 
-Required controls:
-
-- Administrator-owned allow-list of canonical executable paths.
-- Fixed argument templates with typed placeholders; never a shell command string.
-- Controlled working directories and environment variables.
-- Restricted Windows service account and filesystem ACLs.
-- Time, CPU/memory where enforceable, stdout/stderr, and output-file limits.
-- Process-tree termination on cancellation/timeout.
-- No interactive desktop and no arbitrary PowerShell/cmd invocation by workflow authors.
-- Audit records for definition, approval, and every invocation.
+- Workflow JSON contains only the trusted-action ID; authors cannot supply paths, accounts, environment values, or arguments.
+- Arguments use `ProcessStartInfo.ArgumentList` and only typed run/node/attempt/input-count placeholders. THub never composes a shell command.
+- `cmd`, PowerShell, script hosts, indirect binary launchers, UNC/device paths, and executable/working-directory reparse points are rejected.
+- The child receives a cleared environment plus the administrator's fixed entries and `SystemRoot`; Worker master keys and other host environment secrets are not inherited.
+- Optional `DOMAIN\user`/UPN credentials use AES-GCM ciphertext in SQL and the external key ring. Passwords are replacement-only and are never logged or returned to the browser.
+- Cancellation, timeout, and output-limit failure terminate the process tree. Nonzero exit codes fail the node without automatic retry.
+- The Worker or run-as account still requires least-privilege Windows logon rights and filesystem/network ACLs. THub does not enforce a CPU/memory job-object sandbox or contain arbitrary output files.
+- Definition creator/updater metadata and invocation logs provide the current bounded audit surface; retained security-event history remains open under PD-009.
 
 ## REST publications
 

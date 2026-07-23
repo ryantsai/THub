@@ -1,16 +1,18 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using THub.Application.Actions;
 using THub.Application.Alerts;
 using THub.Application.Connections;
 using THub.Application.Execution;
+using THub.Application.Publications;
 using THub.Application.Scheduling;
 using THub.Application.Security;
-using THub.Application.Publications;
-using THub.Application.Workflows.Management;
 using THub.Application.Workflows;
-using THub.Infrastructure.Connections;
+using THub.Application.Workflows.Management;
+using THub.Infrastructure.Actions;
 using THub.Infrastructure.Alerts;
+using THub.Infrastructure.Connections;
 using THub.Infrastructure.Execution;
 using THub.Infrastructure.Files;
 using THub.Infrastructure.Persistence;
@@ -50,6 +52,7 @@ public static class DependencyInjection
         services.AddScoped<IPublicationSourceDataReader, SqlPublicationSourceDataReader>();
         services.AddScoped<IPublicationSourceSchemaInspector, SqlPublicationSourceSchemaInspector>();
         services.AddScoped<IAccessControlStore, SqlAccessControlStore>();
+        services.AddSingleton<ITrustedActionStore, SqlTrustedActionStore>();
         return services;
     }
 
@@ -73,6 +76,8 @@ public static class DependencyInjection
         services.AddSingleton<IWorkflowTerminalAlertStore, SqlWorkflowTerminalAlertStore>();
         ConfigureSmtpDelivery(services, configuration);
         services.AddSingleton<ExecutionConnectionResolver>();
+        services.AddSingleton<ITrustedActionStore, SqlTrustedActionStore>();
+        services.AddSingleton<TrustedActionExecutionResolver>();
         services.AddSingleton<IWorkflowDatabaseVariableProvider, InfrastructureWorkflowDatabaseVariableProvider>();
         services.AddSingleton<IWorkflowExpressionSessionFactory, JintWorkflowExpressionSessionFactory>();
         services.AddScoped<IWorkflowNodeExecutor, SqlSourceNodeExecutor>();
@@ -93,6 +98,18 @@ public static class DependencyInjection
         services.AddScoped<IWorkflowNodeExecutor, CsvTargetNodeExecutor>();
         services.AddScoped<IWorkflowNodeExecutor, ExcelTargetNodeExecutor>();
         services.AddScoped<IWorkflowNodeExecutor, EmailAlertNodeExecutor>();
+        services.AddHttpClient(WebhookNodeExecutor.ClientName)
+            .ConfigureHttpClient(client => client.Timeout = Timeout.InfiniteTimeSpan)
+            .ConfigurePrimaryHttpMessageHandler(() => new SocketsHttpHandler
+            {
+                AllowAutoRedirect = false,
+                AutomaticDecompression = System.Net.DecompressionMethods.None,
+                ConnectCallback = WebhookNetworkGuard.ConnectAsync,
+                UseCookies = false,
+                UseProxy = false,
+            });
+        services.AddScoped<IWorkflowNodeExecutor, WebhookNodeExecutor>();
+        services.AddScoped<IWorkflowNodeExecutor, ExecutableNodeExecutor>();
         services.AddScoped<IPublicationChangeSetClaimStore, SqlPublicationChangeSetClaimStore>();
         services.AddScoped<IPublicationChangeSetProcessor, SqlPublicationChangeSetProcessor>();
         services.AddScoped<IPublicationSourceSchemaInspector, SqlPublicationSourceSchemaInspector>();

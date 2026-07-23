@@ -5,15 +5,18 @@
 @using System.Text.Json
 @using System.Text.Json.Nodes
 @using THub.Application.Alerts
+@using THub.Application.Actions
 @using THub.Application.Connections
 @using THub.Application.Execution
 @using THub.Application.Workflows
 @using THub.Application.Workflows.Management
 @using THub.Domain.Connections
+@using THub.Domain.Actions
 @using THub.Domain.Security
 @using THub.Domain.Workflows
 @inject ConnectionManagementService ConnectionService
 @inject EmailAlertAdministrationService EmailAdministration
+@inject TrustedActionAdministrationService TrustedActionAdministration
 @inject WorkflowGraphValidator GraphValidator
 @inject WorkflowNodeSettingsValidator NodeSettingsValidator
 @inject WorkflowGraphSerializer GraphSerializer
@@ -256,6 +259,21 @@ else
                             </select>
                         </label>
                     }
+                    @if (SelectedNode.Kind is WorkflowNodeKind.Webhook or WorkflowNodeKind.Executable)
+                    {
+                        var trustedKind = SelectedNode.Kind == WorkflowNodeKind.Webhook
+                            ? TrustedActionKind.Webhook
+                            : TrustedActionKind.Executable;
+                        <label>Trusted action
+                            <select value="@(GetSettingString(SelectedNode, "trustedActionId"))" @onchange="SetSelectedTrustedAction">
+                                <option value="">Select an authorized action…</option>
+                                @foreach (var action in TrustedActions.Where(action => action.Kind == trustedKind && action.IsEnabled))
+                                {
+                                    <option value="@action.Id.ToString("D")">@action.Name</option>
+                                }
+                            </select>
+                        </label>
+                    }
                     @if (SelectedNode.Kind == WorkflowNodeKind.Join)
                     {
                         <div class="join-input-summary"><span>Left input</span><code>@(GetSettingString(SelectedNode, "leftNodeId") ?? "Not connected")</code><span>Right input</span><code>@(GetSettingString(SelectedNode, "rightNodeId") ?? "Not connected")</code></div>
@@ -471,6 +489,8 @@ else
     private IReadOnlyList<GraphValidationIssue> ValidationIssues { get; set; } = [];
     private IReadOnlyList<ConnectionSummary> Connections { get; set; } = [];
     private IReadOnlyList<EmailDeliveryProfileDto> EmailProfiles { get; set; } = [];
+    private IReadOnlyList<TrustedActionSummary> TrustedActions { get; set; } = [];
+    private IReadOnlySet<Guid> CurrentRoleIds { get; set; } = new HashSet<Guid>();
     private string? DependencyWarning { get; set; }
     private bool SchemaBusy { get; set; }
     private string? SchemaError { get; set; }
@@ -495,7 +515,7 @@ else
         ? []
         : Edges.Where(edge => edge.To == SelectedNode.Id).ToArray();
 
-    private static readonly PaletteGroup[] Groups =
+    private PaletteGroup[] Groups =>
     [
         new("Sources", [
             new("SQL Server", "Read an approved table", WorkflowNodeKind.SqlSource, "database", "blue", true),
@@ -519,8 +539,8 @@ else
             new("Excel target", "Write an XLSX workbook", WorkflowNodeKind.ExcelTarget, "grid_on", "green", true)]),
         new("Actions", [
             new("Email alert", "Queue a durable Email message", WorkflowNodeKind.EmailAlert, "mail", "rose", true),
-            new("Webhook", "Disabled until allow-list policy exists", WorkflowNodeKind.Webhook, "webhook", "rose", false),
-            new("Executable", "Disabled until sandbox policy exists", WorkflowNodeKind.Executable, "terminal", "slate", false)])
+            new("Webhook", "Call an authorized trusted destination", WorkflowNodeKind.Webhook, "webhook", "rose", TrustedActions.Any(action => action.Kind == TrustedActionKind.Webhook)),
+            new("Executable", "Run an authorized trusted executable", WorkflowNodeKind.Executable, "terminal", "slate", TrustedActions.Any(action => action.Kind == TrustedActionKind.Executable))])
     ];
 
     private IEnumerable<PaletteGroup> FilteredGroups => string.IsNullOrWhiteSpace(Search)
@@ -534,6 +554,9 @@ else
         var authentication = await AuthenticationStateProvider.GetAuthenticationStateAsync();
         CurrentUser = authentication.User;
         Owner = authentication.User.Identity?.Name ?? "unknown";
+        CurrentRoleIds = await AccessControl.ResolveRoleIdsAsync(
+            authentication.User,
+            cancellation.Token);
         if (WorkflowId is null)
         {
             CanEdit = await AccessControl.HasPermissionAsync(
@@ -591,7 +614,10 @@ else
         {
             var connectionsTask = ConnectionService.ListAsync(cancellation.Token);
             var profilesTask = EmailAdministration.ListProfilesAsync(cancellation.Token);
-            await Task.WhenAll(connectionsTask, profilesTask);
+            var trustedActionsTask = TrustedActionAdministration.ListAvailableAsync(
+                CurrentRoleIds,
+                cancellation.Token);
+            await Task.WhenAll(connectionsTask, profilesTask, trustedActionsTask);
             var connections = await connectionsTask;
             var visibleConnections = new List<ConnectionSummary>(connections.Count);
             foreach (var connection in connections)
@@ -617,6 +643,7 @@ else
             {
                 DependencyWarning = "Email profiles could not be listed.";
             }
+            TrustedActions = await trustedActionsTask;
         }
         catch (Exception) when (!cancellation.IsCancellationRequested)
         {
@@ -1532,6 +1559,14 @@ else
         }
     }
 
+    private void SetSelectedTrustedAction(ChangeEventArgs eventArgs)
+    {
+        if (SelectedNode is not null)
+        {
+            SetSettingString(SelectedNode, "trustedActionId", eventArgs.Value?.ToString());
+        }
+    }
+
     private static ConnectionKind? ExpectedConnectionKind(WorkflowNodeKind kind) => kind switch
     {
         WorkflowNodeKind.SqlSource or WorkflowNodeKind.SqlTarget => ConnectionKind.SqlServer,
@@ -1680,7 +1715,11 @@ else
         try
         {
             var result = await WorkflowCatalog.PublishAsync(
-                new PublishWorkflowCommand(WorkflowId.Value, DraftRevision, Owner),
+                new PublishWorkflowCommand(
+                    WorkflowId.Value,
+                    DraftRevision,
+                    Owner,
+                    CurrentRoleIds),
                 cancellation.Token);
             if (!result.IsSuccess)
             {
@@ -1816,7 +1855,7 @@ else
         ConnectionKind.SqlServer or ConnectionKind.MySql
             or ConnectionKind.PostgreSql or ConnectionKind.Oracle;
 
-    private static string DefaultSettings(WorkflowNodeKind kind) => kind switch
+    private string DefaultSettings(WorkflowNodeKind kind) => kind switch
     {
         WorkflowNodeKind.SqlSource => "{\"connectionId\":\"\",\"schema\":\"dbo\",\"object\":\"\",\"batchSize\":1000}",
         WorkflowNodeKind.MySqlSource => "{\"connectionId\":\"\",\"schema\":\"warehouse\",\"object\":\"\",\"batchSize\":1000}",
@@ -1836,6 +1875,15 @@ else
         WorkflowNodeKind.CsvTarget => "{\"connectionId\":\"\",\"relativePath\":\"outbound/result.csv\",\"mode\":\"createNew\",\"includeHeader\":true}",
         WorkflowNodeKind.ExcelTarget => "{\"connectionId\":\"\",\"relativePath\":\"outbound/result.xlsx\",\"worksheet\":\"Results\",\"mode\":\"createNew\"}",
         WorkflowNodeKind.EmailAlert => "{\"profileId\":\"\",\"recipients\":[],\"subject\":\"THub workflow notification\",\"body\":\"The workflow reached this Email action.\",\"maximumAttempts\":5}",
+        WorkflowNodeKind.Webhook => JsonSerializer.Serialize(new
+        {
+            trustedActionId = TrustedActions.FirstOrDefault(action => action.Kind == TrustedActionKind.Webhook)?.Id.ToString("D") ?? string.Empty,
+            body = "{}",
+        }),
+        WorkflowNodeKind.Executable => JsonSerializer.Serialize(new
+        {
+            trustedActionId = TrustedActions.FirstOrDefault(action => action.Kind == TrustedActionKind.Executable)?.Id.ToString("D") ?? string.Empty,
+        }),
         _ => "{}"
     };
 
@@ -1859,7 +1907,9 @@ else
         WorkflowNodeKind.CsvTarget => "CSV file output",
         WorkflowNodeKind.ExcelTarget => "Excel output",
         WorkflowNodeKind.EmailAlert => "Durable Email outbox",
-        _ => "Disabled by policy"
+        WorkflowNodeKind.Webhook => "Trusted webhook",
+        WorkflowNodeKind.Executable => "Trusted executable",
+        _ => "Unavailable"
     };
 
     private static string IconFor(WorkflowNodeKind kind) => kind switch

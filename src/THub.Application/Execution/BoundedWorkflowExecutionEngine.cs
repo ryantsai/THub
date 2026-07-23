@@ -8,8 +8,6 @@ public sealed class BoundedWorkflowExecutionEngine
 {
     private static readonly HashSet<WorkflowNodeKind> GatedNodeKinds =
     [
-        WorkflowNodeKind.Webhook,
-        WorkflowNodeKind.Executable,
         WorkflowNodeKind.PublishRestApi,
         WorkflowNodeKind.PublishDataEditor
     ];

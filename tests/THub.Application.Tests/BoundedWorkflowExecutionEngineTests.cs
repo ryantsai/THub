@@ -280,7 +280,7 @@ public sealed class BoundedWorkflowExecutionEngineTests
     }
 
     [Fact]
-    public async Task GatedNodeKindsFailValidationBeforeAnyExecutorRuns()
+    public async Task MissingTrustedActionExecutorFailsBeforeAnyNodeRuns()
     {
         var sourceCalls = 0;
         var graph = new WorkflowGraph(
@@ -302,7 +302,7 @@ public sealed class BoundedWorkflowExecutionEngineTests
         ]).ExecuteAsync(Guid.NewGuid(), graph, CancellationToken.None);
 
         Assert.Equal(WorkflowExecutionStatus.Failed, result.Status);
-        Assert.Equal("workflow.graph.invalid", result.Error?.Code);
+        Assert.Equal("executor.missing", result.Error?.Code);
         Assert.Equal(0, sourceCalls);
     }
 

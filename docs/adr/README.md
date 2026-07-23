@@ -34,6 +34,7 @@ Accepted ADRs are not immutable. Supersede them when evidence changes; do not si
 | [0017](0017-safe-workflow-lifecycle-and-package-portability.md) | Accepted | Safe workflow removal and redacted portable packages |
 | [0018](0018-primary-key-relational-target-mutations.md) | Accepted | Primary-key upsert and incoming-key delete for relational targets |
 | [0019](0019-encrypted-sql-connection-credentials.md) | Accepted | AES-GCM encrypted SQL-backed connection credentials with external versioned keys |
+| [0020](0020-sql-backed-trusted-workflow-actions.md) | Accepted | SQL-backed, role-granted trusted webhooks and executables with optional encrypted Windows run-as credentials |
 
 ## Creating an ADR
 

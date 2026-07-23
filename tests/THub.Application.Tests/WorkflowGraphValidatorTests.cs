@@ -99,13 +99,15 @@ public sealed class WorkflowGraphValidatorTests
     [Theory]
     [InlineData(WorkflowNodeKind.Webhook)]
     [InlineData(WorkflowNodeKind.Executable)]
-    public void GatedExecutorsCannotBePublished(WorkflowNodeKind kind)
+    public void TrustedActionKindsAreStructurallySupported(WorkflowNodeKind kind)
     {
         var graph = new WorkflowGraph(
             [Node("source", WorkflowNodeKind.SqlSource), Node("action", kind)],
             [new("source", "action")]);
 
-        Assert.Contains(_validator.Validate(graph), issue => issue.Code == "node.kind.disabled");
+        Assert.DoesNotContain(
+            _validator.Validate(graph),
+            issue => issue.Code == "node.kind.disabled");
     }
 
     private static WorkflowNode Node(string id, WorkflowNodeKind kind) =>

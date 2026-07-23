@@ -1,0 +1,265 @@
+@page "/trusted-actions"
+@attribute [Authorize(Policy = Permissions.Administration)]
+@using THub.Application.Actions
+@using THub.Domain.Actions
+@inject TrustedActionAdministrationService Administration
+@inject TrustedActionDefinitionSerializer DefinitionSerializer
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject NotificationService Notifications
+
+<PageTitle>Trusted actions · THub</PageTitle>
+
+<div class="page-heading">
+    <div>
+        <div class="eyebrow">Administration</div>
+        <h1>Trusted actions</h1>
+        <p>Approve fixed webhook destinations and executable definitions. Role grants control which workflow authors may select each action.</p>
+    </div>
+    <div class="heading-actions">
+        <RadzenButton Text="New webhook" Icon="webhook" ButtonStyle="ButtonStyle.Primary" Click="@(() => StartCreate(TrustedActionKind.Webhook))" Disabled="@Busy" />
+        <RadzenButton Text="New executable" Icon="terminal" ButtonStyle="ButtonStyle.Light" Click="@(() => StartCreate(TrustedActionKind.Executable))" Disabled="@Busy" />
+        <RadzenButton Text="Refresh" Icon="refresh" ButtonStyle="ButtonStyle.Light" Click="@LoadAsync" Disabled="@Busy" />
+    </div>
+</div>
+
+@if (!string.IsNullOrWhiteSpace(Error))
+{
+    <div class="inline-alert warning"><RadzenIcon Icon="warning_amber" /><span>@Error</span></div>
+}
+
+<section class="panel">
+    <div class="panel-head"><div><h2>Approved definitions</h2><p>Use each resource ID when assigning <code>trusted-action.use</code> to a role.</p></div></div>
+    <table class="activity-table">
+        <thead><tr><th>Name</th><th>Kind</th><th>Resource ID</th><th>Credential</th><th>Status</th><th></th></tr></thead>
+        <tbody>
+            @foreach (var action in Actions)
+            {
+                <tr>
+                    <td><strong>@action.Name</strong></td>
+                    <td>@action.Kind</td>
+                    <td><code>@action.Id</code></td>
+                    <td>@(action.HasStoredCredential ? "Stored encrypted" : "Worker identity / none")</td>
+                    <td>@(action.IsEnabled ? "Enabled" : "Disabled")</td>
+                    <td><button type="button" @onclick="() => EditAsync(action.Id)">Manage</button></td>
+                </tr>
+            }
+        </tbody>
+    </table>
+</section>
+
+@if (Editor is not null)
+{
+    <section class="panel">
+        <div class="panel-head">
+            <div><h2>@(Editor.Id is null ? $"New {Editor.Kind}" : Editor.Name)</h2><p>Definitions and credentials are visible only to System Administrators. Passwords are replacement-only and never read back.</p></div>
+            <button class="icon-close" type="button" @onclick="CloseEditor">×</button>
+        </div>
+
+        <div class="inline-form">
+            <label><span>Name</span><input maxlength="100" @bind="Editor.Name" /></label>
+            <label><span>Kind</span><input value="@Editor.Kind" disabled /></label>
+            <label><span>Credential reference</span><input maxlength="185" autocomplete="off" spellcheck="false" @bind="Editor.CredentialReference" /><small>Required for authenticated webhooks; optional run-as identity for executables.</small></label>
+        </div>
+        <div class="inline-form">
+            <label><span>Replacement username</span><input maxlength="256" autocomplete="off" @bind="Editor.CredentialUserName" /><small>Use <code>DOMAIN\user</code> or a UPN for executable impersonation.</small></label>
+            <label><span>Replacement password</span><input type="password" maxlength="4096" autocomplete="new-password" @bind="Editor.CredentialPassword" /></label>
+        </div>
+        <label>Definition JSON
+            <textarea class="settings-json" rows="18" spellcheck="false" @bind="Editor.DefinitionJson"></textarea>
+        </label>
+        <small class="property-help">Executable arguments are passed with <code>ArgumentList</code>, never a shell. Supported placeholders: <code>{runId}</code>, <code>{nodeId}</code>, <code>{attempt}</code>, <code>{inputRowCount}</code>.</small>
+        <div class="form-actions">
+            @if (Editor.Id is not null)
+            {
+                <RadzenButton Text="@(Editor.IsEnabled ? "Disable" : "Enable")" Icon="power_settings_new" ButtonStyle="@(Editor.IsEnabled ? ButtonStyle.Danger : ButtonStyle.Success)" Click="@ToggleAsync" Disabled="@Busy" />
+            }
+            <RadzenButton Text="Save" Icon="save" ButtonStyle="ButtonStyle.Primary" Click="@SaveAsync" Disabled="@Busy" />
+        </div>
+    </section>
+}
+
+@code {
+    private IReadOnlyList<TrustedActionSummary> Actions { get; set; } = [];
+    private EditorModel? Editor { get; set; }
+    private bool Busy { get; set; }
+    private string? Error { get; set; }
+
+    protected override Task OnInitializedAsync() => LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        Busy = true;
+        Error = null;
+        try
+        {
+            Actions = await Administration.ListAsync(CancellationToken.None);
+        }
+        catch (Exception)
+        {
+            Error = "Trusted actions could not be loaded.";
+        }
+        finally
+        {
+            Busy = false;
+        }
+    }
+
+    private void StartCreate(TrustedActionKind kind) => Editor = new EditorModel
+    {
+        Kind = kind,
+        DefinitionJson = kind == TrustedActionKind.Webhook
+            ? """
+              {
+                "destination": "https://example.internal/hooks/thub",
+                "method": "POST",
+                "contentType": "application/json",
+                "authentication": "none",
+                "allowPrivateAddresses": true,
+                "timeoutSeconds": 30,
+                "maximumRequestBytes": 65536,
+                "maximumResponseBytes": 65536,
+                "headers": {}
+              }
+              """
+            : """
+              {
+                "executablePath": "C:\\Program Files\\THub Actions\\approved.exe",
+                "workingDirectory": "C:\\Program Files\\THub Actions",
+                "arguments": ["--run-id", "{runId}"],
+                "environment": {},
+                "timeoutSeconds": 300,
+                "maximumOutputCharacters": 65536,
+                "loadUserProfile": false
+              }
+              """,
+    };
+
+    private async Task EditAsync(Guid id)
+    {
+        Busy = true;
+        try
+        {
+            var action = await Administration.GetAsync(id, CancellationToken.None);
+            if (action is null)
+            {
+                Notify(false, "The trusted action no longer exists.");
+                return;
+            }
+
+            Editor = new EditorModel
+            {
+                Id = action.Id,
+                Name = action.Name,
+                Kind = action.Kind,
+                CredentialReference = action.CredentialReference ?? string.Empty,
+                DefinitionJson = DefinitionSerializer.Serialize(action.Definition),
+                IsEnabled = action.IsEnabled,
+                ExpectedUpdatedAtUtc = action.UpdatedAtUtc,
+            };
+        }
+        finally
+        {
+            Busy = false;
+        }
+    }
+
+    private void CloseEditor() => Editor = null;
+
+    private async Task SaveAsync()
+    {
+        if (Editor is null)
+        {
+            return;
+        }
+
+        Busy = true;
+        try
+        {
+            var definition = DefinitionSerializer.Deserialize(Editor.Kind, Editor.DefinitionJson);
+            var actor = (await AuthenticationStateProvider.GetAuthenticationStateAsync())
+                .User.Identity?.Name ?? "unknown";
+            var result = await Administration.SaveAsync(
+                new(
+                    Editor.Id,
+                    Editor.Name,
+                    Editor.Kind,
+                    definition,
+                    NullIfWhitespace(Editor.CredentialReference),
+                    NullIfWhitespace(Editor.CredentialUserName),
+                    string.IsNullOrEmpty(Editor.CredentialPassword) ? null : Editor.CredentialPassword,
+                    Editor.ExpectedUpdatedAtUtc,
+                    actor),
+                CancellationToken.None);
+            Notify(result.Status == TrustedActionWriteStatus.Saved, result.Message ?? $"Save result: {result.Status}.");
+            if (result.Status == TrustedActionWriteStatus.Saved)
+            {
+                Editor = null;
+                await LoadAsync();
+            }
+        }
+        catch (Exception exception) when (exception is ArgumentException
+            or InvalidOperationException
+            or TrustedActionDefinitionException)
+        {
+            Notify(false, exception.Message);
+        }
+        finally
+        {
+            Busy = false;
+        }
+    }
+
+    private async Task ToggleAsync()
+    {
+        if (Editor?.Id is not Guid id || Editor.ExpectedUpdatedAtUtc is not DateTimeOffset expected)
+        {
+            return;
+        }
+
+        Busy = true;
+        try
+        {
+            var result = await Administration.SetEnabledAsync(
+                id,
+                !Editor.IsEnabled,
+                (await AuthenticationStateProvider.GetAuthenticationStateAsync())
+                    .User.Identity?.Name ?? "unknown",
+                expected,
+                CancellationToken.None);
+            Notify(result.Status == TrustedActionWriteStatus.Saved, $"Status update: {result.Status}.");
+            if (result.Status == TrustedActionWriteStatus.Saved)
+            {
+                Editor = null;
+                await LoadAsync();
+            }
+        }
+        finally
+        {
+            Busy = false;
+        }
+    }
+
+    private void Notify(bool success, string detail) => Notifications.Notify(new NotificationMessage
+    {
+        Severity = success ? NotificationSeverity.Success : NotificationSeverity.Error,
+        Summary = success ? "Trusted action updated" : "Trusted action update failed",
+        Detail = detail,
+        Duration = 7_000,
+    });
+
+    private static string? NullIfWhitespace(string value) =>
+        string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+
+    private sealed class EditorModel
+    {
+        public Guid? Id { get; set; }
+        public string Name { get; set; } = string.Empty;
+        public TrustedActionKind Kind { get; set; }
+        public string DefinitionJson { get; set; } = "{}";
+        public string CredentialReference { get; set; } = string.Empty;
+        public string CredentialUserName { get; set; } = string.Empty;
+        public string CredentialPassword { get; set; } = string.Empty;
+        public bool IsEnabled { get; set; } = true;
+        public DateTimeOffset? ExpectedUpdatedAtUtc { get; set; }
+    }
+}

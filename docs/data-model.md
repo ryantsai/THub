@@ -12,6 +12,13 @@
 
 The migration chain and runtime now implement the immutable workflow/run/step model required by [ADR-0010](adr/0010-durable-leased-workflow-execution.md), the durable Email model required by [ADR-0012](adr/0012-durable-email-alert-delivery.md), and the governed publication model required by [ADR-0011](adr/0011-isolated-governed-data-publications.md).
 
+`TrustedActions` stores administrator-owned webhook or executable definitions, enablement,
+creator/last-updater metadata, and an optional encrypted credential reference. Workflow
+graphs contain only the trusted-action ID and a bounded non-secret webhook body.
+`AccessResourceGrants` uses resource kind `TrustedAction` plus permission
+`trusted-action.use` to authorize publication. Credential values remain in
+`EncryptedConnectionCredentials`; the definition row never contains a password or token.
+
 ## Current relational model
 
 The initial EF Core migration creates the `thub` schema and the foundation tables below. Reviewed forward migrations add the durable slices described later in this document.

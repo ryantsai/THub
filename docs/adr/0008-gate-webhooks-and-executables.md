@@ -4,11 +4,18 @@
 - Date: 2026-07-22
 - Deciders: Project maintainers
 
+> Implementation note: [ADR-0020](0020-sql-backed-trusted-workflow-actions.md)
+> defines the accepted SQL-backed policy, role-grant, encrypted credential, and runtime
+> model that satisfies this gate.
+
 ## Context
 
 THub requirements include calling webhooks and running external executables. These actions cross major network and operating-system trust boundaries. Arbitrary user-configurable URLs, command lines, paths, or environment settings could enable SSRF, credential exposure, remote-code execution, persistence, or data exfiltration under the worker service identity.
 
-The designer exposes webhook and executable node concepts, and the general workflow engine now executes lower-risk, bounded node kinds. Webhook and executable settings are still rejected by publish validation and execution preflight because no administrator policy model or runtime executor has been approved for either trust boundary.
+The designer originally exposed webhook and executable node concepts while publish validation
+and execution preflight rejected them because no administrator policy model or runtime executor
+had been approved for either trust boundary. ADR-0020 subsequently accepted and implemented the
+governed policy model required by this decision.
 
 ## Decision
 
@@ -44,7 +51,7 @@ UI presence, Designer role membership, or a node stored in workflow JSON does no
 
 ### Negative
 
-- Visible action concepts remain draft-only and non-executable until the required administrator policies and executors are implemented.
+- Enabling these actions requires administrators to define and maintain trusted-action policies.
 - Administrators must configure and maintain policies.
 - Some integrations require additional infrastructure/network coordination.
 
@@ -56,7 +63,7 @@ UI presence, Designer role membership, or a node stored in workflow JSON does no
 
 ## Follow-up
 
-- Select the secret provider and audit model.
-- Define administrator policy schemas and management UI.
-- Threat-model each executor before implementation.
-- Add integration tests for destination/path constraints, cancellation, redaction, and policy denial.
+- ADR-0020 defines the implemented secret, policy, role-grant, and management model.
+- Audit-retention policy remains unresolved under PD-009.
+- Integration validation remains required for destination/path constraints, cancellation,
+  redaction, impersonation, and policy denial.

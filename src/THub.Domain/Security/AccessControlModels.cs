@@ -22,6 +22,7 @@ public enum AccessResourceKind
 {
     Workflow,
     Connection,
+    TrustedAction,
 }
 
 public sealed class AccessRole

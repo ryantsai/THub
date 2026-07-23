@@ -1,4 +1,5 @@
 using Microsoft.Extensions.DependencyInjection;
+using THub.Application.Actions;
 using THub.Application.Alerts;
 using THub.Application.Connections;
 using THub.Application.Execution;
@@ -37,6 +38,9 @@ public static class DependencyInjection
         services.AddScoped<EmailAlertMonitoringService>();
         services.AddScoped<WorkflowTerminalAlertService>();
         services.AddScoped<AccessControlAdministrationService>();
+        services.AddSingleton<TrustedActionDefinitionSerializer>();
+        services.AddScoped<TrustedActionAdministrationService>();
+        services.AddScoped<TrustedActionWorkflowAuthorization>();
         services.AddSingleton(TimeProvider.System);
         return services;
     }
@@ -47,6 +51,7 @@ public static class DependencyInjection
 
         AddWorkflowDefinitionServices(services);
         services.AddSingleton<ConnectionConfigurationSerializer>();
+        services.AddSingleton<TrustedActionDefinitionSerializer>();
         services.AddSingleton<WorkflowExecutionPlanner>();
         services.AddSingleton<IWorkflowExecutionPreflightValidator, WorkflowExecutionPreflightValidator>();
         services.AddSingleton<ITabularDataSetStore, InMemoryTabularDataSetStore>();

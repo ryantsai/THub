@@ -1,12 +1,13 @@
+using Microsoft.Data.SqlClient;
 using THub.Application.Alerts;
 using THub.Application.Connections;
 using THub.Application.Execution;
 using THub.Domain.Alerts;
 using THub.Domain.Connections;
 using THub.Domain.Workflows;
+using THub.Infrastructure.Actions;
 using THub.Infrastructure.Connections;
 using THub.Infrastructure.Files;
-using Microsoft.Data.SqlClient;
 
 namespace THub.Infrastructure.Execution;
 
@@ -20,7 +21,8 @@ public sealed class InfrastructureWorkflowNodeResourceValidator(
     RelationalConnectionFactory relationalConnectionFactory,
     FtpClientFactory ftpClientFactory,
     ApprovedPathResolver pathResolver,
-    IEmailAlertAdministrationStore emailProfiles) : IWorkflowNodeResourceValidator
+    IEmailAlertAdministrationStore emailProfiles,
+    TrustedActionExecutionResolver trustedActions) : IWorkflowNodeResourceValidator
 {
     private readonly ExecutionConnectionResolver _connectionResolver =
         connectionResolver ?? throw new ArgumentNullException(nameof(connectionResolver));
@@ -77,6 +79,18 @@ public sealed class InfrastructureWorkflowNodeResourceValidator(
                 break;
             case EmailAlertNodeSettings email:
                 await ValidateEmailAsync(email, cancellationToken).ConfigureAwait(false);
+                break;
+            case WebhookNodeSettings webhook:
+                _ = await trustedActions.ResolveAsync(
+                    webhook.TrustedActionId,
+                    THub.Domain.Actions.TrustedActionKind.Webhook,
+                    cancellationToken).ConfigureAwait(false);
+                break;
+            case ExecutableNodeSettings executable:
+                _ = await trustedActions.ResolveAsync(
+                    executable.TrustedActionId,
+                    THub.Domain.Actions.TrustedActionKind.Executable,
+                    cancellationToken).ConfigureAwait(false);
                 break;
             case SelectColumnsNodeSettings or FilterRowsNodeSettings or JoinNodeSettings:
                 break;
