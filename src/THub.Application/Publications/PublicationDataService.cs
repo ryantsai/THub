@@ -66,7 +66,7 @@ public sealed class PublicationDataService(
 
     public async Task<PublicationResult<PublicationRowPageDto>> ReadEditorRowsAsync(
         Guid publicationId,
-        IReadOnlyCollection<PublicationRole> roles,
+        IReadOnlyCollection<Guid> roleIds,
         PublicationEditorRowsQuery query,
         CancellationToken cancellationToken)
     {
@@ -79,7 +79,7 @@ public sealed class PublicationDataService(
 
         var authorization = await RequireEditorAuthorizationService().AuthorizeAsync(
                 publicationId,
-                roles,
+                roleIds,
                 PublicationOperation.View,
                 cancellationToken)
             .ConfigureAwait(false);
@@ -145,7 +145,7 @@ public sealed class PublicationDataService(
 
         var authorization = await RequireEditorAuthorizationService().AuthorizeAsync(
                 query.PublicationId,
-                query.Roles,
+                query.RoleIds,
                 PublicationOperation.View,
                 cancellationToken)
             .ConfigureAwait(false);
@@ -238,7 +238,7 @@ public sealed class PublicationDataService(
 
         var authorization = await RequireEditorAuthorizationService().AuthorizeAsync(
                 query.PublicationId,
-                query.Roles,
+                query.RoleIds,
                 PublicationOperation.View,
                 cancellationToken)
             .ConfigureAwait(false);

@@ -286,7 +286,7 @@ public sealed class PublicationEditorServiceTests
 
     private static StagePublicationChangeSetCommand CreateUpdateCommand(
         Guid publicationId,
-        IReadOnlyCollection<PublicationRole> roles) =>
+        IReadOnlyCollection<Guid> roles) =>
         new(
             publicationId,
             roles,

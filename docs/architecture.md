@@ -253,7 +253,7 @@ Authorization is permission-based. Windows groups map to application roles, and 
 
 Current permissions cover workflow view/edit/execute, schedule management, connection management, publication management, and administration.
 
-Publication-management permission does not itself grant access to editor data. Each editor publication independently maps the four global roles to View, Insert, Update, Delete, and Approve capabilities. Application services enforce those grants for load, lookup, submit, review, and change-set queries. Worker apply accepts only an already approved set and revalidates publication/version/schema state, but the current change set does not retain a role snapshot and the worker does not re-evaluate submitter/reviewer grants after approval.
+Publication-management permission does not itself grant access to editor data. Each editor publication independently maps SQL-backed system or custom roles to View, Insert, Update, Delete, and Approve capabilities. Application services enforce those grants for load, lookup, submit, review, and change-set queries. Worker apply accepts only an already approved set and revalidates publication/version/schema state, but the current change set does not retain a role snapshot and the worker does not re-evaluate submitter/reviewer grants after approval.
 
 ### Secrets and untrusted configuration
 

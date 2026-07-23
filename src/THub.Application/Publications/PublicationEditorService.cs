@@ -51,7 +51,7 @@ public sealed class PublicationEditorService(
         {
             var authorization = await _authorizationService.AuthorizeAsync(
                     command.PublicationId,
-                    command.Roles,
+                    command.RoleIds,
                     operation,
                     cancellationToken)
                 .ConfigureAwait(false);
@@ -138,7 +138,7 @@ public sealed class PublicationEditorService(
             {
                 var authorization = await _authorizationService.AuthorizeAsync(
                         command.PublicationId,
-                        command.Roles,
+                        command.RoleIds,
                         operation,
                         cancellationToken)
                     .ConfigureAwait(false);
@@ -210,7 +210,7 @@ public sealed class PublicationEditorService(
 
         var authorization = await _authorizationService.AuthorizeAsync(
                 command.PublicationId,
-                command.Roles,
+                command.RoleIds,
                 PublicationOperation.Approve,
                 cancellationToken)
             .ConfigureAwait(false);

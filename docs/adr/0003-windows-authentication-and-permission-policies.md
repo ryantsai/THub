@@ -1,6 +1,6 @@
 # ADR-0003: Use Windows Authentication with permission policies
 
-- Status: Accepted
+- Status: Superseded by [ADR-0016](0016-sql-backed-custom-role-and-resource-authorization.md)
 - Date: 2026-07-22
 - Deciders: Project maintainers
 

@@ -4,7 +4,7 @@ namespace THub.Application.Publications;
 
 public sealed record PublicationChangeSetListQuery(
     Guid PublicationId,
-    IReadOnlyCollection<PublicationRole> Roles,
+    IReadOnlyCollection<Guid> RoleIds,
     IReadOnlyCollection<PublicationChangeSetStatus>? Statuses = null,
     int Take = 50,
     DateTimeOffset? BeforeSubmittedAtUtc = null,
@@ -87,7 +87,7 @@ public sealed class PublicationChangeSetManagementService(
 
         var authorization = await _authorizationService.AuthorizeAsync(
                 query.PublicationId,
-                query.Roles,
+                query.RoleIds,
                 PublicationOperation.View,
                 cancellationToken)
             .ConfigureAwait(false);
@@ -117,7 +117,7 @@ public sealed class PublicationChangeSetManagementService(
     public async Task<PublicationResult<PublicationChangeSetDetailDto>> GetAsync(
         Guid publicationId,
         Guid changeSetId,
-        IReadOnlyCollection<PublicationRole> roles,
+        IReadOnlyCollection<Guid> roleIds,
         CancellationToken cancellationToken)
     {
         if (publicationId == Guid.Empty || changeSetId == Guid.Empty)
@@ -129,7 +129,7 @@ public sealed class PublicationChangeSetManagementService(
 
         var authorization = await _authorizationService.AuthorizeAsync(
                 publicationId,
-                roles,
+                roleIds,
                 PublicationOperation.View,
                 cancellationToken)
             .ConfigureAwait(false);

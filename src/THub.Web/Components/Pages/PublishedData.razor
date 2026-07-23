@@ -26,7 +26,7 @@
     }
     else if (Items.Count == 0)
     {
-        <div class="page-state"><RadzenIcon Icon="table_view" /><h2>No editors are assigned</h2><p>An administrator can grant View, Insert, Update, Delete, or Approve access to one of your global roles.</p></div>
+        <div class="page-state"><RadzenIcon Icon="table_view" /><h2>No editors are assigned</h2><p>An administrator can grant View, Insert, Update, Delete, or Approve access to one of your assigned roles.</p></div>
     }
     else
     {
@@ -58,7 +58,7 @@
         try
         {
             var authentication = await AuthenticationStateProvider.GetAuthenticationStateAsync();
-            var roles = RoleResolver.Resolve(authentication.User);
+            var roles = await RoleResolver.ResolveAsync(authentication.User, cancellation.Token);
             var result = await Catalog.ListAsync(
                 new PublicationCatalogQuery(PublicationKind.Editor, PublicationState.Active),
                 cancellation.Token);

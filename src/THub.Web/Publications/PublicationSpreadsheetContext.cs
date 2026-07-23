@@ -8,7 +8,7 @@ namespace THub.Web.Publications;
 public sealed class PublicationSpreadsheetContext(
     PublicationDataService dataService,
     Guid publicationId,
-    IReadOnlyCollection<PublicationRole> roles,
+    IReadOnlyCollection<Guid> roleIds,
     IReadOnlyList<PublicationColumnDto> columns)
 {
     private const int LookupTake = 100;
@@ -35,7 +35,7 @@ public sealed class PublicationSpreadsheetContext(
             new PublicationForeignKeyLookupQuery(
                 publicationId,
                 column.PublicAlias,
-                roles,
+                roleIds,
                 search,
                 LookupTake),
             cancellationToken);
@@ -113,7 +113,7 @@ public sealed class PublicationSpreadsheetContext(
         var result = await dataService.ResolveForeignKeyLabelsAsync(
             new PublicationForeignKeyLabelQuery(
                 publicationId,
-                roles,
+                roleIds,
                 pending.Select(item => new PublicationForeignKeyLabelRequest(
                     item.RequestId,
                     item.Pending.ColumnAlias,

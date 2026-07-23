@@ -2,23 +2,19 @@ namespace THub.Web.Security;
 
 public static class Permissions
 {
-    public const string WorkflowView = "workflow.view";
-    public const string WorkflowEdit = "workflow.edit";
-    public const string WorkflowExecute = "workflow.execute";
-    public const string ScheduleManage = "schedule.manage";
-    public const string ConnectionManage = "connection.manage";
-    public const string PublicationManage = "publication.manage";
-    public const string Administration = "administration";
+    public const string WorkflowView = Application.Security.SecurityPermissions.WorkflowView;
+    public const string WorkflowCreate = Application.Security.SecurityPermissions.WorkflowCreate;
+    public const string WorkflowEdit = Application.Security.SecurityPermissions.WorkflowEdit;
+    public const string WorkflowPublish = Application.Security.SecurityPermissions.WorkflowPublish;
+    public const string WorkflowExecute = Application.Security.SecurityPermissions.WorkflowExecute;
+    public const string RunView = Application.Security.SecurityPermissions.RunView;
+    public const string ScheduleManage = Application.Security.SecurityPermissions.ScheduleManage;
+    public const string ConnectionView = Application.Security.SecurityPermissions.ConnectionView;
+    public const string ConnectionManage = Application.Security.SecurityPermissions.ConnectionManage;
+    public const string PublicationView = Application.Security.SecurityPermissions.PublicationView;
+    public const string PublicationManage = Application.Security.SecurityPermissions.PublicationManage;
+    public const string SecurityManage = Application.Security.SecurityPermissions.SecurityManage;
+    public const string Administration = Application.Security.SecurityPermissions.Administration;
 
-    public static readonly string[] All =
-    [
-        WorkflowView,
-        WorkflowEdit,
-        WorkflowExecute,
-        ScheduleManage,
-        ConnectionManage,
-        PublicationManage,
-        Administration
-    ];
+    public static IReadOnlySet<string> All => Application.Security.SecurityPermissions.All;
 }
-

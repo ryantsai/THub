@@ -1,4 +1,5 @@
 using THub.Domain.Publications;
+using THub.Domain.Security;
 
 namespace THub.Application.Publications;
 
@@ -13,7 +14,7 @@ public sealed class PublicationAuthorizationService(
 
     public async Task<PublicationResult<PublicationAuthorizationDto>> AuthorizeAsync(
         Guid publicationId,
-        IReadOnlyCollection<PublicationRole> roles,
+        IReadOnlyCollection<Guid> roleIds,
         PublicationOperation operation,
         CancellationToken cancellationToken)
     {
@@ -25,8 +26,8 @@ public sealed class PublicationAuthorizationService(
         }
 
         if (!Enum.IsDefined(operation) ||
-            roles is null ||
-            roles.Any(role => !Enum.IsDefined(role)))
+            roleIds is null ||
+            roleIds.Any(roleId => roleId == Guid.Empty))
         {
             return PublicationResultFactory.Validation<PublicationAuthorizationDto>(
                 "publication.authorization_invalid",
@@ -42,12 +43,22 @@ public sealed class PublicationAuthorizationService(
                 "The publication was not found.");
         }
 
-        var requestedRoles = roles.Distinct().ToHashSet();
+        var requestedRoleIds = roleIds.Distinct().ToHashSet();
         var grants = await _grantStore.ListAsync(publicationId, cancellationToken).ConfigureAwait(false);
         var grantFingerprint = PublicationGrantFingerprint.Compute(grants);
+        if (requestedRoleIds.Contains(SystemRoleIds.SystemAdministrator))
+        {
+            return PublicationResult<PublicationAuthorizationDto>.Success(
+                new PublicationAuthorizationDto(
+                    publicationId,
+                    operation,
+                    [SystemRoleIds.SystemAdministrator],
+                    grantFingerprint));
+        }
+
         var effectiveRoles = grants
-            .Where(grant => requestedRoles.Contains(grant.Role) && grant.Allows(operation))
-            .Select(grant => grant.Role)
+            .Where(grant => requestedRoleIds.Contains(grant.RoleId) && grant.Allows(operation))
+            .Select(grant => grant.RoleId)
             .Distinct()
             .Order()
             .ToArray();

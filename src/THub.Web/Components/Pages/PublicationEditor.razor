@@ -273,7 +273,7 @@ else if (Publication is not null && Version is not null && Workbook is not null 
     private IReadOnlyList<PublicationColumnDto> Columns { get; set; } = [];
     private IReadOnlyList<PublicationChangeSetDto> ChangeSets { get; set; } = [];
     private PublicationChangeSetDetailDto? InspectedChangeSet { get; set; }
-    private IReadOnlyList<PublicationRole> Roles { get; set; } = [];
+    private IReadOnlyList<Guid> Roles { get; set; } = [];
     private string? NextCursor { get; set; }
     private string? Error { get; set; }
     private bool Loading { get; set; }
@@ -325,7 +325,7 @@ else if (Publication is not null && Version is not null && Workbook is not null 
         try
         {
             var authentication = await AuthenticationStateProvider.GetAuthenticationStateAsync();
-            Roles = RoleResolver.Resolve(authentication.User);
+            Roles = await RoleResolver.ResolveAsync(authentication.User, cancellation.Token);
             var view = await AuthorizationService.AuthorizeAsync(
                 PublicationId,
                 Roles,

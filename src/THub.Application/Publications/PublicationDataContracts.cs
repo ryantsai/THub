@@ -54,7 +54,7 @@ public sealed record PublicationSourceRowPage(
 public sealed record PublicationForeignKeyLookupQuery(
     Guid PublicationId,
     string ColumnAlias,
-    IReadOnlyCollection<PublicationRole> Roles,
+    IReadOnlyCollection<Guid> RoleIds,
     string? Search = null,
     int Take = 50,
     string? Cursor = null);
@@ -83,7 +83,7 @@ public sealed record PublicationForeignKeyLabelRequest(
 
 public sealed record PublicationForeignKeyLabelQuery(
     Guid PublicationId,
-    IReadOnlyCollection<PublicationRole> Roles,
+    IReadOnlyCollection<Guid> RoleIds,
     IReadOnlyList<PublicationForeignKeyLabelRequest> Requests);
 
 public sealed record PublicationForeignKeyLabelDto(

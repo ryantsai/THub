@@ -34,16 +34,16 @@ The checked-in VS Code web debug profiles explicitly enable this handler so F5 d
 
 ## Authorization
 
-THub uses permission policies rather than scattering raw role checks.
+THub uses permission policies plus SQL-backed resource authorization rather than scattering raw role checks.
 
-| Role | Intended permissions |
+| System role | Intended permissions |
 | --- | --- |
-| Viewer | View workflows and operational state |
-| Operator | View, execute, and manage schedules |
-| Designer | View/edit workflows, manage connections and publications |
-| Administrator | All permissions and platform settings |
+| System Administrator | Every platform permission and implicit access to every resource |
+| Developer | Create, view, edit, publish, execute, and schedule workflows; view runs and approved connections |
 
-The current resolver maps Windows/AD groups to application roles and optionally assigns a default authenticated role. The checked-in production group arrays are intentionally empty; configure real organization groups before deployment.
+Custom roles, permissions, Windows user/group assignments, workflow/connection grants, and editor-publication grants are authoritative in SQL Server. An unmapped authenticated user receives no default role. System-role capabilities are immutable; their assignments and all custom roles are managed under `/settings`.
+
+Production bootstrap arrays are intentionally empty. Configure at least one administrator user or group under `Authorization:Bootstrap` before first use. Bootstrap configuration grants only the two system roles.
 
 Rules:
 
@@ -51,9 +51,9 @@ Rules:
 - Never trust browser-side state or `AuthorizeView` as enforcement.
 - Avoid putting authorization decisions inside infrastructure adapters.
 - Record privileged changes in an audit stream when audit persistence is added.
-- Per-workflow or per-connection grants require a separate authorization design; they are not implemented by the global roles.
+- Resource-specific workflow and connection grants are checked at list, detail, and mutation boundaries. System Administrator bypass is explicit and server-side.
 
-Editor data access is resource-specific even though its subjects are the four global roles. Each editor publication independently grants View, Insert, Update, Delete, and Approve. `PublicationManage`, Designer membership, UI visibility, or possession of a REST bearer token grants none of those capabilities implicitly. Server-side authorization runs for editor load, lookup, submit, review, and change-set queries. Staging and review persist only after a serializable recheck of the exact grant fingerprint. Replacing grants transactionally rejects every pending or approved set before the new policy becomes current, so stale authorization cannot later reach the Worker; the Worker then accepts only an approved set whose publication/version/schema state remains current.
+Editor data access is resource-specific and its subjects are SQL-backed system or custom roles. Each editor publication independently grants View, Insert, Update, Delete, and Approve. `PublicationManage`, Developer membership, UI visibility, or possession of a REST bearer token grants none of those capabilities implicitly. Server-side authorization runs for editor load, lookup, submit, review, and change-set queries. Staging and review persist only after a serializable recheck of the exact grant fingerprint. Replacing grants transactionally rejects every pending or approved set before the new policy becomes current, so stale authorization cannot later reach the Worker; the Worker then accepts only an approved set whose publication/version/schema state remains current.
 
 ## Service identities
 
@@ -165,7 +165,7 @@ The isolated host implements `GET /api/v1/publications/{slug}/schema` and `GET /
 
 Editors remain inside Windows-authenticated `THub.Web` and stage all writes in the THub control plane.
 
-- Radzen Blazor Spreadsheet is a bounded presentation surface, not the persistence or authorization boundary. Viewer sessions are read-only.
+- Radzen Blazor Spreadsheet is a bounded presentation surface, not the persistence or authorization boundary. View-only sessions are read-only.
 - Editor sessions may change approved values but cannot change structure, formatting, formulas, images, charts, hyperlinks, imports/exports, validation rules, clipboard contents, or autofill. Undo/redo remains available, and staged values are normalized and revalidated server-side.
 - The default workbook window is 250 rows and the absolute maximum is 1,000. Server-side filtering and deterministic navigation remain authoritative.
 - On submit, server code accepts the current edit, compares the workbook with its protected loaded snapshot, and revalidates keys, types, nullability, lengths, writable columns, formula absence, row limits, and the current resource grant.

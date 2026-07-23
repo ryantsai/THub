@@ -9,7 +9,7 @@ public sealed class PublicationGrant
     public PublicationGrant(
         Guid id,
         Guid publicationId,
-        PublicationRole role,
+        Guid roleId,
         bool canView,
         bool canInsert,
         bool canUpdate,
@@ -18,7 +18,7 @@ public sealed class PublicationGrant
     {
         Id = PublicationGuard.RequireId(id, nameof(id));
         PublicationId = PublicationGuard.RequireId(publicationId, nameof(publicationId));
-        Role = PublicationGuard.RequireDefined(role, nameof(role));
+        RoleId = PublicationGuard.RequireId(roleId, nameof(roleId));
         CanInsert = canInsert;
         CanUpdate = canUpdate;
         CanDelete = canDelete;
@@ -32,7 +32,7 @@ public sealed class PublicationGrant
 
     public Guid PublicationId { get; private set; }
 
-    public PublicationRole Role { get; private set; }
+    public Guid RoleId { get; private set; }
 
     public bool CanView { get; private set; }
 

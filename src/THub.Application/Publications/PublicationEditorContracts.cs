@@ -10,7 +10,7 @@ public sealed record StagePublicationChangeCommand(
 
 public sealed record StagePublicationChangeSetCommand(
     Guid PublicationId,
-    IReadOnlyCollection<PublicationRole> Roles,
+    IReadOnlyCollection<Guid> RoleIds,
     IReadOnlyList<StagePublicationChangeCommand> Changes,
     string Actor);
 
@@ -23,7 +23,7 @@ public enum PublicationChangeReviewDecision
 public sealed record ReviewPublicationChangeSetCommand(
     Guid PublicationId,
     Guid ChangeSetId,
-    IReadOnlyCollection<PublicationRole> Roles,
+    IReadOnlyCollection<Guid> RoleIds,
     PublicationChangeReviewDecision Decision,
     string? Comment,
     string Actor);

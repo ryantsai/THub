@@ -5,7 +5,7 @@ namespace THub.Application.Publications;
 public sealed record PublicationAuthorizationDto(
     Guid PublicationId,
     PublicationOperation Operation,
-    IReadOnlyList<PublicationRole> EffectiveRoles,
+    IReadOnlyList<Guid> EffectiveRoleIds,
     string GrantFingerprint);
 
 public interface IPublicationGrantStore

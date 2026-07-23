@@ -8,10 +8,11 @@ public static class AuthorizationExtensions
         this IServiceCollection services,
         IConfiguration configuration)
     {
-        services.AddOptions<RoleMappingOptions>()
-            .Bind(configuration.GetSection(RoleMappingOptions.SectionName));
-        services.AddSingleton<IAuthorizationHandler, PermissionAuthorizationHandler>();
-        services.AddSingleton<PublicationRoleResolver>();
+        services.AddOptions<AuthorizationBootstrapOptions>()
+            .Bind(configuration.GetSection(AuthorizationBootstrapOptions.SectionName));
+        services.AddScoped<AccessControlEvaluator>();
+        services.AddScoped<IAuthorizationHandler, PermissionAuthorizationHandler>();
+        services.AddScoped<PublicationRoleResolver>();
         services.AddAuthorization(options =>
         {
             options.FallbackPolicy = new AuthorizationPolicyBuilder()

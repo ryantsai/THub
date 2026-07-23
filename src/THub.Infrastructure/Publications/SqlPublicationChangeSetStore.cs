@@ -146,7 +146,7 @@ public sealed class SqlPublicationChangeSetStore(
         var grants = await db.PublicationGrants
             .AsNoTracking()
             .Where(grant => grant.PublicationId == publicationId)
-            .OrderBy(grant => grant.Role)
+            .OrderBy(grant => grant.RoleId)
             .ToListAsync(cancellationToken)
             .ConfigureAwait(false);
         return string.Equals(

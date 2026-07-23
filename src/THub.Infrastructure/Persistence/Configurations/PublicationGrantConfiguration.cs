@@ -11,17 +11,17 @@ public sealed class PublicationGrantConfiguration : IEntityTypeConfiguration<Pub
         builder.ToTable("PublicationGrants");
         builder.HasKey(grant => grant.Id);
 
-        builder.Property(grant => grant.Role)
-            .HasConversion<string>()
-            .HasMaxLength(32)
-            .IsRequired();
-
-        builder.HasIndex(grant => new { grant.PublicationId, grant.Role })
+        builder.HasIndex(grant => new { grant.PublicationId, grant.RoleId })
             .IsUnique();
 
         builder.HasOne<Publication>()
             .WithMany()
             .HasForeignKey(grant => grant.PublicationId)
             .OnDelete(DeleteBehavior.Restrict);
+
+        builder.HasOne<THub.Domain.Security.AccessRole>()
+            .WithMany()
+            .HasForeignKey(grant => grant.RoleId)
+            .OnDelete(DeleteBehavior.Cascade);
     }
 }

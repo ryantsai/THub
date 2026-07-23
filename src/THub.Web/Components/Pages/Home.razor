@@ -3,9 +3,12 @@
 @implements IDisposable
 @using THub.Application.Workflows.Management
 @using THub.Domain.Runs
+@using THub.Domain.Security
 @using THub.Domain.Workflows
 @inject WorkflowCatalogService WorkflowCatalog
 @inject WorkflowRunHistoryService RunHistory
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject AccessControlEvaluator AccessControl
 @inject NavigationManager Navigation
 @inject TimeProvider TimeProvider
 
@@ -160,9 +163,29 @@ else
                 return;
             }
 
-            Workflows = workflows.Value.Items;
-            WorkflowCount = workflows.Value.TotalCount;
-            RecentRuns = runs.Value.Items.Take(8).ToArray();
+            var user = (await AuthenticationStateProvider.GetAuthenticationStateAsync()).User;
+            var visibleWorkflowIds = new HashSet<Guid>();
+            var visibleWorkflows = new List<WorkflowListItemDto>();
+            foreach (var workflow in workflows.Value.Items)
+            {
+                if (await AccessControl.HasPermissionAsync(
+                        user,
+                        Permissions.WorkflowView,
+                        AccessResourceKind.Workflow,
+                        workflow.Id,
+                        cancellation.Token))
+                {
+                    visibleWorkflowIds.Add(workflow.Id);
+                    visibleWorkflows.Add(workflow);
+                }
+            }
+
+            Workflows = visibleWorkflows;
+            WorkflowCount = visibleWorkflows.Count;
+            RecentRuns = runs.Value.Items
+                .Where(run => visibleWorkflowIds.Contains(run.WorkflowId))
+                .Take(8)
+                .ToArray();
         }
         catch (OperationCanceledException) when (cancellation.IsCancellationRequested)
         {

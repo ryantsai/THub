@@ -2,12 +2,13 @@
 @attribute [Authorize(Policy = Permissions.WorkflowView)]
 @implements IDisposable
 @using THub.Application.Workflows.Management
+@using THub.Domain.Security
 @inject WorkflowCatalogService WorkflowCatalog
 @inject WorkflowRunService WorkflowRuns
 @inject AuthenticationStateProvider AuthenticationStateProvider
-@inject IAuthorizationService AuthorizationService
 @inject NotificationService Notifications
 @inject NavigationManager Navigation
+@inject AccessControlEvaluator AccessControl
 
 <PageTitle>Workflows · THub</PageTitle>
 
@@ -17,11 +18,12 @@
         <h1>Workflows</h1>
         <p>Design, version, publish, and monitor durable data movement.</p>
     </div>
-    <AuthorizeView Policy="@Permissions.WorkflowEdit">
+    @if (CanCreate)
+    {
         <div class="heading-actions">
             <RadzenButton Text="New workflow" Icon="add" ButtonStyle="ButtonStyle.Primary" Click="@NewWorkflow" />
         </div>
-    </AuthorizeView>
+    }
 </div>
 
 <section class="panel">
@@ -54,21 +56,23 @@
                     @foreach (var workflow in Items)
                     {
                         <tr>
-                            <td><div class="workflow-name"><span class="mini-flow-icon"><RadzenIcon Icon="account_tree" /></span><AuthorizeView Policy="@Permissions.WorkflowEdit"><Authorized><a href="@($"/designer/{workflow.Id}")">@workflow.Name</a></Authorized><NotAuthorized><span>@workflow.Name</span></NotAuthorized></AuthorizeView></div></td>
+                            <td><div class="workflow-name"><span class="mini-flow-icon"><RadzenIcon Icon="account_tree" /></span>@if (CanEdit.Contains(workflow.Id)){<a href="@($"/designer/{workflow.Id}")">@workflow.Name</a>}else{<span>@workflow.Name</span>}</div></td>
                             <td><span class="status-chip @workflow.Status.ToString().ToLowerInvariant()">@workflow.Status</span></td>
                             <td class="muted">Draft r@(workflow.DraftRevision) · @(workflow.PublishedVersionNumber is null ? "not published" : $"v{workflow.PublishedVersionNumber}")</td>
                             <td><code>@(workflow.CronExpression ?? "Manual")</code></td>
                             <td class="muted">@(workflow.NextRunAtUtc?.ToLocalTime().ToString("g") ?? "—")</td>
                             <td class="muted">@workflow.Owner</td>
                             <td class="workflow-actions">
-                                <AuthorizeView Policy="@Permissions.WorkflowEdit">
+                                @if (CanEdit.Contains(workflow.Id))
+                                {
                                     <a href="@($"/designer/{workflow.Id}")" aria-label="Open @workflow.Name">Open</a>
-                                </AuthorizeView>
+                                }
                                 @if (workflow.Status == THub.Domain.Workflows.WorkflowStatus.Published)
                                 {
-                                    <AuthorizeView Policy="@Permissions.WorkflowExecute">
+                                    @if (CanExecute.Contains(workflow.Id))
+                                    {
                                         <button type="button" disabled="@Loading" @onclick="() => QueueAsync(workflow.Id)">Run now</button>
-                                    </AuthorizeView>
+                                    }
                                 }
                             </td>
                         </tr>
@@ -84,6 +88,9 @@
     private IReadOnlyList<WorkflowListItemDto> Items { get; set; } = [];
     private bool Loading { get; set; }
     private string? Error { get; set; }
+    private bool CanCreate { get; set; }
+    private HashSet<Guid> CanEdit { get; } = [];
+    private HashSet<Guid> CanExecute { get; } = [];
 
     private string Summary =>
         $"{Items.Count} shown · {Items.Count(item => item.Status == THub.Domain.Workflows.WorkflowStatus.Published)} published · " +
@@ -103,7 +110,48 @@
                 cancellation.Token);
             if (result.IsSuccess)
             {
-                Items = result.Value!.Items;
+                var authentication = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+                CanCreate = await AccessControl.HasPermissionAsync(
+                    authentication.User,
+                    Permissions.WorkflowCreate,
+                    cancellationToken: cancellation.Token);
+                CanEdit.Clear();
+                CanExecute.Clear();
+                var visible = new List<WorkflowListItemDto>();
+                foreach (var workflow in result.Value!.Items)
+                {
+                    if (await AccessControl.HasPermissionAsync(
+                            authentication.User,
+                            Permissions.WorkflowView,
+                            AccessResourceKind.Workflow,
+                            workflow.Id,
+                            cancellation.Token))
+                    {
+                        visible.Add(workflow);
+                    }
+
+                    if (await AccessControl.HasPermissionAsync(
+                            authentication.User,
+                            Permissions.WorkflowEdit,
+                            AccessResourceKind.Workflow,
+                            workflow.Id,
+                            cancellation.Token))
+                    {
+                        CanEdit.Add(workflow.Id);
+                    }
+
+                    if (await AccessControl.HasPermissionAsync(
+                            authentication.User,
+                            Permissions.WorkflowExecute,
+                            AccessResourceKind.Workflow,
+                            workflow.Id,
+                            cancellation.Token))
+                    {
+                        CanExecute.Add(workflow.Id);
+                    }
+                }
+
+                Items = visible;
             }
             else
             {
@@ -128,9 +176,12 @@
     private async Task QueueAsync(Guid workflowId)
     {
         var state = await AuthenticationStateProvider.GetAuthenticationStateAsync();
-        if (!(await AuthorizationService.AuthorizeAsync(
+        if (!await AccessControl.HasPermissionAsync(
                 state.User,
-                Permissions.WorkflowExecute)).Succeeded)
+                Permissions.WorkflowExecute,
+                AccessResourceKind.Workflow,
+                workflowId,
+                cancellation.Token))
         {
             Notifications.Notify(NotificationSeverity.Error, "Not authorized", "Workflow execution permission is required.");
             return;

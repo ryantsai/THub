@@ -42,13 +42,13 @@ public sealed class PublicationGrantManagementServiceTests
             result.Value!.Grants,
             viewer =>
             {
-                Assert.Equal(PublicationRole.Viewer, viewer.Role);
+                Assert.Equal(PublicationRole.Viewer, viewer.RoleId);
                 Assert.True(viewer.CanView);
                 Assert.False(viewer.CanUpdate);
             },
             editor =>
             {
-                Assert.Equal(PublicationRole.Operator, editor.Role);
+                Assert.Equal(PublicationRole.Operator, editor.RoleId);
                 Assert.True(editor.CanInsert);
                 Assert.True(editor.CanUpdate);
                 Assert.False(editor.CanDelete);

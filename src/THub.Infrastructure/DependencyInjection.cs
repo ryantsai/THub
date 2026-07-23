@@ -5,6 +5,7 @@ using THub.Application.Alerts;
 using THub.Application.Connections;
 using THub.Application.Execution;
 using THub.Application.Scheduling;
+using THub.Application.Security;
 using THub.Application.Publications;
 using THub.Application.Workflows.Management;
 using THub.Application.Workflows;
@@ -15,6 +16,7 @@ using THub.Infrastructure.Files;
 using THub.Infrastructure.Persistence;
 using THub.Infrastructure.Publications;
 using THub.Infrastructure.Scheduling;
+using THub.Infrastructure.Security;
 using THub.Infrastructure.Workflows;
 
 namespace THub.Infrastructure;
@@ -47,6 +49,7 @@ public static class DependencyInjection
         services.AddScoped<IPublicationChangeSetQueryStore, SqlPublicationChangeSetQueryStore>();
         services.AddScoped<IPublicationSourceDataReader, SqlPublicationSourceDataReader>();
         services.AddScoped<IPublicationSourceSchemaInspector, SqlPublicationSourceSchemaInspector>();
+        services.AddScoped<IAccessControlStore, SqlAccessControlStore>();
         return services;
     }
 

@@ -5,7 +5,7 @@ using THub.Domain.Publications;
 namespace THub.Application.Publications;
 
 public sealed record PublicationGrantCommand(
-    PublicationRole Role,
+    Guid RoleId,
     bool CanView,
     bool CanInsert,
     bool CanUpdate,
@@ -18,7 +18,7 @@ public sealed record ReplacePublicationGrantsCommand(
     IReadOnlyList<PublicationGrantCommand> Grants);
 
 public sealed record PublicationGrantDto(
-    PublicationRole Role,
+    Guid RoleId,
     bool CanView,
     bool CanInsert,
     bool CanUpdate,
@@ -88,9 +88,9 @@ public sealed class PublicationGrantManagementService(
                 "A publication, current grant fingerprint, and bounded grant set are required.");
         }
 
-        if (command.Grants.Count > Enum.GetValues<PublicationRole>().Length ||
-            command.Grants.Any(grant => grant is null || !Enum.IsDefined(grant.Role)) ||
-            command.Grants.Select(grant => grant.Role).Distinct().Count() != command.Grants.Count)
+        if (command.Grants.Count > 128 ||
+            command.Grants.Any(grant => grant is null || grant.RoleId == Guid.Empty) ||
+            command.Grants.Select(grant => grant.RoleId).Distinct().Count() != command.Grants.Count)
         {
             return PublicationResultFactory.Validation<PublicationGrantSnapshotDto>(
                 "publication.grants_invalid",
@@ -108,7 +108,7 @@ public sealed class PublicationGrantManagementService(
             .Select(grant => new PublicationGrant(
                 Guid.NewGuid(),
                 command.PublicationId,
-                grant.Role,
+                grant.RoleId,
                 grant.CanView,
                 grant.CanInsert,
                 grant.CanUpdate,
@@ -173,9 +173,9 @@ public sealed class PublicationGrantManagementService(
             publicationId,
             PublicationGrantFingerprint.Compute(grants),
             grants
-                .OrderBy(grant => grant.Role)
+                .OrderBy(grant => grant.RoleId)
                 .Select(grant => new PublicationGrantDto(
-                    grant.Role,
+                    grant.RoleId,
                     grant.CanView,
                     grant.CanInsert,
                     grant.CanUpdate,
@@ -199,9 +199,9 @@ public static class PublicationGrantFingerprint
         var canonical = string.Join(
             ';',
             grants
-                .OrderBy(grant => grant.Role)
+                .OrderBy(grant => grant.RoleId)
                 .Select(grant => string.Concat(
-                    ((int)grant.Role).ToString(System.Globalization.CultureInfo.InvariantCulture),
+                    grant.RoleId.ToString("N"),
                     ':',
                     grant.CanView ? '1' : '0',
                     grant.CanInsert ? '1' : '0',

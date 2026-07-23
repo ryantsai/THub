@@ -3,11 +3,12 @@
 @implements IDisposable
 @using THub.Application.Workflows.Management
 @using THub.Domain.Runs
+@using THub.Domain.Security
 @inject WorkflowRunHistoryService RunHistory
 @inject WorkflowRunService RunCommands
 @inject AuthenticationStateProvider AuthenticationStateProvider
-@inject IAuthorizationService AuthorizationService
 @inject NotificationService Notifications
+@inject AccessControlEvaluator AccessControl
 
 <PageTitle>Runs · THub</PageTitle>
 
@@ -62,7 +63,8 @@
                             <td class="muted">@run.TriggeredBy</td>
                             <td class="run-actions">
                                 <button type="button" @onclick="() => SelectAsync(run.Id)">Details</button>
-                                <AuthorizeView Policy="@Permissions.WorkflowExecute">
+                                @if (ExecutableRuns.Contains(run.Id))
+                                {
                                     @if (run.Status is WorkflowRunStatus.Queued or WorkflowRunStatus.Running)
                                     {
                                         <button type="button" disabled="@(Busy || run.CancellationRequested)" @onclick="() => CancelAsync(run.Id)">@(run.CancellationRequested ? "Cancelling" : "Cancel")</button>
@@ -71,7 +73,7 @@
                                     {
                                         <button type="button" disabled="@Busy" @onclick="() => RetryAsync(run.Id)">Retry exact version</button>
                                     }
-                                </AuthorizeView>
+                                }
                             </td>
                         </tr>
                     }
@@ -126,6 +128,8 @@
     private WorkflowRunStatus? StatusFilter { get; set; }
     private bool Busy { get; set; }
     private string? Error { get; set; }
+    private HashSet<Guid> ExecutableRuns { get; } = [];
+    private Dictionary<Guid, Guid> RunWorkflowIds { get; } = [];
 
     private static IReadOnlyList<StatusOption> StatusOptions { get; } = Enum
         .GetValues<WorkflowRunStatus>()
@@ -151,7 +155,35 @@
                 return;
             }
 
-            Items = result.Value.Items;
+            var authentication = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+            var visible = new List<WorkflowRunListRecord>();
+            ExecutableRuns.Clear();
+            RunWorkflowIds.Clear();
+            foreach (var run in result.Value.Items)
+            {
+                RunWorkflowIds[run.Id] = run.WorkflowId;
+                if (await AccessControl.HasPermissionAsync(
+                        authentication.User,
+                        Permissions.WorkflowView,
+                        AccessResourceKind.Workflow,
+                        run.WorkflowId,
+                        cancellation.Token))
+                {
+                    visible.Add(run);
+                }
+
+                if (await AccessControl.HasPermissionAsync(
+                        authentication.User,
+                        Permissions.WorkflowExecute,
+                        AccessResourceKind.Workflow,
+                        run.WorkflowId,
+                        cancellation.Token))
+                {
+                    ExecutableRuns.Add(run.Id);
+                }
+            }
+
+            Items = visible;
             if (Selected is not null && Items.All(run => run.Id != Selected.Id))
             {
                 Selected = null;
@@ -172,6 +204,12 @@
 
     private async Task SelectAsync(Guid runId)
     {
+        if (!RunWorkflowIds.ContainsKey(runId))
+        {
+            Notify(NotificationSeverity.Error, "Run access is not permitted.");
+            return;
+        }
+
         var result = await RunHistory.LoadAsync(runId, cancellation.Token);
         if (result.IsSuccess)
         {
@@ -185,7 +223,7 @@
 
     private async Task CancelAsync(Guid runId)
     {
-        var actor = await GetAuthorizedExecutionActorAsync();
+        var actor = await GetAuthorizedExecutionActorAsync(runId);
         if (actor is null)
         {
             return;
@@ -218,7 +256,7 @@
 
     private async Task RetryAsync(Guid runId)
     {
-        var actor = await GetAuthorizedExecutionActorAsync();
+        var actor = await GetAuthorizedExecutionActorAsync(runId);
         if (actor is null)
         {
             return;
@@ -248,12 +286,16 @@
         }
     }
 
-    private async Task<string?> GetAuthorizedExecutionActorAsync()
+    private async Task<string?> GetAuthorizedExecutionActorAsync(Guid runId)
     {
         var state = await AuthenticationStateProvider.GetAuthenticationStateAsync();
-        if (!(await AuthorizationService.AuthorizeAsync(
+        if (!RunWorkflowIds.TryGetValue(runId, out var workflowId) ||
+            !await AccessControl.HasPermissionAsync(
                 state.User,
-                Permissions.WorkflowExecute)).Succeeded)
+                Permissions.WorkflowExecute,
+                AccessResourceKind.Workflow,
+                workflowId,
+                cancellation.Token))
         {
             Notify(NotificationSeverity.Error, "Workflow execution permission is required.");
             return null;

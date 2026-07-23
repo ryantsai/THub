@@ -1,6 +1,6 @@
 @page "/designer"
 @page "/designer/{WorkflowId:guid}"
-@attribute [Authorize(Policy = Permissions.WorkflowEdit)]
+@attribute [Authorize]
 @implements IDisposable
 @using System.Text.Json
 @using System.Text.Json.Nodes
@@ -10,6 +10,7 @@
 @using THub.Application.Workflows
 @using THub.Application.Workflows.Management
 @using THub.Domain.Connections
+@using THub.Domain.Security
 @using THub.Domain.Workflows
 @inject ConnectionManagementService ConnectionService
 @inject EmailAlertAdministrationService EmailAdministration
@@ -21,6 +22,7 @@
 @inject AuthenticationStateProvider AuthenticationStateProvider
 @inject NotificationService Notifications
 @inject NavigationManager Navigation
+@inject AccessControlEvaluator AccessControl
 
 <PageTitle>@WorkflowName · THub designer</PageTitle>
 
@@ -32,8 +34,8 @@
     <div class="designer-actions">
         <span class="draft-state"><i></i>@StatusText</span>
         <RadzenButton Text="Validate" Icon="fact_check" ButtonStyle="ButtonStyle.Light" Size="ButtonSize.Small" Click="@Validate" Disabled="@Busy" />
-        <RadzenButton Text="Save draft" Icon="save" ButtonStyle="ButtonStyle.Primary" Size="ButtonSize.Small" Click="@SaveDraftAsync" Disabled="@Busy" />
-        <RadzenButton Text="Publish" Icon="rocket_launch" ButtonStyle="ButtonStyle.Success" Size="ButtonSize.Small" Click="@PublishAsync" Disabled="@Busy" />
+        <RadzenButton Text="Save draft" Icon="save" ButtonStyle="ButtonStyle.Primary" Size="ButtonSize.Small" Click="@SaveDraftAsync" Disabled="@(Busy || !CanEdit)" />
+        <RadzenButton Text="Publish" Icon="rocket_launch" ButtonStyle="ButtonStyle.Success" Size="ButtonSize.Small" Click="@PublishAsync" Disabled="@(Busy || !CanPublish)" />
     </div>
 </div>
 
@@ -451,6 +453,9 @@ else
     private bool Busy { get; set; }
     private bool Loading { get; set; }
     private string? LoadError { get; set; }
+    private System.Security.Claims.ClaimsPrincipal? CurrentUser { get; set; }
+    private bool CanEdit { get; set; }
+    private bool CanPublish { get; set; }
     private IReadOnlyList<GraphValidationIssue> ValidationIssues { get; set; } = [];
     private IReadOnlyList<ConnectionSummary> Connections { get; set; } = [];
     private IReadOnlyList<EmailDeliveryProfileDto> EmailProfiles { get; set; } = [];
@@ -515,13 +520,62 @@ else
     protected override async Task OnInitializedAsync()
     {
         var authentication = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        CurrentUser = authentication.User;
         Owner = authentication.User.Identity?.Name ?? "unknown";
+        if (WorkflowId is null)
+        {
+            CanEdit = await AccessControl.HasPermissionAsync(
+                authentication.User,
+                Permissions.WorkflowCreate,
+                cancellationToken: cancellation.Token);
+            CanPublish = CanEdit && await AccessControl.HasPermissionAsync(
+                authentication.User,
+                Permissions.WorkflowPublish,
+                cancellationToken: cancellation.Token);
+        }
+        else
+        {
+            CanEdit = await AccessControl.HasPermissionAsync(
+                authentication.User,
+                Permissions.WorkflowEdit,
+                AccessResourceKind.Workflow,
+                WorkflowId.Value,
+                cancellation.Token);
+            CanPublish = await AccessControl.HasPermissionAsync(
+                authentication.User,
+                Permissions.WorkflowPublish,
+                AccessResourceKind.Workflow,
+                WorkflowId.Value,
+                cancellation.Token);
+        }
+
+        if (!CanEdit)
+        {
+            LoadError = "You do not have permission to edit this workflow.";
+            return;
+        }
+
         try
         {
             var connectionsTask = ConnectionService.ListAsync(cancellation.Token);
             var profilesTask = EmailAdministration.ListProfilesAsync(cancellation.Token);
             await Task.WhenAll(connectionsTask, profilesTask);
-            Connections = await connectionsTask;
+            var connections = await connectionsTask;
+            var visibleConnections = new List<ConnectionSummary>(connections.Count);
+            foreach (var connection in connections)
+            {
+                if (await AccessControl.HasPermissionAsync(
+                        CurrentUser,
+                        Permissions.ConnectionView,
+                        AccessResourceKind.Connection,
+                        connection.Id,
+                        cancellation.Token))
+                {
+                    visibleConnections.Add(connection);
+                }
+            }
+
+            Connections = visibleConnections;
             var profiles = await profilesTask;
             if (profiles.IsSuccess && profiles.Value is not null)
             {
@@ -1412,6 +1466,23 @@ else
 
     private async Task SaveDraftAsync()
     {
+        if (CurrentUser is null ||
+            (WorkflowId is null
+                ? !await AccessControl.HasPermissionAsync(
+                    CurrentUser,
+                    Permissions.WorkflowCreate,
+                    cancellationToken: cancellation.Token)
+                : !await AccessControl.HasPermissionAsync(
+                    CurrentUser,
+                    Permissions.WorkflowEdit,
+                    AccessResourceKind.Workflow,
+                    WorkflowId.Value,
+                    cancellation.Token)))
+        {
+            Notifications.Notify(NotificationSeverity.Error, "Not authorized", "Workflow edit permission is required.");
+            return;
+        }
+
         Busy = true;
         try
         {
@@ -1477,6 +1548,18 @@ else
             {
                 return;
             }
+        }
+
+        if (CurrentUser is null ||
+            !await AccessControl.HasPermissionAsync(
+                CurrentUser,
+                Permissions.WorkflowPublish,
+                AccessResourceKind.Workflow,
+                WorkflowId.Value,
+                cancellation.Token))
+        {
+            Notifications.Notify(NotificationSeverity.Error, "Not authorized", "Workflow publish permission is required.");
+            return;
         }
 
         Busy = true;

@@ -17,7 +17,7 @@ public sealed class SqlPublicationGrantStore(
         return await db.PublicationGrants
             .AsNoTracking()
             .Where(grant => grant.PublicationId == publicationId)
-            .OrderBy(grant => grant.Role)
+            .OrderBy(grant => grant.RoleId)
             .ToListAsync(cancellationToken)
             .ConfigureAwait(false);
     }

@@ -1,61 +1,339 @@
 @page "/settings"
-@attribute [Authorize(Policy = Permissions.Administration)]
-@inject Microsoft.Extensions.Options.IOptions<RoleMappingOptions> RoleMappingOptions
+@attribute [Authorize(Policy = Permissions.SecurityManage)]
+@using THub.Application.Security
+@using THub.Domain.Security
+@inject AccessControlAdministrationService AccessControl
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject NotificationService Notifications
 
-<PageTitle>Settings · THub</PageTitle>
+<PageTitle>Access control · THub</PageTitle>
 
 <div class="page-heading">
     <div>
         <div class="eyebrow">Administration</div>
-        <h1>Platform settings</h1>
-        <p>Effective Windows-group role mappings loaded by this web host.</p>
+        <h1>Roles and access</h1>
+        <p>SQL-backed roles, Windows users and groups, global capabilities, and resource-specific grants.</p>
+    </div>
+    <div class="heading-actions">
+        <RadzenButton Text="New custom role" Icon="group_add" ButtonStyle="ButtonStyle.Primary" Click="@StartCreate" Disabled="@Busy" />
+        <RadzenButton Text="Refresh" Icon="refresh" ButtonStyle="ButtonStyle.Light" Click="@LoadAsync" Disabled="@Busy" />
     </div>
 </div>
+
+@if (!string.IsNullOrWhiteSpace(Error))
+{
+    <div class="inline-alert warning"><RadzenIcon Icon="warning_amber" /><span>@Error</span></div>
+}
 
 <section class="panel">
     <div class="panel-head">
         <div>
-            <h2>Role mapping</h2>
-            <p>Configure these values under <code>Authorization:RoleMappings</code> in deployment configuration, then restart the web host.</p>
+            <h2>Effective roles</h2>
+            <p>System Administrator always has every capability and resource. Developer can create, edit, publish, and execute workflows.</p>
         </div>
     </div>
-
-    @if (Mappings.Administrators.Length == 0)
-    {
-        <div class="inline-alert warning"><RadzenIcon Icon="warning_amber" /><span>No administrator group is configured in this host. Set a real Windows or Active Directory group before production use.</span></div>
-    }
-
     <table class="activity-table">
-        <thead><tr><th>Application role</th><th>Configured Windows groups</th><th>Capabilities</th></tr></thead>
+        <thead><tr><th>Role</th><th>Type</th><th>Principals</th><th>Global permissions</th><th>Resource grants</th><th></th></tr></thead>
         <tbody>
-            @foreach (var row in MappingRows)
+            @foreach (var role in Roles)
             {
                 <tr>
-                    <td><strong>@row.Role</strong></td>
-                    <td>@GroupSummary(row.Groups)</td>
-                    <td class="muted">@row.Capabilities</td>
+                    <td><strong>@role.Name</strong><div class="muted">@role.Description</div></td>
+                    <td>@(role.SystemRole is null ? "Custom" : "System")</td>
+                    <td>@role.Assignments.Count</td>
+                    <td>@(role.SystemRole == SystemRoleKind.SystemAdministrator ? "All" : role.Permissions.Count.ToString())</td>
+                    <td>@role.ResourceGrants.Count</td>
+                    <td><button type="button" @onclick="() => Edit(role)">Manage</button></td>
                 </tr>
             }
         </tbody>
     </table>
-
-    <div class="panel-foot-note">Authenticated users that match no configured group receive the <strong>@Mappings.DefaultAuthenticatedRole</strong> role.</div>
 </section>
 
+@if (Editor is not null)
+{
+    <section class="panel">
+        <div class="panel-head">
+            <div>
+                <h2>@(Editor.RoleId is null ? "Create custom role" : Editor.Name)</h2>
+                <p>Assignments match the authenticated Windows user name or Windows/AD group membership.</p>
+            </div>
+            <button class="icon-close" type="button" @onclick="CloseEditor">×</button>
+        </div>
+
+        @if (!Editor.IsSystem)
+        {
+            <div class="inline-form">
+                <label><span>Name</span><input maxlength="100" @bind="Editor.Name" /></label>
+                <label><span>Description</span><input maxlength="500" @bind="Editor.Description" /></label>
+            </div>
+
+            <h3>Global permissions</h3>
+            <div class="permission-grid">
+                @foreach (var permission in PermissionOptions)
+                {
+                    <label><input type="checkbox" checked="@Editor.Permissions.Contains(permission)" @onchange="eventArgs => TogglePermission(permission, eventArgs)" /><span>@permission</span></label>
+                }
+            </div>
+        }
+        else
+        {
+            <div class="inline-alert"><RadzenIcon Icon="verified_user" /><span>System-role permissions are fixed. Principal assignments remain editable.</span></div>
+        }
+
+        <div class="section-heading">
+            <div><h3>Windows principals</h3><p>Use canonical names such as <code>DOMAIN\alice</code> or <code>DOMAIN\THub Developers</code>.</p></div>
+            <button type="button" @onclick="AddAssignment">Add principal</button>
+        </div>
+        @foreach (var assignment in Editor.Assignments)
+        {
+            <div class="inline-form three">
+                <label><span>Kind</span><select @bind="assignment.Kind"><option value="@AccessPrincipalKind.User">User</option><option value="@AccessPrincipalKind.WindowsGroup">Windows group</option></select></label>
+                <label><span>Principal name</span><input maxlength="256" @bind="assignment.Name" /></label>
+                <div class="field-button"><button type="button" @onclick="() => Editor.Assignments.Remove(assignment)">Remove</button></div>
+            </div>
+        }
+
+        @if (!Editor.IsSystem)
+        {
+            <div class="section-heading">
+                <div><h3>Resource grants</h3><p>Grant a capability only on one workflow, publication, or connection identifier.</p></div>
+                <button type="button" @onclick="AddGrant">Add resource grant</button>
+            </div>
+            @foreach (var grant in Editor.Grants)
+            {
+                <div class="inline-form four">
+                    <label><span>Resource</span><select value="@grant.Kind" @onchange="eventArgs => ChangeGrantKind(grant, eventArgs)">@foreach (var kind in Enum.GetValues<AccessResourceKind>()){<option value="@kind">@kind</option>}</select></label>
+                    <label><span>Resource ID</span><input @bind="grant.ResourceId" /></label>
+                    <label><span>Permission</span><select @bind="grant.Permission">@foreach (var permission in ResourcePermissionOptions(grant.Kind)){<option value="@permission">@permission</option>}</select></label>
+                    <div class="field-button"><button type="button" @onclick="() => Editor.Grants.Remove(grant)">Remove</button></div>
+                </div>
+            }
+        }
+
+        <div class="form-actions">
+            @if (Editor.RoleId is not null && !Editor.IsSystem)
+            {
+                <RadzenButton Text="Delete role" Icon="delete" ButtonStyle="ButtonStyle.Danger" Click="@DeleteAsync" Disabled="@Busy" />
+            }
+            <RadzenButton Text="Save" Icon="save" ButtonStyle="ButtonStyle.Primary" Click="@SaveAsync" Disabled="@Busy" />
+        </div>
+    </section>
+}
+
 @code {
-    private RoleMappingOptions Mappings => RoleMappingOptions.Value;
+    private IReadOnlyList<AccessRoleDto> Roles { get; set; } = [];
+    private RoleEditor? Editor { get; set; }
+    private bool Busy { get; set; }
+    private string? Error { get; set; }
+    private static IReadOnlyList<string> PermissionOptions =>
+        SecurityPermissions.GlobalAssignable.Order(StringComparer.Ordinal).ToArray();
 
-    private IEnumerable<MappingRow> MappingRows =>
-    [
-        new("Administrator", Mappings.Administrators, "All platform operations"),
-        new("Designer", Mappings.Designers, "Connections, workflows, and publications"),
-        new("Operator", Mappings.Operators, "Run, schedule, and monitor workflows"),
-        new("Viewer", Mappings.Viewers, "Read workflow and run status")
-    ];
+    protected override Task OnInitializedAsync() => LoadAsync();
 
-    private static string GroupSummary(string[] groups) => groups.Length == 0
-        ? "Not configured"
-        : string.Join(", ", groups);
+    private async Task LoadAsync()
+    {
+        Busy = true;
+        Error = null;
+        try
+        {
+            Roles = (await AccessControl.ListAsync(CancellationToken.None)).Roles;
+        }
+        catch (Exception)
+        {
+            Error = "Role data could not be loaded.";
+        }
+        finally
+        {
+            Busy = false;
+        }
+    }
 
-    private sealed record MappingRow(string Role, string[] Groups, string Capabilities);
+    private void StartCreate() => Editor = new RoleEditor();
+
+    private void Edit(AccessRoleDto role) => Editor = new RoleEditor(role);
+
+    private void CloseEditor() => Editor = null;
+
+    private void AddAssignment() => Editor?.Assignments.Add(new AssignmentEditor());
+
+    private void AddGrant()
+    {
+        var kind = AccessResourceKind.Workflow;
+        Editor?.Grants.Add(new GrantEditor
+        {
+            Kind = kind,
+            Permission = ResourcePermissionOptions(kind)[0],
+        });
+    }
+
+    private void TogglePermission(string permission, ChangeEventArgs eventArgs)
+    {
+        if (Editor is null)
+        {
+            return;
+        }
+
+        if (eventArgs.Value is true)
+        {
+            Editor.Permissions.Add(permission);
+        }
+        else
+        {
+            Editor.Permissions.Remove(permission);
+        }
+    }
+
+    private static void ChangeGrantKind(GrantEditor grant, ChangeEventArgs eventArgs)
+    {
+        if (Enum.TryParse<AccessResourceKind>(eventArgs.Value?.ToString(), out var kind))
+        {
+            grant.Kind = kind;
+            grant.Permission = ResourcePermissionOptions(kind)[0];
+        }
+    }
+
+    private static IReadOnlyList<string> ResourcePermissionOptions(AccessResourceKind kind) =>
+        SecurityPermissions.ResourcePermissions[kind].Order(StringComparer.Ordinal).ToArray();
+
+    private async Task SaveAsync()
+    {
+        if (Editor is null)
+        {
+            return;
+        }
+
+        Busy = true;
+        try
+        {
+            AccessRoleWriteStatus status;
+            var assignments = Editor.Assignments
+                .Select(item => new SaveAccessRoleAssignmentCommand(item.Kind, item.Name))
+                .ToArray();
+            if (Editor.IsSystem)
+            {
+                status = await AccessControl.ReplaceAssignmentsAsync(
+                    Editor.RoleId!.Value,
+                    assignments,
+                    CancellationToken.None);
+            }
+            else
+            {
+                status = await AccessControl.SaveAsync(
+                    new SaveAccessRoleCommand(
+                        Editor.RoleId,
+                        Editor.Name,
+                        Editor.Description,
+                        Editor.Permissions.Order(StringComparer.Ordinal).ToArray(),
+                        assignments,
+                        Editor.Grants.Select(item => new SaveAccessResourceGrantCommand(
+                            item.Kind,
+                            Guid.TryParse(item.ResourceId, out var id) ? id : Guid.Empty,
+                            item.Permission)).ToArray(),
+                        await GetActorAsync()),
+                    CancellationToken.None);
+            }
+
+            Notify(status == AccessRoleWriteStatus.Saved, $"Role save result: {status}.");
+            if (status == AccessRoleWriteStatus.Saved)
+            {
+                Editor = null;
+                await LoadAsync();
+            }
+        }
+        catch (Exception exception) when (exception is ArgumentException or InvalidOperationException)
+        {
+            Notify(false, exception.Message);
+        }
+        finally
+        {
+            Busy = false;
+        }
+    }
+
+    private async Task DeleteAsync()
+    {
+        if (Editor?.RoleId is not Guid roleId)
+        {
+            return;
+        }
+
+        Busy = true;
+        try
+        {
+            var status = await AccessControl.DeleteAsync(roleId, CancellationToken.None);
+            Notify(status == AccessRoleWriteStatus.Saved, $"Role delete result: {status}.");
+            if (status == AccessRoleWriteStatus.Saved)
+            {
+                Editor = null;
+                await LoadAsync();
+            }
+        }
+        finally
+        {
+            Busy = false;
+        }
+    }
+
+    private async Task<string> GetActorAsync() =>
+        (await AuthenticationStateProvider.GetAuthenticationStateAsync()).User.Identity?.Name ?? "unknown";
+
+    private void Notify(bool success, string detail) =>
+        Notifications.Notify(new NotificationMessage
+        {
+            Severity = success ? NotificationSeverity.Success : NotificationSeverity.Error,
+            Summary = success ? "Access updated" : "Access update failed",
+            Detail = detail,
+            Duration = 6_000,
+        });
+
+    private sealed class RoleEditor
+    {
+        public RoleEditor()
+        {
+        }
+
+        public RoleEditor(AccessRoleDto role)
+        {
+            RoleId = role.Id;
+            Name = role.Name;
+            Description = role.Description;
+            IsSystem = role.SystemRole is not null;
+            Permissions = role.Permissions.ToHashSet(StringComparer.Ordinal);
+            Assignments = role.Assignments
+                .Select(item => new AssignmentEditor
+                {
+                    Kind = item.PrincipalKind,
+                    Name = item.PrincipalName,
+                }).ToList();
+            Grants = role.ResourceGrants
+                .Select(item => new GrantEditor
+                {
+                    Kind = item.ResourceKind,
+                    ResourceId = item.ResourceId.ToString(),
+                    Permission = item.Permission,
+                }).ToList();
+        }
+
+        public Guid? RoleId { get; }
+        public bool IsSystem { get; }
+        public string Name { get; set; } = string.Empty;
+        public string Description { get; set; } = string.Empty;
+        public HashSet<string> Permissions { get; set; } = new(StringComparer.Ordinal);
+        public List<AssignmentEditor> Assignments { get; set; } = [];
+        public List<GrantEditor> Grants { get; set; } = [];
+    }
+
+    private sealed class AssignmentEditor
+    {
+        public AccessPrincipalKind Kind { get; set; }
+        public string Name { get; set; } = string.Empty;
+    }
+
+    private sealed class GrantEditor
+    {
+        public AccessResourceKind Kind { get; set; }
+        public string ResourceId { get; set; } = string.Empty;
+        public string Permission { get; set; } = string.Empty;
+    }
 }

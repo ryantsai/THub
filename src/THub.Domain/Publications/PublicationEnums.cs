@@ -53,14 +53,6 @@ public enum PublicationLookupMode
     ServerFiltered,
 }
 
-public enum PublicationRole
-{
-    Viewer,
-    Operator,
-    Designer,
-    Administrator,
-}
-
 public enum PublicationOperation
 {
     View,

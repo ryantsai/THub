@@ -3,9 +3,11 @@
 @implements IDisposable
 @using THub.Application.Workflows.Management
 @using THub.Domain.Workflows
+@using THub.Domain.Security
 @inject WorkflowCatalogService WorkflowCatalog
 @inject AuthenticationStateProvider AuthenticationStateProvider
 @inject NotificationService Notifications
+@inject AccessControlEvaluator AccessControl
 
 <PageTitle>Schedules · THub</PageTitle>
 
@@ -90,8 +92,23 @@
                 return;
             }
 
-            ScheduledWorkflows = result.Value.Items
-                .Where(workflow => !string.IsNullOrWhiteSpace(workflow.CronExpression))
+            var authentication = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+            var permitted = new List<WorkflowListItemDto>();
+            foreach (var workflow in result.Value.Items.Where(workflow =>
+                         !string.IsNullOrWhiteSpace(workflow.CronExpression)))
+            {
+                if (await AccessControl.HasPermissionAsync(
+                        authentication.User,
+                        Permissions.ScheduleManage,
+                        AccessResourceKind.Workflow,
+                        workflow.Id,
+                        cancellation.Token))
+                {
+                    permitted.Add(workflow);
+                }
+            }
+
+            ScheduledWorkflows = permitted
                 .OrderBy(workflow => workflow.NextRunAtUtc ?? DateTimeOffset.MaxValue)
                 .ThenBy(workflow => workflow.Name)
                 .ToArray();
@@ -111,6 +128,12 @@
 
     private async Task PauseAsync(WorkflowListItemDto workflow)
     {
+        if (!await CanManageAsync(workflow.Id))
+        {
+            Notify(false, "Schedule management permission is required.");
+            return;
+        }
+
         Busy = true;
         try
         {
@@ -128,6 +151,12 @@
 
     private async Task ResumeAsync(WorkflowListItemDto workflow)
     {
+        if (!await CanManageAsync(workflow.Id))
+        {
+            Notify(false, "Schedule management permission is required.");
+            return;
+        }
+
         Busy = true;
         try
         {
@@ -154,6 +183,17 @@
         Detail = detail,
         Duration = 5_000
     });
+
+    private async Task<bool> CanManageAsync(Guid workflowId)
+    {
+        var state = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        return await AccessControl.HasPermissionAsync(
+            state.User,
+            Permissions.ScheduleManage,
+            AccessResourceKind.Workflow,
+            workflowId,
+            cancellation.Token);
+    }
 
     private static string StatusCss(WorkflowStatus status) => status switch
     {

@@ -1,0 +1,22 @@
+.permission-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: .55rem 1rem;
+    margin: .75rem 0 1.25rem;
+}
+
+.permission-grid label {
+    align-items: center;
+    display: flex;
+    gap: .55rem;
+}
+
+.inline-form.four {
+    grid-template-columns: minmax(130px, .7fr) minmax(240px, 1.3fr) minmax(220px, 1fr) auto;
+}
+
+@media (max-width: 900px) {
+    .inline-form.four {
+        grid-template-columns: 1fr;
+    }
+}

@@ -18,7 +18,7 @@
             <NavLink href="/runs"><RadzenIcon Icon="play_circle" />Runs</NavLink>
 
             <span class="nav-section">Data plane</span>
-            <AuthorizeView Policy="@Permissions.ConnectionManage">
+            <AuthorizeView Policy="@Permissions.ConnectionView">
                 <NavLink href="/connections"><RadzenIcon Icon="database" />Connections</NavLink>
             </AuthorizeView>
             <AuthorizeView Policy="@Permissions.ScheduleManage">
@@ -34,7 +34,7 @@
         </nav>
 
         <div class="sidebar-foot">
-            <AuthorizeView Policy="@Permissions.Administration">
+            <AuthorizeView Policy="@Permissions.SecurityManage">
                 <NavLink class="settings-link" href="/settings"><RadzenIcon Icon="settings" />Settings</NavLink>
             </AuthorizeView>
         </div>

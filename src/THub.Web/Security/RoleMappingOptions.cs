@@ -1,13 +1,11 @@
 namespace THub.Web.Security;
 
-public sealed class RoleMappingOptions
+public sealed class AuthorizationBootstrapOptions
 {
-    public const string SectionName = "Authorization:RoleMappings";
+    public const string SectionName = "Authorization:Bootstrap";
 
-    public string DefaultAuthenticatedRole { get; init; } = nameof(AppRole.Viewer);
-    public string[] Administrators { get; init; } = [];
-    public string[] Designers { get; init; } = [];
-    public string[] Operators { get; init; } = [];
-    public string[] Viewers { get; init; } = [];
+    public string[] SystemAdministratorUsers { get; init; } = [];
+    public string[] SystemAdministratorGroups { get; init; } = [];
+    public string[] DeveloperUsers { get; init; } = [];
+    public string[] DeveloperGroups { get; init; } = [];
 }
-

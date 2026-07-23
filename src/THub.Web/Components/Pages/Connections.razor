@@ -1,12 +1,14 @@
 @page "/connections"
-@attribute [Authorize(Policy = Permissions.ConnectionManage)]
+@attribute [Authorize]
 @implements IDisposable
 @using THub.Application.Connections
 @using THub.Domain.Connections
+@using THub.Domain.Security
 @inject ConnectionManagementService ConnectionService
 @inject AuthenticationStateProvider AuthenticationStateProvider
 @inject NotificationService Notifications
 @inject TimeProvider TimeProvider
+@inject AccessControlEvaluator AccessControl
 
 <PageTitle>Connections · THub</PageTitle>
 
@@ -17,7 +19,7 @@
         <p>Approved database, FTP/FTPS, and bounded local file connections.</p>
     </div>
     <div class="heading-actions">
-        <RadzenButton Text="New connection" Icon="add" ButtonStyle="ButtonStyle.Primary" Click="@NewConnection" Disabled="@Busy" />
+        <RadzenButton Text="New connection" Icon="add" ButtonStyle="ButtonStyle.Primary" Click="@NewConnection" Disabled="@(Busy || !CanCreate)" />
         <RadzenButton Text="Refresh" Icon="refresh" ButtonStyle="ButtonStyle.Light" Click="@LoadAsync" Disabled="@Busy" />
     </div>
 </div>
@@ -45,7 +47,10 @@ else
                     <div><h2>@item.Name</h2><p>@KindLabel(item.Kind)</p></div>
                     <span class="status-chip @(item.IsEnabled ? null : "draft")">@(item.IsEnabled ? "Enabled" : "Disabled")</span>
                     <dl><dt>Connector</dt><dd>@item.Kind</dd><dt>Updated</dt><dd>@item.UpdatedAtUtc.ToLocalTime().ToString("g")</dd></dl>
-                    <button type="button" @onclick="() => EditConnectionAsync(item.Id)">Manage connection →</button>
+                    @if (CanManage.Contains(item.Id))
+                    {
+                        <button type="button" @onclick="() => EditConnectionAsync(item.Id)">Manage connection →</button>
+                    }
                 </article>
             }
         </section>
@@ -156,6 +161,8 @@ else
     private string? LoadError { get; set; }
     private string? FormError { get; set; }
     private ConnectionProbeResult? ProbeResult { get; set; }
+    private bool CanCreate { get; set; }
+    private HashSet<Guid> CanManage { get; } = [];
 
     protected override Task OnInitializedAsync() => LoadAsync();
 
@@ -165,7 +172,39 @@ else
         LoadError = null;
         try
         {
-            Items = await ConnectionService.ListAsync(cancellation.Token);
+            var authentication = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+            CanCreate = await AccessControl.HasPermissionAsync(
+                authentication.User,
+                Permissions.ConnectionManage,
+                cancellationToken: cancellation.Token);
+            CanManage.Clear();
+            var visible = new List<ConnectionSummary>();
+            foreach (var connection in await ConnectionService.ListAsync(cancellation.Token))
+            {
+                var canManage = await AccessControl.HasPermissionAsync(
+                    authentication.User,
+                    Permissions.ConnectionManage,
+                    AccessResourceKind.Connection,
+                    connection.Id,
+                    cancellation.Token);
+                var canView = canManage || await AccessControl.HasPermissionAsync(
+                    authentication.User,
+                    Permissions.ConnectionView,
+                    AccessResourceKind.Connection,
+                    connection.Id,
+                    cancellation.Token);
+                if (canView)
+                {
+                    visible.Add(connection);
+                }
+
+                if (canManage)
+                {
+                    CanManage.Add(connection.Id);
+                }
+            }
+
+            Items = visible;
         }
         catch (OperationCanceledException) when (cancellation.IsCancellationRequested)
         {
@@ -182,6 +221,11 @@ else
 
     private void NewConnection()
     {
+        if (!CanCreate)
+        {
+            return;
+        }
+
         Edit = ConnectionEditModel.Create();
         FormError = null;
         ProbeResult = null;
@@ -190,6 +234,12 @@ else
 
     private async Task EditConnectionAsync(Guid id)
     {
+        if (!CanManage.Contains(id))
+        {
+            Notify(NotificationSeverity.Error, "You do not have permission to manage this connection.");
+            return;
+        }
+
         Busy = true;
         try
         {
@@ -214,6 +264,12 @@ else
 
     private async Task SaveAsync()
     {
+        if (Edit.Id is Guid existingId ? !CanManage.Contains(existingId) : !CanCreate)
+        {
+            Notify(NotificationSeverity.Error, "You do not have permission to save this connection.");
+            return;
+        }
+
         Busy = true;
         FormError = null;
         ProbeResult = null;
@@ -268,7 +324,7 @@ else
 
     private async Task ProbeAsync()
     {
-        if (Edit.Id is not { } id)
+        if (Edit.Id is not { } id || !CanManage.Contains(id))
         {
             return;
         }
@@ -286,7 +342,7 @@ else
 
     private async Task ToggleAsync()
     {
-        if (Edit.Id is not { } id)
+        if (Edit.Id is not { } id || !CanManage.Contains(id))
         {
             return;
         }

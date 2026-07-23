@@ -4,6 +4,7 @@ using THub.Application.Connections;
 using THub.Application.Execution;
 using THub.Application.Publications;
 using THub.Application.Scheduling;
+using THub.Application.Security;
 using THub.Application.Workflows;
 using THub.Application.Workflows.Management;
 
@@ -34,6 +35,7 @@ public static class DependencyInjection
         services.AddScoped<EmailAlertAdministrationService>();
         services.AddScoped<EmailAlertMonitoringService>();
         services.AddScoped<WorkflowTerminalAlertService>();
+        services.AddScoped<AccessControlAdministrationService>();
         services.AddSingleton(TimeProvider.System);
         return services;
     }

@@ -3,6 +3,7 @@ using THub.Domain.Alerts;
 using THub.Domain.Connections;
 using THub.Domain.Publications;
 using THub.Domain.Runs;
+using THub.Domain.Security;
 using THub.Domain.Workflows;
 
 namespace THub.Infrastructure.Persistence;
@@ -24,6 +25,10 @@ public sealed class THubDbContext(DbContextOptions<THubDbContext> options) : DbC
     public DbSet<PublicationAccessToken> PublicationAccessTokens => Set<PublicationAccessToken>();
     public DbSet<PublicationChangeSet> PublicationChangeSets => Set<PublicationChangeSet>();
     public DbSet<PublicationChange> PublicationChanges => Set<PublicationChange>();
+    public DbSet<AccessRole> AccessRoles => Set<AccessRole>();
+    public DbSet<AccessRolePermission> AccessRolePermissions => Set<AccessRolePermission>();
+    public DbSet<AccessRoleAssignment> AccessRoleAssignments => Set<AccessRoleAssignment>();
+    public DbSet<AccessResourceGrant> AccessResourceGrants => Set<AccessResourceGrant>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

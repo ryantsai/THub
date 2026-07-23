@@ -3,6 +3,7 @@
 @implements IDisposable
 @using THub.Application.Connections
 @using THub.Application.Publications
+@using THub.Application.Security
 @using THub.Domain.Connections
 @using THub.Domain.Publications
 @inject PublicationCatalogService Catalog
@@ -13,6 +14,7 @@
 @inject AuthenticationStateProvider AuthenticationStateProvider
 @inject NotificationService Notifications
 @inject TimeProvider TimeProvider
+@inject AccessControlAdministrationService AccessControl
 
 <PageTitle>Publications · THub</PageTitle>
 
@@ -221,7 +223,7 @@
         {
             <div class="detail-section">
                 <div class="section-heading"><div><h3>Editor role grants</h3><p>Management permission does not imply data access. Every load, lookup, stage, review, and apply is checked server-side.</p></div></div>
-                <table class="grant-table"><thead><tr><th>Global role</th><th>View</th><th>Insert</th><th>Update</th><th>Delete</th><th>Approve</th></tr></thead><tbody>@foreach (var grant in GrantRows){<tr><td><strong>@grant.Role</strong></td><td><input type="checkbox" @bind="grant.CanView" /></td><td><input type="checkbox" @bind="grant.CanInsert" /></td><td><input type="checkbox" @bind="grant.CanUpdate" /></td><td><input type="checkbox" @bind="grant.CanDelete" /></td><td><input type="checkbox" @bind="grant.CanApprove" /></td></tr>}</tbody></table>
+                <table class="grant-table"><thead><tr><th>Role</th><th>View</th><th>Insert</th><th>Update</th><th>Delete</th><th>Approve</th></tr></thead><tbody>@foreach (var grant in GrantRows){<tr><td><strong>@grant.RoleName</strong></td><td><input type="checkbox" @bind="grant.CanView" /></td><td><input type="checkbox" @bind="grant.CanInsert" /></td><td><input type="checkbox" @bind="grant.CanUpdate" /></td><td><input type="checkbox" @bind="grant.CanDelete" /></td><td><input type="checkbox" @bind="grant.CanApprove" /></td></tr>}</tbody></table>
                 <div class="form-actions"><RadzenButton Text="Save role grants" Icon="save" ButtonStyle="ButtonStyle.Primary" Click="@SaveGrantsAsync" Disabled="@Busy" /></div>
             </div>
         }
@@ -256,6 +258,7 @@
     private CreatedPublicationTokenDto? CreatedToken { get; set; }
     private string GrantFingerprint { get; set; } = string.Empty;
     private List<GrantRowModel> GrantRows { get; set; } = [];
+    private IReadOnlyList<AccessRoleDto> AccessRoles { get; set; } = [];
 
     protected override Task OnInitializedAsync() => LoadAsync();
 
@@ -267,7 +270,8 @@
         {
             var publicationsTask = Catalog.ListAsync(new PublicationCatalogQuery(), cancellation.Token);
             var connectionsTask = ConnectionService.ListAsync(cancellation.Token);
-            await Task.WhenAll(publicationsTask, connectionsTask);
+            var rolesTask = AccessControl.ListAsync(cancellation.Token);
+            await Task.WhenAll(publicationsTask, connectionsTask, rolesTask);
             var result = await publicationsTask;
             if (!result.IsSuccess || result.Value is null)
             {
@@ -276,6 +280,7 @@
             }
             Items = result.Value;
             SqlConnections = (await connectionsTask).Where(connection => connection.Kind == ConnectionKind.SqlServer && connection.IsEnabled).ToArray();
+            AccessRoles = (await rolesTask).Roles;
             if (Selected is not null)
             {
                 await SelectAsync(Selected.Id);
@@ -536,10 +541,10 @@
             return;
         }
         GrantFingerprint = result.Value.Fingerprint;
-        GrantRows = Enum.GetValues<PublicationRole>().Select(role =>
+        GrantRows = AccessRoles.Select(role =>
         {
-            var existing = result.Value.Grants.SingleOrDefault(grant => grant.Role == role);
-            return new GrantRowModel(role, existing);
+            var existing = result.Value.Grants.SingleOrDefault(grant => grant.RoleId == role.Id);
+            return new GrantRowModel(role.Id, role.Name, existing);
         }).ToList();
     }
 
@@ -736,9 +741,9 @@
         }
     }
 
-    private sealed class GrantRowModel(PublicationRole role, PublicationGrantDto? existing)
+    private sealed class GrantRowModel(Guid roleId, string roleName, PublicationGrantDto? existing)
     {
-        public PublicationRole Role { get; } = role; public bool CanView { get; set; } = existing?.CanView ?? false; public bool CanInsert { get; set; } = existing?.CanInsert ?? false; public bool CanUpdate { get; set; } = existing?.CanUpdate ?? false; public bool CanDelete { get; set; } = existing?.CanDelete ?? false; public bool CanApprove { get; set; } = existing?.CanApprove ?? false;
-        public PublicationGrantCommand ToCommand() => new(Role, CanView, CanInsert, CanUpdate, CanDelete, CanApprove);
+        public Guid RoleId { get; } = roleId; public string RoleName { get; } = roleName; public bool CanView { get; set; } = existing?.CanView ?? false; public bool CanInsert { get; set; } = existing?.CanInsert ?? false; public bool CanUpdate { get; set; } = existing?.CanUpdate ?? false; public bool CanDelete { get; set; } = existing?.CanDelete ?? false; public bool CanApprove { get; set; } = existing?.CanApprove ?? false;
+        public PublicationGrantCommand ToCommand() => new(RoleId, CanView, CanInsert, CanUpdate, CanDelete, CanApprove);
     }
 }

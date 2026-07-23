@@ -1,5 +1,15 @@
 # Deployment and operations
 
+## Authorization bootstrap
+
+SQL Server is authoritative for roles, permissions, assignments, and resource grants. Before the first production start, configure at least one emergency/bootstrap administrator user or Windows group:
+
+```text
+Authorization__Bootstrap__SystemAdministratorGroups__0=DOMAIN\THub System Administrators
+```
+
+Optional Developer users/groups use `DeveloperUsers` or `DeveloperGroups`. Bootstrap arrays do not replace persisted role administration, and an unmapped authenticated identity is denied by default.
+
 ## Recommended topology
 
 The accepted initial production topology is Windows Server with separate IIS applications/hostnames for `THub.Web` and one `THub.Publications` instance, one `THub.Worker` Windows Service, and an existing SQL Server instance. The publication host is functional, but production use still requires a real internal hostname/certificate, firewall policy, separate least-privilege identities, reviewed migrations, source-object grants, and live SQL Server verification.

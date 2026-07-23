@@ -20,7 +20,7 @@ public sealed class SqlPublicationGrantManagementStore(
         ArgumentException.ThrowIfNullOrWhiteSpace(expectedFingerprint);
         ArgumentNullException.ThrowIfNull(grants);
         if (grants.Any(grant => grant.PublicationId != publicationId) ||
-            grants.Select(grant => grant.Role).Distinct().Count() != grants.Count)
+            grants.Select(grant => grant.RoleId).Distinct().Count() != grants.Count)
         {
             return PublicationGrantWriteStatus.Conflict;
         }
@@ -56,7 +56,7 @@ public sealed class SqlPublicationGrantManagementStore(
 
                 var current = await db.PublicationGrants
                     .Where(grant => grant.PublicationId == publicationId)
-                    .OrderBy(grant => grant.Role)
+                    .OrderBy(grant => grant.RoleId)
                     .ToListAsync(cancellationToken)
                     .ConfigureAwait(false);
                 var currentFingerprint = PublicationGrantFingerprint.Compute(current);

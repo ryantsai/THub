@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using THub.Application.Publications;
 using THub.Domain.Connections;
 using THub.Domain.Publications;
+using THub.Domain.Security;
 using THub.Infrastructure.Persistence;
 using THub.Infrastructure.Publications;
 
@@ -111,7 +112,14 @@ public sealed class SqlPublicationGrantManagementStoreIntegrationTests
             PublicationKind.Editor,
             "integration-test",
             Now);
-        db.AddRange(connection, publication);
+        var role = new AccessRole(
+            PublicationRole.Operator,
+            "Integration operator",
+            "Integration-test publication role.",
+            null,
+            Now,
+            "integration-test");
+        db.AddRange(connection, publication, role);
         await db.SaveChangesAsync();
 
         var versionId = Guid.NewGuid();

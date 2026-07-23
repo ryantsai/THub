@@ -17,7 +17,7 @@ Accepted ADRs are not immutable. Supersede them when evidence changes; do not si
 | --- | --- | --- |
 | [0001](0001-modular-monolith-on-dotnet-10.md) | Accepted | Modular monolith on .NET 10 |
 | [0002](0002-blazor-interactive-server-and-radzen.md) | Accepted | Blazor Interactive Server and Radzen UI |
-| [0003](0003-windows-authentication-and-permission-policies.md) | Accepted | Windows Authentication and permission policies |
+| [0003](0003-windows-authentication-and-permission-policies.md) | Superseded | Windows Authentication and permission policies |
 | [0004](0004-sql-server-control-plane-and-windows-worker.md) | Superseded | Initial SQL polling scheduler and Windows worker |
 | [0005](0005-versioned-dag-workflow-model.md) | Accepted | Versioned DAG workflow model |
 | [0006](0006-v1-sql-server-and-local-file-connectors.md) | Superseded | Initial SQL Server and local-file connector scope |
@@ -30,6 +30,7 @@ Accepted ADRs are not immutable. Supersede them when evidence changes; do not si
 | [0013](0013-provider-neutral-database-authentication.md) | Accepted | Provider-neutral referenced database credentials |
 | [0014](0014-expand-relational-and-ftp-connectors.md) | Accepted | MySQL, PostgreSQL, Oracle, and FTP/FTPS workflow connectors |
 | [0015](0015-bounded-workflow-variables-and-javascript-expressions.md) | Accepted | Bounded workflow variables and JavaScript value expressions |
+| [0016](0016-sql-backed-custom-role-and-resource-authorization.md) | Accepted | SQL-backed custom roles and resource authorization |
 
 ## Creating an ADR
 

@@ -21,7 +21,7 @@ Quartz owns schedule timing, persistence, misfire handling, and scheduler cluste
 | Capability | Status | Notes |
 | --- | --- | --- |
 | Windows Authentication | Implemented | Negotiate in normal environments; explicit loopback-only development bypass available |
-| Permission-based RBAC | Implemented | AD/Windows groups map to Viewer, Operator, Designer, and Administrator |
+| SQL-backed RBAC | Implemented | Windows users/groups map to System Administrator, Developer, or custom roles with global and resource-specific grants |
 | Blazor/Radzen application shell | Implemented | Dashboard and management views are present |
 | Visual workflow designer | Implemented | Create/load/save/publish/pause/archive persisted workflows, configure/connect nodes, and detect optimistic draft-revision conflicts |
 | Workflow graph validation | Implemented | Explicit schema version, size bounds, IDs, endpoints, cardinality, cycles, typed per-node settings, and operational-policy checks |
@@ -207,8 +207,8 @@ The migration creates both THub metadata in the `thub` schema and Quartz operati
 - Published Web, Worker, and Publications environments must supply a real SQL Server `ConnectionStrings:THub`; startup fails fast when it is missing.
 - The publication host requires its own least-privilege control-plane identity plus Windows-integrated read access only to source objects approved by active REST publications. Keep source-write access on the Worker identity.
 - Production logs default to `%PROGRAMDATA%\THub\Logs`. Grant each host identity write access or override `Serilog:FilePath` through deployment configuration.
-- Configure real AD groups under `Authorization:RoleMappings`; the checked-in production arrays are intentionally empty.
-- Production currently gives an authenticated unmapped account the configured default role (`Viewer`). Use an invalid/empty default when explicit group membership must be mandatory.
+- Configure initial administrator/developer users or AD groups under `Authorization:Bootstrap`; checked-in production arrays are intentionally empty.
+- Persisted custom roles and resource grants are managed under `/settings`. Authenticated users without a bootstrap or persisted role assignment receive no access.
 - Never put source-system passwords or tokens in `DataConnection.ConfigurationJson`; store a protected secret reference. Plain FTP is supported only as an explicit compatibility mode and exposes both credentials and data in transit; prefer explicit or implicit FTPS.
 - For a database-authenticated connection reference such as `warehouse_reader`, supply `ConnectionCredentials__warehouse_reader__Username` and `ConnectionCredentials__warehouse_reader__Password` to each authorized host through external deployment configuration or a vault-backed .NET configuration provider.
 - Managed publication tokens are returned once and stored only as one-way verifiers; their list view exposes status, expiry/revocation, accepted-use count, and last-used time but never the bearer secret. Email delivery profiles store SMTP credential references, never secret values; the checked-in resolver fails closed for referenced credentials until deployment replaces it with an organization-approved provider. Profiles without a reference use only an explicitly approved anonymous relay.
