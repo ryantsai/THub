@@ -1,4 +1,5 @@
 using System.Text.Json;
+using THub.Application.Execution;
 using THub.Domain.Workflows;
 
 namespace THub.Application.Workflows;
@@ -13,6 +14,13 @@ public sealed class WorkflowGraphValidator
     public const int MaximumVariableValueCharacters = 4_096;
     public const int MaximumFunctionExpressionCharacters = 4_096;
     public const int MaximumFunctionParameters = 8;
+    private readonly IWorkflowExpressionSessionFactory? expressionSessionFactory;
+
+    public WorkflowGraphValidator(
+        IWorkflowExpressionSessionFactory? expressionSessionFactory = null)
+    {
+        this.expressionSessionFactory = expressionSessionFactory;
+    }
 
     public IReadOnlyList<GraphValidationIssue> Validate(WorkflowGraph graph)
     {
@@ -200,7 +208,7 @@ public sealed class WorkflowGraphValidator
                 continue;
             }
 
-            if (variable.ConnectionId is null or { } id && id == Guid.Empty
+            if (variable.ConnectionId is null || variable.ConnectionId == Guid.Empty
                 || !IsBoundedIdentifier(variable.Schema)
                 || !IsBoundedIdentifier(variable.Object)
                 || !IsBoundedIdentifier(variable.ValueColumn)
@@ -215,7 +223,7 @@ public sealed class WorkflowGraphValidator
         }
     }
 
-    private static void ValidateFunctions(
+    private void ValidateFunctions(
         IReadOnlyList<WorkflowFunction> functions,
         ICollection<GraphValidationIssue> issues)
     {
@@ -254,6 +262,23 @@ public sealed class WorkflowGraphValidator
                 issues.Add(new(
                     "function.expression.invalid",
                     $"Function '{function.Name}' requires an expression no longer than {MaximumFunctionExpressionCharacters} characters."));
+            }
+        }
+
+        if (expressionSessionFactory is not null
+            && !issues.Any(issue => issue.Code.StartsWith(
+                "function.",
+                StringComparison.Ordinal)))
+        {
+            try
+            {
+                expressionSessionFactory.Validate(functions);
+            }
+            catch (Exception exception) when (exception is not OutOfMemoryException)
+            {
+                issues.Add(new(
+                    "function.javascript.invalid",
+                    "A workflow JavaScript function contains an invalid or unsupported expression."));
             }
         }
     }

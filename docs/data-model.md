@@ -28,7 +28,7 @@ Represents the current workflow aggregate and draft graph.
 | `Status` | Draft, Published, Paused, or Archived |
 | `Version` | Candidate graph version; advances when a published graph is edited |
 | `DraftRevision` | Optimistic concurrency revision for editable workflow state |
-| `GraphJson` | Canonical schema-versioned mutable draft DAG/settings |
+| `GraphJson` | Canonical schema-versioned mutable draft DAG, variables, functions, and node settings |
 | `PublishedVersionId`, `PublishedVersionNumber` | Pointer to the active immutable snapshot |
 | `CronExpression` | Standard five-field cron expression, when scheduled |
 | `TimeZoneId` | Time zone used to interpret the schedule |
@@ -47,7 +47,7 @@ Represents one immutable published workflow graph.
 | `Id` | Deterministic identity derived from workflow plus version number |
 | `WorkflowId`, `Version` | Owning workflow and unique version number |
 | `SchemaVersion` | Supported workflow document schema version |
-| `GraphJson` | Canonical immutable DAG and typed node-settings document |
+| `GraphJson` | Canonical immutable DAG with typed variables, functions, and node-settings document |
 | `Checksum` | SHA-256 integrity checksum over the stored graph JSON |
 | `PublishedBy`, `PublishedAtUtc` | Publication actor and UTC time |
 
@@ -113,11 +113,31 @@ Quartz rows are operational projections, not the source of truth for workflow de
 
 ## Workflow graph contract
 
-`WorkflowGraph` contains `Nodes` and `Edges`.
+`WorkflowGraph` contains typed `Variables`, expression-only `Functions`, `Nodes`, and `Edges`.
 
 ```json
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
+  "variables": [
+    {
+      "name": "region",
+      "kind": "Literal",
+      "dataType": "String",
+      "value": "north",
+      "schema": null,
+      "object": null,
+      "valueColumn": null,
+      "filterColumn": null,
+      "filterValue": null
+    }
+  ],
+  "functions": [
+    {
+      "name": "normalize",
+      "parameters": ["value"],
+      "expression": "String(value).trim().toUpperCase()"
+    }
+  ],
   "nodes": [
     {
       "id": "customer-source",
@@ -135,7 +155,7 @@ Quartz rows are operational projections, not the source of truth for workflow de
 }
 ```
 
-The serializer requires the explicit `schemaVersion` envelope, rejects unknown/duplicate properties and unsupported future versions, and canonicalizes saved documents. Each node retains a JSON `settings` object in the graph, but publish and Worker execution parse it through a strict kind-specific contract with required fields, bounds, allow-listed properties/operators/modes, and graph-aware join inputs.
+The serializer requires the explicit `schemaVersion` envelope, rejects unknown/duplicate properties and unsupported versions, and canonicalizes saved documents. Each node retains a JSON `settings` object in the graph, but publish and Worker execution parse it through a strict kind-specific contract with required fields, bounds, allow-listed properties/operators/modes, graph-aware join inputs, and destination value bindings. Schema version 1 is intentionally unsupported because the application has not been released.
 
 ## Durable persistence slices
 

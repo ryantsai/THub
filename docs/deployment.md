@@ -134,6 +134,8 @@ The Web host needs a credential to test/discover its connection and the Worker n
 
 FTP connections select plain FTP, explicit FTPS, or implicit FTPS. Plain FTP exposes credentials and data in transit and must be restricted to explicitly approved legacy endpoints on a controlled network. Prefer FTPS with certificate validation. Size Worker temporary storage for the configured maximum FTP file size and monitor `%TEMP%\THub` for remnants after abrupt process termination.
 
+Workflow database variables use the same referenced credentials as their approved connection and resolve once at the start of each execution attempt. Grant the Worker read access only to the lookup objects that workflows are permitted to use. JavaScript value expressions run inside the Worker with fixed internal safety ceilings; no deployment setting can remove CLR/string-compilation restrictions or raise those ceilings in v1.
+
 The worker supports:
 
 ```json

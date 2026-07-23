@@ -12,12 +12,22 @@ public sealed class WorkflowGraphSerializerTests
     {
         var graph = new WorkflowGraph(
             [new WorkflowNode("source", WorkflowNodeKind.SqlSource, "Source", 12.5, 42, "{\"table\":\"Customers\"}")],
-            []);
+            [],
+            [new(
+                "tenant",
+                WorkflowVariableKind.Literal,
+                WorkflowValueType.String,
+                "north")],
+            [new("slug", ["value"], "String(value).toLowerCase()")]);
 
         var json = serializer.Serialize(graph);
         var restored = serializer.Deserialize(json);
 
-        Assert.Contains("\"schemaVersion\":1", json, StringComparison.Ordinal);
+        Assert.Contains("\"schemaVersion\":2", json, StringComparison.Ordinal);
+        Assert.Contains("\"variables\":[", json, StringComparison.Ordinal);
+        Assert.Contains("\"functions\":[", json, StringComparison.Ordinal);
+        Assert.Equal("tenant", Assert.Single(restored.Variables).Name);
+        Assert.Equal("slug", Assert.Single(restored.Functions).Name);
         Assert.Contains("\"settings\":{\"table\":\"Customers\"}", json, StringComparison.Ordinal);
         Assert.Equal(graph.Nodes[0] with { SettingsJson = "{\"table\":\"Customers\"}" }, restored.Nodes[0]);
     }
@@ -26,7 +36,7 @@ public sealed class WorkflowGraphSerializerTests
     public void RejectsUnsupportedSchemaVersion()
     {
         var exception = Assert.Throws<WorkflowGraphSerializationException>(() =>
-            serializer.Deserialize("{\"schemaVersion\":2,\"nodes\":[],\"edges\":[]}"));
+            serializer.Deserialize("{\"schemaVersion\":1,\"variables\":[],\"functions\":[],\"nodes\":[],\"edges\":[]}"));
 
         Assert.Contains("not supported", exception.Message, StringComparison.OrdinalIgnoreCase);
     }
@@ -36,7 +46,9 @@ public sealed class WorkflowGraphSerializerTests
     {
         const string json = """
             {
-              "schemaVersion": 1,
+              "schemaVersion": 2,
+              "variables": [],
+              "functions": [],
               "nodes": [{
                 "id": "source",
                 "kind": "SqlSource",
@@ -61,7 +73,9 @@ public sealed class WorkflowGraphSerializerTests
     {
         const string json = """
             {
-              "schemaVersion": 1,
+              "schemaVersion": 2,
+              "variables": [],
+              "functions": [],
               "nodes": [{
                 "id": "source",
                 "kind": "SqlSource",
@@ -87,4 +101,3 @@ public sealed class WorkflowGraphSerializerTests
         Assert.Throws<WorkflowGraphSerializationException>(() => serializer.Serialize(graph));
     }
 }
-

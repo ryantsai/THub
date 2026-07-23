@@ -29,6 +29,7 @@ Accepted ADRs are not immutable. Supersede them when evidence changes; do not si
 | [0012](0012-durable-email-alert-delivery.md) | Accepted | Durable Email alert outbox and SMTP delivery |
 | [0013](0013-provider-neutral-database-authentication.md) | Accepted | Provider-neutral referenced database credentials |
 | [0014](0014-expand-relational-and-ftp-connectors.md) | Accepted | MySQL, PostgreSQL, Oracle, and FTP/FTPS workflow connectors |
+| [0015](0015-bounded-workflow-variables-and-javascript-expressions.md) | Accepted | Bounded workflow variables and JavaScript value expressions |
 
 ## Creating an ADR
 

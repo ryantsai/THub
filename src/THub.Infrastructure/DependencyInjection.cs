@@ -33,6 +33,7 @@ public static class DependencyInjection
         services.AddSingleton<IDataConnectionStore, SqlDataConnectionStore>();
         services.AddSingleton<IDataConnectionProbe, DataConnectionProbe>();
         services.AddSingleton<IWorkflowSchemaInspector, InfrastructureWorkflowSchemaInspector>();
+        services.AddSingleton<IWorkflowExpressionSessionFactory, JintWorkflowExpressionSessionFactory>();
         services.AddScoped<IWorkflowManagementRepository, SqlWorkflowManagementRepository>();
         services.AddScoped<IWorkflowRunHistoryStore, SqlWorkflowRunHistoryStore>();
         services.AddSingleton<IEmailAlertAdministrationStore, SqlEmailAlertAdministrationStore>();
@@ -69,6 +70,8 @@ public static class DependencyInjection
         services.AddSingleton<IWorkflowTerminalAlertStore, SqlWorkflowTerminalAlertStore>();
         ConfigureSmtpDelivery(services, configuration);
         services.AddSingleton<ExecutionConnectionResolver>();
+        services.AddSingleton<IWorkflowDatabaseVariableProvider, InfrastructureWorkflowDatabaseVariableProvider>();
+        services.AddSingleton<IWorkflowExpressionSessionFactory, JintWorkflowExpressionSessionFactory>();
         services.AddScoped<IWorkflowNodeExecutor, SqlSourceNodeExecutor>();
         services.AddScoped<IWorkflowNodeExecutor, MySqlSourceNodeExecutor>();
         services.AddScoped<IWorkflowNodeExecutor, PostgreSqlSourceNodeExecutor>();

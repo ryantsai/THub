@@ -77,6 +77,25 @@ public sealed class WorkflowGraphValidatorTests
         Assert.Contains(_validator.Validate(graph), issue => issue.Code == "node.settings.invalid");
     }
 
+    [Fact]
+    public void VariablesAndFunctionsRequireUniqueSafeSymbols()
+    {
+        var graph = new WorkflowGraph(
+            [Node("source", WorkflowNodeKind.SqlSource)],
+            [],
+            [
+                new("region", WorkflowVariableKind.Literal, WorkflowValueType.String, "north"),
+                new("REGION", WorkflowVariableKind.Literal, WorkflowValueType.String, "south")
+            ],
+            [new("row", ["value", "value"], "value")]);
+
+        var issues = _validator.Validate(graph);
+
+        Assert.Contains(issues, issue => issue.Code == "variable.name.duplicate");
+        Assert.Contains(issues, issue => issue.Code == "function.name.invalid");
+        Assert.Contains(issues, issue => issue.Code == "function.parameters.invalid");
+    }
+
     [Theory]
     [InlineData(WorkflowNodeKind.Webhook)]
     [InlineData(WorkflowNodeKind.Executable)]

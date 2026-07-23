@@ -17,7 +17,7 @@ public sealed class WorkflowNodeSettingsValidatorTests
     [InlineData(WorkflowNodeKind.ExcelSource, """{"connectionId":"11111111-1111-1111-1111-111111111111","relativePath":"inbound/orders.xlsx","worksheet":"Orders","hasHeader":true}""")]
     [InlineData(WorkflowNodeKind.SelectColumns, """{"columns":["Id","Name"]}""")]
     [InlineData(WorkflowNodeKind.FilterRows, """{"conditions":[{"column":"Id","operator":"greaterThan","value":0}]}""")]
-    [InlineData(WorkflowNodeKind.SqlTarget, """{"connectionId":"11111111-1111-1111-1111-111111111111","schema":"dbo","object":"Orders","mode":"insert"}""")]
+    [InlineData(WorkflowNodeKind.SqlTarget, """{"connectionId":"11111111-1111-1111-1111-111111111111","schema":"dbo","object":"Orders","mode":"insert","bindings":[{"targetColumn":"CreatedAtUtc","kind":"Variable","value":"runStartedAtUtc"}]}""")]
     [InlineData(WorkflowNodeKind.MySqlTarget, """{"connectionId":"11111111-1111-1111-1111-111111111111","schema":"warehouse","object":"Orders","mode":"insert"}""")]
     [InlineData(WorkflowNodeKind.PostgreSqlTarget, """{"connectionId":"11111111-1111-1111-1111-111111111111","schema":"public","object":"Orders","mode":"insert"}""")]
     [InlineData(WorkflowNodeKind.OracleTarget, """{"connectionId":"11111111-1111-1111-1111-111111111111","schema":"APP","object":"ORDERS","mode":"insert"}""")]
@@ -85,6 +85,28 @@ public sealed class WorkflowNodeSettingsValidatorTests
         var exception = Assert.Throws<WorkflowNodeSettingsException>(() => _validator.Parse(node));
 
         Assert.Equal("node.csv.columns.required", exception.Code);
+    }
+
+    [Fact]
+    public void ValidateRejectsUnknownVariableBinding()
+    {
+        var graph = new WorkflowGraph(
+            [
+                new(
+                    "target",
+                    WorkflowNodeKind.SqlTarget,
+                    "Target",
+                    0,
+                    0,
+                    """{"connectionId":"11111111-1111-1111-1111-111111111111","schema":"dbo","object":"Orders","mode":"insert","bindings":[{"targetColumn":"Tenant","kind":"Variable","value":"missing"}]}""")
+            ],
+            [],
+            [],
+            []);
+
+        var issue = Assert.Single(_validator.Validate(graph));
+
+        Assert.Equal("node.target.variable.missing", issue.Code);
     }
 
     [Theory]

@@ -32,6 +32,7 @@ Quartz owns schedule timing, persistence, misfire handling, and scheduler cluste
 | Relational/file execution | Implemented v1 | SQL Server, MySQL, PostgreSQL, and Oracle table/view sources and transactional insert targets; bounded local and FTP/FTPS CSV, tab-delimited, and modern Excel sources plus create-new targets |
 | Connection authentication | Implemented v1 | SQL Server supports Windows integrated or referenced credentials; other databases and FTP use referenced username/password credentials through a replaceable external configuration resolver |
 | Schema mapping and transforms | Implemented v1 | The designer opens live SQL Server/MySQL/PostgreSQL/Oracle source and target schemas, selects source columns, and edits target mappings graphically; advanced JSON remains available for import/troubleshooting |
+| Workflow variables and expressions | Implemented v1 | Destination bindings can use source columns, run values, typed workflow globals, bounded one-row database lookups, or constrained reusable JavaScript expressions |
 | Email alerts/actions | Implemented | Administrator-managed profiles/rules, terminal-event and `EmailAlert` action enqueueing, deduplicated SQL outbox, leased Worker dispatch, bounded retries/dead letters, and MailKit SMTP delivery; credential-backed SMTP requires an approved `ISecretResolver` deployment integration |
 | Webhook/executable execution | Gated | Draft node concepts remain visible, but publish and execution reject them until administrator allow-list, secret, timeout, identity, and audit policies exist |
 | Publication canvas nodes | Gated and separated | `PublishRestApi` and `PublishDataEditor` cannot run in a workflow; create the implemented governed resources under Publications instead |
@@ -54,6 +55,7 @@ Quartz owns schedule timing, persistence, misfire handling, and scheduler cluste
 - FluentFTP for FTP/FTPS transfers
 - CsvHelper and ClosedXML for bounded CSV and modern Excel connector execution
 - xUnit for unit tests
+- Jint for bounded expression-only JavaScript value evaluation
 
 ## Repository layout
 

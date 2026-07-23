@@ -37,10 +37,13 @@ public interface IWorkflowExpressionSessionFactory
         CancellationToken cancellationToken);
 
     void Validate(IReadOnlyList<WorkflowFunction> functions);
+
+    void ValidateExpression(string expression);
 }
 
 public sealed class WorkflowVariableResolver(
-    IWorkflowDatabaseVariableProvider databaseProvider) : IWorkflowVariableResolver
+    IWorkflowDatabaseVariableProvider databaseProvider,
+    IWorkflowExpressionSessionFactory? expressionFactory = null) : IWorkflowVariableResolver
 {
     public async Task<IReadOnlyDictionary<string, TabularValue>> ResolveAsync(
         Guid workflowRunId,
@@ -49,6 +52,7 @@ public sealed class WorkflowVariableResolver(
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(graph);
+        expressionFactory?.Validate(graph.Functions);
         var values = new Dictionary<string, TabularValue>(StringComparer.OrdinalIgnoreCase)
         {
             ["runId"] = TabularValue.From(workflowRunId),

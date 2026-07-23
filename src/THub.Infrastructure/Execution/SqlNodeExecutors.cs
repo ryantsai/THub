@@ -124,7 +124,8 @@ public sealed class SqlSourceNodeExecutor(
 public sealed class SqlTargetNodeExecutor(
     ExecutionConnectionResolver connectionResolver,
     WorkflowNodeSettingsValidator settingsValidator,
-    SqlServerConnectionStringFactory connectionStringFactory) : IWorkflowNodeExecutor
+    SqlServerConnectionStringFactory connectionStringFactory,
+    IWorkflowExpressionSessionFactory? expressionSessionFactory = null) : IWorkflowNodeExecutor
 {
     public WorkflowNodeExecutorDescriptor Descriptor { get; } =
         WorkflowNodeExecutorDescriptor.Target(WorkflowNodeKind.SqlTarget);
@@ -152,7 +153,21 @@ public sealed class SqlTargetNodeExecutor(
             settings.Object,
             allowView: false,
             cancellationToken);
-        var mappings = BuildMappings(input.Schema, metadata, settings.Mappings);
+        using var expressionSession = settings.Bindings.Any(binding =>
+            binding.Kind == WorkflowValueBindingKind.JavaScript)
+            ? (expressionSessionFactory ?? throw ExecutionFailure.Configuration(
+                "execution.javascript.unavailable",
+                "JavaScript value expressions are not available in this host.")).Create(
+                context.Functions,
+                context.Variables,
+                cancellationToken)
+            : null;
+        var mappings = BuildMappings(
+            input.Schema,
+            metadata,
+            settings.Bindings,
+            context,
+            expressionSession);
         await InsertAsync(
             connectionString,
             connection.CommandTimeoutSeconds,
@@ -167,7 +182,9 @@ public sealed class SqlTargetNodeExecutor(
     private static IReadOnlyList<SqlTargetMapping> BuildMappings(
         TabularSchema sourceSchema,
         IReadOnlyList<SqlColumnMetadata> targetColumns,
-        IReadOnlyDictionary<string, string> configured)
+        IReadOnlyList<WorkflowValueBinding> configured,
+        WorkflowNodeExecutionContext context,
+        IWorkflowExpressionSession? expressionSession)
     {
         var targetByName = targetColumns.ToDictionary(column => column.Name, StringComparer.OrdinalIgnoreCase);
         var mappings = new List<SqlTargetMapping>();
@@ -179,21 +196,22 @@ public sealed class SqlTargetNodeExecutor(
                 if (targetByName.TryGetValue(source.column.Name, out var target)
                     && target.CanWrite)
                 {
-                    mappings.Add(new(source.index, target));
+                    mappings.Add(new(
+                        target,
+                        (row, _) => row.Values[source.index]));
                     mappedTargets.Add(target.Name);
                 }
             }
         }
         else
         {
-            foreach (var configuredMapping in configured)
+            foreach (var binding in configured)
             {
-                var sourceIndex = TabularExecutionSupport.FindColumn(sourceSchema, configuredMapping.Key);
-                if (!targetByName.TryGetValue(configuredMapping.Value, out var target))
+                if (!targetByName.TryGetValue(binding.TargetColumn, out var target))
                 {
                     throw ExecutionFailure.Configuration(
                         "execution.sql.target.column",
-                        $"Configured target column '{configuredMapping.Value}' does not exist.");
+                        $"Configured target column '{binding.TargetColumn}' does not exist.");
                 }
 
                 if (!target.CanWrite)
@@ -210,7 +228,14 @@ public sealed class SqlTargetNodeExecutor(
                         $"Target column '{target.Name}' is mapped more than once.");
                 }
 
-                mappings.Add(new(sourceIndex, target));
+                mappings.Add(new(
+                    target,
+                    CreateValueFactory(
+                        binding,
+                        sourceSchema,
+                        target,
+                        context,
+                        expressionSession)));
             }
         }
 
@@ -234,6 +259,43 @@ public sealed class SqlTargetNodeExecutor(
         }
 
         return mappings;
+    }
+
+    private static Func<TabularRow, CancellationToken, TabularValue> CreateValueFactory(
+        WorkflowValueBinding binding,
+        TabularSchema sourceSchema,
+        SqlColumnMetadata target,
+        WorkflowNodeExecutionContext context,
+        IWorkflowExpressionSession? expressionSession) => binding.Kind switch
+        {
+            WorkflowValueBindingKind.Column => CreateColumnFactory(
+                sourceSchema,
+                binding.Value),
+            WorkflowValueBindingKind.Variable => context.Variables.TryGetValue(
+                binding.Value,
+                out var value)
+                ? (_, _) => value
+                : throw ExecutionFailure.Configuration(
+                    "execution.sql.target.variable",
+                    $"Workflow variable '{binding.Value}' was not resolved."),
+            WorkflowValueBindingKind.JavaScript when expressionSession is not null =>
+                (row, cancellationToken) => expressionSession.Evaluate(
+                    binding.Value,
+                    sourceSchema,
+                    row,
+                    target.DataType,
+                    cancellationToken),
+            _ => throw ExecutionFailure.Configuration(
+                "execution.sql.target.binding",
+                "A SQL target value binding is invalid.")
+        };
+
+    private static Func<TabularRow, CancellationToken, TabularValue> CreateColumnFactory(
+        TabularSchema sourceSchema,
+        string sourceColumn)
+    {
+        var sourceIndex = TabularExecutionSupport.FindColumn(sourceSchema, sourceColumn);
+        return (row, _) => row.Values[sourceIndex];
     }
 
     private static async Task InsertAsync(
@@ -271,7 +333,7 @@ public sealed class SqlTargetNodeExecutor(
                         for (var index = 0; index < mappings.Count; index++)
                         {
                             command.Parameters[index].Value = TabularExecutionSupport.ToProviderValue(
-                                row.Values[mappings[index].SourceIndex]);
+                                mappings[index].ValueFactory(row, cancellationToken));
                         }
 
                         _ = await command.ExecuteNonQueryAsync(cancellationToken);
@@ -304,7 +366,9 @@ public sealed class SqlTargetNodeExecutor(
         }
     }
 
-    private sealed record SqlTargetMapping(int SourceIndex, SqlColumnMetadata Target);
+    private sealed record SqlTargetMapping(
+        SqlColumnMetadata Target,
+        Func<TabularRow, CancellationToken, TabularValue> ValueFactory);
 }
 
 internal sealed record SqlColumnMetadata(

@@ -446,7 +446,7 @@ public sealed class BoundedWorkflowExecutionEngineTests
         var sourceSettings =
             $$"""{"connectionId":"{{connectionId:D}}","schema":"dbo","object":"Source","batchSize":100}""";
         var targetSettings =
-            $"{{\"connectionId\":\"{connectionId:D}\",\"schema\":\"dbo\",\"object\":\"Target\",\"mode\":\"insert\",\"mappings\":{{}}}}";
+            $"{{\"connectionId\":\"{connectionId:D}\",\"schema\":\"dbo\",\"object\":\"Target\",\"mode\":\"insert\",\"bindings\":[]}}";
         var graph = new WorkflowGraph(
             [
                 new WorkflowNode("source", WorkflowNodeKind.SqlSource, "source", 0, 0, sourceSettings),

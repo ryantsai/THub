@@ -12,7 +12,9 @@ internal static class WorkflowManagementTestData
 
     public const string ValidGraphJson = """
         {
-          "schemaVersion": 1,
+          "schemaVersion": 2,
+          "variables": [],
+          "functions": [],
           "nodes": [
             {
               "id": "source",
@@ -37,7 +39,8 @@ internal static class WorkflowManagementTestData
                 "connectionId": "22222222-2222-2222-2222-222222222222",
                 "schema": "dbo",
                 "object": "TargetOrders",
-                "mode": "insert"
+                "mode": "insert",
+                "bindings": []
               }
             }
           ],

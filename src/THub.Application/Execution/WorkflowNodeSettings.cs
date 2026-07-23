@@ -136,6 +136,14 @@ public sealed class WorkflowNodeSettingsException : Exception
 
 public sealed class WorkflowNodeSettingsValidator
 {
+    private readonly IWorkflowExpressionSessionFactory? expressionSessionFactory;
+
+    public WorkflowNodeSettingsValidator(
+        IWorkflowExpressionSessionFactory? expressionSessionFactory = null)
+    {
+        this.expressionSessionFactory = expressionSessionFactory;
+    }
+
     private static readonly HashSet<string> SqlSourceProperties =
         ["connectionId", "schema", "object", "batchSize", "columns"];
     private static readonly HashSet<string> CsvSourceProperties =
@@ -183,6 +191,7 @@ public sealed class WorkflowNodeSettingsValidator
                 else if (settings is SqlTargetNodeSettings target)
                 {
                     ValidateTargetVariables(graph, node, target);
+                    ValidateJavaScriptBindings(target);
                 }
             }
             catch (WorkflowNodeSettingsException exception)
@@ -192,6 +201,29 @@ public sealed class WorkflowNodeSettingsValidator
         }
 
         return issues;
+    }
+
+    private void ValidateJavaScriptBindings(SqlTargetNodeSettings settings)
+    {
+        if (expressionSessionFactory is null)
+        {
+            return;
+        }
+
+        foreach (var binding in settings.Bindings.Where(binding =>
+                     binding.Kind == WorkflowValueBindingKind.JavaScript))
+        {
+            try
+            {
+                expressionSessionFactory.ValidateExpression(binding.Value);
+            }
+            catch (Exception exception) when (exception is not OutOfMemoryException)
+            {
+                throw Invalid(
+                    "node.target.javascript.invalid",
+                    $"JavaScript binding for target column '{binding.TargetColumn}' is invalid.");
+            }
+        }
     }
 
     private static void ValidateTargetVariables(

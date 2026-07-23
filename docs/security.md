@@ -94,6 +94,16 @@ Provider-specific database connectors use their own maintained provider, identif
 
 Workflow schema mapping uses the Web identity and the selected connection's referenced credential to load column metadata only. It requires an enabled connection of the node's exact provider kind, bounds schema/object identifiers, quotes or parameterizes them through the provider adapter, and never previews row values. Grant the Web identity or referenced schema-inspection credential metadata/read permissions only where designers are allowed to inspect objects.
 
+## Workflow variables and JavaScript expressions
+
+- Workflow literal variables are configuration, not a secret store. Never place credentials, bearer tokens, or sensitive row payloads in graph variables or JavaScript.
+- Database variables use only enabled approved relational connections. Schema, object, and column identifiers are quoted through the provider adapter; the equality-filter value is parameterized. Arbitrary SQL is not accepted.
+- A database variable resolves once per execution attempt and must return exactly one scalar row. Per-row lookup behavior belongs in bounded source/join nodes.
+- JavaScript receives frozen JSON-shaped `row` and `vars` values only. THub does not expose CLR objects, connections, secrets, filesystem, network, modules, environment variables, or host services.
+- Dynamic string compilation (`eval` and string-based `Function`) is disabled. Memory, statements, recursion, wall time, cancellation, node timeout, and run timeout are all bounded.
+- Jint is in-process and is not an operating-system sandbox. Keep the Worker least-privileged, monitor the dependency, and preserve host-level CPU/memory controls.
+- Do not log expressions with live row/variable values or resolved database scalars. Normalized errors may identify the variable or binding name but not its value.
+
 ## FTP connectors
 
 - Prefer explicit or implicit FTPS with normal certificate validation.

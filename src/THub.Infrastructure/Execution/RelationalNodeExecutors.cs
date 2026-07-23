@@ -142,6 +142,7 @@ public abstract class RelationalTargetNodeExecutor(
     ExecutionConnectionResolver connectionResolver,
     WorkflowNodeSettingsValidator settingsValidator,
     RelationalConnectionFactory connectionFactory,
+    IWorkflowExpressionSessionFactory? expressionSessionFactory,
     WorkflowNodeKind nodeKind,
     ConnectionKind connectionKind) : IWorkflowNodeExecutor
 {
@@ -165,7 +166,21 @@ public abstract class RelationalTargetNodeExecutor(
             settings.Schema,
             settings.Object,
             cancellationToken);
-        var mappings = BuildMappings(input.Schema, metadata, settings.Mappings);
+        using var expressionSession = settings.Bindings.Any(binding =>
+            binding.Kind == WorkflowValueBindingKind.JavaScript)
+            ? (expressionSessionFactory ?? throw ExecutionFailure.Configuration(
+                "execution.javascript.unavailable",
+                "JavaScript value expressions are not available in this host.")).Create(
+                context.Functions,
+                context.Variables,
+                cancellationToken)
+            : null;
+        var mappings = BuildMappings(
+            input.Schema,
+            metadata,
+            settings.Bindings,
+            context,
+            expressionSession);
         await InsertAsync(
             connection,
             configuration,
@@ -180,7 +195,9 @@ public abstract class RelationalTargetNodeExecutor(
     private static IReadOnlyList<RelationalTargetMapping> BuildMappings(
         TabularSchema source,
         IReadOnlyList<RelationalColumnMetadata> target,
-        IReadOnlyDictionary<string, string> configured)
+        IReadOnlyList<WorkflowValueBinding> configured,
+        WorkflowNodeExecutionContext context,
+        IWorkflowExpressionSession? expressionSession)
     {
         var targetByName = target.ToDictionary(column => column.Name, StringComparer.OrdinalIgnoreCase);
         var mappings = new List<RelationalTargetMapping>();
@@ -192,24 +209,32 @@ public abstract class RelationalTargetNodeExecutor(
                 if (targetByName.TryGetValue(item.column.Name, out var targetColumn) &&
                     targetColumn.CanWrite)
                 {
-                    mappings.Add(new(item.index, targetColumn));
+                    mappings.Add(new(
+                        targetColumn,
+                        (row, _) => row.Values[item.index]));
                     used.Add(targetColumn.Name);
                 }
             }
         }
         else
         {
-            foreach (var mapping in configured)
+            foreach (var binding in configured)
             {
-                var sourceIndex = TabularExecutionSupport.FindColumn(source, mapping.Key);
-                if (!targetByName.TryGetValue(mapping.Value, out var targetColumn) ||
+                if (!targetByName.TryGetValue(binding.TargetColumn, out var targetColumn) ||
                     !targetColumn.CanWrite || !used.Add(targetColumn.Name))
                 {
                     throw ExecutionFailure.Configuration(
                         "execution.database.target.mapping",
                         "A configured database target mapping is missing, generated, or duplicated.");
                 }
-                mappings.Add(new(sourceIndex, targetColumn));
+                mappings.Add(new(
+                    targetColumn,
+                    CreateValueFactory(
+                        binding,
+                        source,
+                        targetColumn,
+                        context,
+                        expressionSession)));
             }
         }
         return mappings.Count > 0
@@ -217,6 +242,43 @@ public abstract class RelationalTargetNodeExecutor(
             : throw ExecutionFailure.Configuration(
                 "execution.database.target.mappings",
                 "No writable target columns match the input schema.");
+    }
+
+    private static Func<TabularRow, CancellationToken, TabularValue> CreateValueFactory(
+        WorkflowValueBinding binding,
+        TabularSchema sourceSchema,
+        RelationalColumnMetadata target,
+        WorkflowNodeExecutionContext context,
+        IWorkflowExpressionSession? expressionSession) => binding.Kind switch
+        {
+            WorkflowValueBindingKind.Column => CreateColumnFactory(
+                sourceSchema,
+                binding.Value),
+            WorkflowValueBindingKind.Variable => context.Variables.TryGetValue(
+                binding.Value,
+                out var value)
+                ? (_, _) => value
+                : throw ExecutionFailure.Configuration(
+                    "execution.database.target.variable",
+                    $"Workflow variable '{binding.Value}' was not resolved."),
+            WorkflowValueBindingKind.JavaScript when expressionSession is not null =>
+                (row, cancellationToken) => expressionSession.Evaluate(
+                    binding.Value,
+                    sourceSchema,
+                    row,
+                    target.DataType,
+                    cancellationToken),
+            _ => throw ExecutionFailure.Configuration(
+                "execution.database.target.binding",
+                "A database target value binding is invalid.")
+        };
+
+    private static Func<TabularRow, CancellationToken, TabularValue> CreateColumnFactory(
+        TabularSchema sourceSchema,
+        string sourceColumn)
+    {
+        var sourceIndex = TabularExecutionSupport.FindColumn(sourceSchema, sourceColumn);
+        return (row, _) => row.Values[sourceIndex];
     }
 
     private static async Task InsertAsync(
@@ -256,7 +318,7 @@ public abstract class RelationalTargetNodeExecutor(
                         for (var index = 0; index < mappings.Count; index++)
                         {
                             command.Parameters[index].Value = TabularExecutionSupport.ToProviderValue(
-                                row.Values[mappings[index].SourceIndex]);
+                                mappings[index].ValueFactory(row, cancellationToken));
                         }
                         _ = await command.ExecuteNonQueryAsync(cancellationToken);
                     }
@@ -278,29 +340,49 @@ public abstract class RelationalTargetNodeExecutor(
         }
     }
 
-    private sealed record RelationalTargetMapping(int SourceIndex, RelationalColumnMetadata Target);
+    private sealed record RelationalTargetMapping(
+        RelationalColumnMetadata Target,
+        Func<TabularRow, CancellationToken, TabularValue> ValueFactory);
 }
 
 public sealed class MySqlTargetNodeExecutor(
     ExecutionConnectionResolver resolver,
     WorkflowNodeSettingsValidator validator,
-    RelationalConnectionFactory factory)
+    RelationalConnectionFactory factory,
+    IWorkflowExpressionSessionFactory? expressionSessionFactory = null)
     : RelationalTargetNodeExecutor(
-        resolver, validator, factory, WorkflowNodeKind.MySqlTarget, ConnectionKind.MySql);
+        resolver,
+        validator,
+        factory,
+        expressionSessionFactory,
+        WorkflowNodeKind.MySqlTarget,
+        ConnectionKind.MySql);
 
 public sealed class PostgreSqlTargetNodeExecutor(
     ExecutionConnectionResolver resolver,
     WorkflowNodeSettingsValidator validator,
-    RelationalConnectionFactory factory)
+    RelationalConnectionFactory factory,
+    IWorkflowExpressionSessionFactory? expressionSessionFactory = null)
     : RelationalTargetNodeExecutor(
-        resolver, validator, factory, WorkflowNodeKind.PostgreSqlTarget, ConnectionKind.PostgreSql);
+        resolver,
+        validator,
+        factory,
+        expressionSessionFactory,
+        WorkflowNodeKind.PostgreSqlTarget,
+        ConnectionKind.PostgreSql);
 
 public sealed class OracleTargetNodeExecutor(
     ExecutionConnectionResolver resolver,
     WorkflowNodeSettingsValidator validator,
-    RelationalConnectionFactory factory)
+    RelationalConnectionFactory factory,
+    IWorkflowExpressionSessionFactory? expressionSessionFactory = null)
     : RelationalTargetNodeExecutor(
-        resolver, validator, factory, WorkflowNodeKind.OracleTarget, ConnectionKind.Oracle);
+        resolver,
+        validator,
+        factory,
+        expressionSessionFactory,
+        WorkflowNodeKind.OracleTarget,
+        ConnectionKind.Oracle);
 
 internal sealed record RelationalColumnMetadata(
     string Name,

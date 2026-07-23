@@ -123,7 +123,10 @@ public sealed class InfrastructureWorkflowNodeResourceValidator(
     {
         if (nodeKind != WorkflowNodeKind.SqlTarget)
         {
-            await ValidateRelationalAsync(nodeKind, settings.Schema, settings.Object, settings.ConnectionId, cancellationToken);
+            await ValidateRelationalTargetAsync(
+                nodeKind,
+                settings,
+                cancellationToken).ConfigureAwait(false);
             return;
         }
         var connection = await _connectionResolver.ResolveAsync<SqlServerConnectionConfiguration>(
@@ -142,7 +145,47 @@ public sealed class InfrastructureWorkflowNodeResourceValidator(
             settings.Object,
             allowView: false,
             cancellationToken).ConfigureAwait(false);
-        ValidateConfiguredTargetColumns(metadata, settings.Mappings);
+        ValidateConfiguredTargetColumns(metadata, settings.Bindings);
+    }
+
+    private async Task ValidateRelationalTargetAsync(
+        WorkflowNodeKind nodeKind,
+        SqlTargetNodeSettings settings,
+        CancellationToken cancellationToken)
+    {
+        var connectionKind = ExpectedRelationalKind(nodeKind);
+        var configuration =
+            await _connectionResolver.ResolveAsync<RelationalDatabaseConnectionConfiguration>(
+                settings.ConnectionId,
+                connectionKind,
+                cancellationToken).ConfigureAwait(false);
+        await using var connection = await relationalConnectionFactory.CreateAsync(
+            configuration,
+            cancellationToken);
+        var metadata = await RelationalExecutionSupport.LoadMetadataAsync(
+            connection,
+            configuration,
+            settings.Schema,
+            settings.Object,
+            cancellationToken).ConfigureAwait(false);
+        if (settings.Bindings.Count == 0)
+        {
+            return;
+        }
+
+        var targetByName = metadata.ToDictionary(
+            column => column.Name,
+            StringComparer.OrdinalIgnoreCase);
+        foreach (var binding in settings.Bindings)
+        {
+            if (!targetByName.TryGetValue(binding.TargetColumn, out var target)
+                || !target.CanWrite)
+            {
+                throw ExecutionFailure.Configuration(
+                    "execution.database.target.mapping",
+                    "A configured database target binding is missing or generated.");
+            }
+        }
     }
 
     private async Task ValidateRelationalAsync(
@@ -152,13 +195,7 @@ public sealed class InfrastructureWorkflowNodeResourceValidator(
         Guid connectionId,
         CancellationToken cancellationToken)
     {
-        var connectionKind = nodeKind switch
-        {
-            WorkflowNodeKind.MySqlSource or WorkflowNodeKind.MySqlTarget => ConnectionKind.MySql,
-            WorkflowNodeKind.PostgreSqlSource or WorkflowNodeKind.PostgreSqlTarget => ConnectionKind.PostgreSql,
-            WorkflowNodeKind.OracleSource or WorkflowNodeKind.OracleTarget => ConnectionKind.Oracle,
-            _ => throw new ArgumentOutOfRangeException(nameof(nodeKind))
-        };
+        var connectionKind = ExpectedRelationalKind(nodeKind);
         var configuration = await _connectionResolver.ResolveAsync<RelationalDatabaseConnectionConfiguration>(
             connectionId,
             connectionKind,
@@ -171,6 +208,15 @@ public sealed class InfrastructureWorkflowNodeResourceValidator(
             objectName,
             cancellationToken);
     }
+
+    private static ConnectionKind ExpectedRelationalKind(WorkflowNodeKind nodeKind) =>
+        nodeKind switch
+        {
+            WorkflowNodeKind.MySqlSource or WorkflowNodeKind.MySqlTarget => ConnectionKind.MySql,
+            WorkflowNodeKind.PostgreSqlSource or WorkflowNodeKind.PostgreSqlTarget => ConnectionKind.PostgreSql,
+            WorkflowNodeKind.OracleSource or WorkflowNodeKind.OracleTarget => ConnectionKind.Oracle,
+            _ => throw new ArgumentOutOfRangeException(nameof(nodeKind))
+        };
 
     private async Task ValidateFtpSourceAsync(
         FtpSourceNodeSettings settings,
@@ -317,17 +363,18 @@ public sealed class InfrastructureWorkflowNodeResourceValidator(
 
     private static void ValidateConfiguredTargetColumns(
         IReadOnlyList<SqlColumnMetadata> metadata,
-        IReadOnlyDictionary<string, string> mappings)
+        IReadOnlyList<WorkflowValueBinding> bindings)
     {
-        if (mappings.Count == 0)
+        if (bindings.Count == 0)
         {
             return;
         }
 
         var targetByName = metadata.ToDictionary(column => column.Name, StringComparer.OrdinalIgnoreCase);
         var mappedTargets = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        foreach (var targetName in mappings.Values)
+        foreach (var binding in bindings)
         {
+            var targetName = binding.TargetColumn;
             if (!targetByName.TryGetValue(targetName, out var target))
             {
                 throw ExecutionFailure.Configuration(

@@ -106,6 +106,115 @@ else
                 <label>Description<textarea rows="2" @bind="Description" disabled="@Busy"></textarea></label>
                 <label>Five-field cron<input placeholder="Manual (leave empty)" @bind="CronExpression" disabled="@Busy" /></label>
                 <label>Time zone<input @bind="TimeZoneId" disabled="@Busy" /></label>
+                <details class="workflow-values">
+                    <summary><RadzenIcon Icon="data_object" /> Variables &amp; functions</summary>
+                    <div class="built-in-values">
+                        <strong>Run values</strong>
+                        <code>runId</code><code>runStartedAtUtc</code><code>utcToday</code>
+                    </div>
+                    <div class="value-editor-head">
+                        <strong>Global variables</strong>
+                        <button type="button" @onclick="AddVariable"><RadzenIcon Icon="add" /> Add</button>
+                    </div>
+                    @foreach (var variable in Variables)
+                    {
+                        <div class="value-editor-card">
+                            <div class="value-editor-row">
+                                <label>Name<input value="@variable.Name" @onchange="eventArgs => SetVariableName(variable, eventArgs)" /></label>
+                                <label>Source
+                                    <select value="@variable.Kind.ToString()" @onchange="eventArgs => SetVariableKind(variable, eventArgs)">
+                                        @foreach (var kind in Enum.GetValues<WorkflowVariableKind>())
+                                        {
+                                            <option value="@kind.ToString()">@kind</option>
+                                        }
+                                    </select>
+                                </label>
+                                <button type="button" aria-label="Delete variable @variable.Name" @onclick="() => RemoveVariable(variable)"><RadzenIcon Icon="delete_outline" /></button>
+                            </div>
+                            <label>Data type
+                                <select value="@variable.DataType.ToString()" @onchange="eventArgs => SetVariableDataType(variable, eventArgs)">
+                                    @foreach (var dataType in Enum.GetValues<WorkflowValueType>())
+                                    {
+                                        <option value="@dataType.ToString()">@dataType</option>
+                                    }
+                                </select>
+                            </label>
+                            @if (variable.Kind == WorkflowVariableKind.Literal)
+                            {
+                                <label>Value<input value="@variable.Value" @onchange="eventArgs => variable.Value = eventArgs.Value?.ToString() ?? string.Empty" /></label>
+                            }
+                            else
+                            {
+                                <label>Approved database connection
+                                    <select value="@variable.ConnectionId" @onchange="eventArgs => SetVariableConnection(variable, eventArgs)">
+                                        <option value="">Select a relational connection…</option>
+                                        @foreach (var connection in Connections.Where(connection => connection.IsEnabled && IsRelationalConnection(connection.Kind)))
+                                        {
+                                            <option value="@connection.Id.ToString("D")">@connection.Name · @ConnectionKindLabel(connection.Kind)</option>
+                                        }
+                                    </select>
+                                </label>
+                                <div class="schema-object-fields">
+                                    <label>Schema<input value="@variable.Schema" @onchange="eventArgs => SetVariableText(variable, nameof(variable.Schema), eventArgs)" /></label>
+                                    <label>Table or view<input value="@variable.Object" @onchange="eventArgs => SetVariableText(variable, nameof(variable.Object), eventArgs)" /></label>
+                                </div>
+                                <button class="lookup-schema-button" type="button" disabled="@SchemaBusy" @onclick="() => LoadVariableSchemaAsync(variable)"><RadzenIcon Icon="schema" /> Open lookup schema</button>
+                                @if (variable.Error is not null)
+                                {
+                                    <div class="schema-message error" role="alert">@variable.Error</div>
+                                }
+                                @if (variable.SchemaMetadata is { } lookupSchema)
+                                {
+                                    <div class="lookup-columns">
+                                        <label>Value column
+                                            <select value="@variable.ValueColumn" @onchange="eventArgs => variable.ValueColumn = eventArgs.Value?.ToString() ?? string.Empty">
+                                                <option value="">Select column…</option>
+                                                @foreach (var column in lookupSchema.Columns)
+                                                {
+                                                    <option value="@column.Name">@column.Name · @column.DataType</option>
+                                                }
+                                            </select>
+                                        </label>
+                                        <label>Filter column
+                                            <select value="@variable.FilterColumn" @onchange="eventArgs => variable.FilterColumn = eventArgs.Value?.ToString() ?? string.Empty">
+                                                <option value="">Select column…</option>
+                                                @foreach (var column in lookupSchema.Columns)
+                                                {
+                                                    <option value="@column.Name">@column.Name · @column.DataType</option>
+                                                }
+                                            </select>
+                                        </label>
+                                    </div>
+                                }
+                                else
+                                {
+                                    <div class="lookup-columns">
+                                        <label>Value column<input value="@variable.ValueColumn" @onchange="eventArgs => variable.ValueColumn = eventArgs.Value?.ToString() ?? string.Empty" /></label>
+                                        <label>Filter column<input value="@variable.FilterColumn" @onchange="eventArgs => variable.FilterColumn = eventArgs.Value?.ToString() ?? string.Empty" /></label>
+                                    </div>
+                                }
+                                <label>Filter value<input value="@variable.FilterValue" @onchange="eventArgs => variable.FilterValue = eventArgs.Value?.ToString() ?? string.Empty" /></label>
+                                <small>The lookup must return exactly one scalar row. Object names are quoted and the filter value is parameterized.</small>
+                            }
+                        </div>
+                    }
+                    <div class="value-editor-head">
+                        <strong>JavaScript functions</strong>
+                        <button type="button" @onclick="AddFunction"><RadzenIcon Icon="add" /> Add</button>
+                    </div>
+                    @foreach (var function in Functions)
+                    {
+                        <div class="value-editor-card">
+                            <div class="value-editor-row">
+                                <label>Name<input value="@function.Name" @onchange="eventArgs => function.Name = eventArgs.Value?.ToString() ?? string.Empty" /></label>
+                                <label>Parameters<input placeholder="value, prefix" value="@function.Parameters" @onchange="eventArgs => function.Parameters = eventArgs.Value?.ToString() ?? string.Empty" /></label>
+                                <button type="button" aria-label="Delete function @function.Name" @onclick="() => Functions.Remove(function)"><RadzenIcon Icon="delete_outline" /></button>
+                            </div>
+                            <label>Return expression<input placeholder="String(value).trim()" value="@function.Expression" @onchange="eventArgs => function.Expression = eventArgs.Value?.ToString() ?? string.Empty" /></label>
+                            <small>Expression-only JavaScript. No CLR, filesystem, network, module, or dynamic code access.</small>
+                        </div>
+                    }
+                </details>
             </div>
 
             @if (SelectedNode is null)
@@ -228,19 +337,46 @@ else
                                             <button type="button" @onclick="ClearMappings"><RadzenIcon Icon="clear_all" /> Clear</button>
                                         </div>
                                     </div>
-                                    <div class="mapping-labels"><span>Source column</span><span></span><span>Destination column</span></div>
-                                    @foreach (var sourceColumn in GetMappingSourceColumns(SelectedNode, sourceNode, sourceSchema))
+                                    <div class="mapping-labels"><span>Destination</span><span>Value source</span><span>Value</span></div>
+                                    @foreach (var targetColumn in targetSchema.Columns.Where(column => column.IsWritable))
                                     {
-                                        <div class="mapping-row @(string.IsNullOrEmpty(GetMappedTarget(SelectedNode, sourceColumn.Name)) ? "unmapped" : "mapped")">
-                                            <div class="mapping-column"><strong>@sourceColumn.Name</strong><small>@sourceColumn.DataType</small></div>
-                                            <span class="mapping-arrow"><RadzenIcon Icon="east" /></span>
-                                            <select aria-label="Map @sourceColumn.Name" value="@GetMappedTarget(SelectedNode, sourceColumn.Name)" @onchange="eventArgs => SetColumnMapping(sourceColumn.Name, eventArgs)">
+                                        var binding = GetBinding(SelectedNode, targetColumn.Name);
+                                        <div class="mapping-row @(binding is null ? "unmapped" : "mapped")">
+                                            <div class="mapping-column"><strong>@targetColumn.Name</strong><small>@targetColumn.DataType</small></div>
+                                            <select aria-label="Value source for @targetColumn.Name" value="@(binding?.Kind.ToString() ?? string.Empty)" @onchange="eventArgs => SetBindingKind(targetColumn.Name, eventArgs)">
                                                 <option value="">Not mapped</option>
-                                                @foreach (var targetColumn in targetSchema.Columns.Where(column => column.IsWritable))
-                                                {
-                                                    <option value="@targetColumn.Name">@targetColumn.Name · @targetColumn.DataType</option>
-                                                }
+                                                <option value="@WorkflowValueBindingKind.Column">Source column</option>
+                                                <option value="@WorkflowValueBindingKind.Variable">Variable</option>
+                                                <option value="@WorkflowValueBindingKind.JavaScript">JavaScript</option>
                                             </select>
+                                            @if (binding?.Kind == WorkflowValueBindingKind.Column)
+                                            {
+                                                <select aria-label="Source column for @targetColumn.Name" value="@binding.Value" @onchange="eventArgs => SetBindingValue(targetColumn.Name, eventArgs)">
+                                                    <option value="">Select column…</option>
+                                                    @foreach (var sourceColumn in GetMappingSourceColumns(SelectedNode, sourceNode, sourceSchema))
+                                                    {
+                                                        <option value="@sourceColumn.Name">@sourceColumn.Name · @sourceColumn.DataType</option>
+                                                    }
+                                                </select>
+                                            }
+                                            else if (binding?.Kind == WorkflowValueBindingKind.Variable)
+                                            {
+                                                <select aria-label="Variable for @targetColumn.Name" value="@binding.Value" @onchange="eventArgs => SetBindingValue(targetColumn.Name, eventArgs)">
+                                                    <option value="">Select variable…</option>
+                                                    @foreach (var variableName in AvailableVariableNames)
+                                                    {
+                                                        <option value="@variableName">@variableName</option>
+                                                    }
+                                                </select>
+                                            }
+                                            else if (binding?.Kind == WorkflowValueBindingKind.JavaScript)
+                                            {
+                                                <input aria-label="JavaScript expression for @targetColumn.Name" placeholder="slug(row.Name)" value="@binding.Value" @onchange="eventArgs => SetBindingValue(targetColumn.Name, eventArgs)" />
+                                            }
+                                            else
+                                            {
+                                                <span class="mapping-empty">Uses target default</span>
+                                            }
                                         </div>
                                     }
                                 </div>
@@ -325,6 +461,14 @@ else
         new(StringComparer.OrdinalIgnoreCase);
     private readonly List<DesignerNode> Nodes = [];
     private readonly List<DesignerEdge> Edges = [];
+    private readonly List<WorkflowVariableEditor> Variables = [];
+    private readonly List<WorkflowFunctionEditor> Functions = [];
+
+    private IEnumerable<string> AvailableVariableNames =>
+        new[] { "runId", "runStartedAtUtc", "utcToday" }
+            .Concat(Variables
+                .Select(variable => variable.Name)
+                .Where(name => !string.IsNullOrWhiteSpace(name)));
 
     private string StatusText => WorkflowId is null
         ? "Unsaved draft"
@@ -434,6 +578,8 @@ else
         CurrentStatus = details.Status;
         Nodes.Clear();
         Edges.Clear();
+        Variables.Clear();
+        Functions.Clear();
         var graph = GraphSerializer.Deserialize(details.GraphJson);
         Nodes.AddRange(graph.Nodes.Select(node => new DesignerNode(
             node.Id,
@@ -447,6 +593,159 @@ else
             node.Y,
             node.SettingsJson)));
         Edges.AddRange(graph.Edges.Select(edge => new DesignerEdge(edge.FromNodeId, edge.ToNodeId)));
+        Variables.AddRange(graph.Variables.Select(variable => new WorkflowVariableEditor(variable)));
+        Functions.AddRange(graph.Functions.Select(function => new WorkflowFunctionEditor(function)));
+    }
+
+    private void AddVariable()
+    {
+        var ordinal = Variables.Count + 1;
+        var name = $"variable{ordinal}";
+        while (Variables.Any(variable =>
+                   string.Equals(variable.Name, name, StringComparison.OrdinalIgnoreCase)))
+        {
+            name = $"variable{++ordinal}";
+        }
+
+        Variables.Add(new WorkflowVariableEditor
+        {
+            Name = name,
+            Kind = WorkflowVariableKind.Literal,
+            DataType = WorkflowValueType.String,
+            Value = string.Empty
+        });
+        ValidationIssues = [];
+    }
+
+    private void RemoveVariable(WorkflowVariableEditor variable)
+    {
+        _ = Variables.Remove(variable);
+        ValidationIssues = [];
+    }
+
+    private void SetVariableName(
+        WorkflowVariableEditor variable,
+        ChangeEventArgs eventArgs)
+    {
+        variable.Name = eventArgs.Value?.ToString() ?? string.Empty;
+        ValidationIssues = [];
+    }
+
+    private void SetVariableKind(
+        WorkflowVariableEditor variable,
+        ChangeEventArgs eventArgs)
+    {
+        if (Enum.TryParse<WorkflowVariableKind>(
+                eventArgs.Value?.ToString(),
+                out var kind))
+        {
+            variable.Kind = kind;
+            variable.Error = null;
+            variable.SchemaMetadata = null;
+            ValidationIssues = [];
+        }
+    }
+
+    private void SetVariableDataType(
+        WorkflowVariableEditor variable,
+        ChangeEventArgs eventArgs)
+    {
+        if (Enum.TryParse<WorkflowValueType>(
+                eventArgs.Value?.ToString(),
+                out var dataType))
+        {
+            variable.DataType = dataType;
+            ValidationIssues = [];
+        }
+    }
+
+    private void SetVariableConnection(
+        WorkflowVariableEditor variable,
+        ChangeEventArgs eventArgs)
+    {
+        variable.ConnectionId = Guid.TryParse(
+            eventArgs.Value?.ToString(),
+            out var connectionId)
+            ? connectionId
+            : null;
+        variable.SchemaMetadata = null;
+        variable.Error = null;
+        ValidationIssues = [];
+    }
+
+    private void SetVariableText(
+        WorkflowVariableEditor variable,
+        string propertyName,
+        ChangeEventArgs eventArgs)
+    {
+        var value = eventArgs.Value?.ToString() ?? string.Empty;
+        if (propertyName == nameof(variable.Schema))
+        {
+            variable.Schema = value;
+        }
+        else if (propertyName == nameof(variable.Object))
+        {
+            variable.Object = value;
+        }
+
+        variable.SchemaMetadata = null;
+        variable.Error = null;
+        ValidationIssues = [];
+    }
+
+    private async Task LoadVariableSchemaAsync(WorkflowVariableEditor variable)
+    {
+        var connection = variable.ConnectionId is { } connectionId
+            ? Connections.FirstOrDefault(candidate => candidate.Id == connectionId)
+            : null;
+        if (connection is null || !IsRelationalConnection(connection.Kind))
+        {
+            variable.Error = "Select an enabled relational connection first.";
+            return;
+        }
+
+        SchemaBusy = true;
+        variable.Error = null;
+        try
+        {
+            var result = await SchemaInspection.InspectAsync(
+                connection.Id,
+                connection.Kind,
+                variable.Schema,
+                variable.Object,
+                requireWritableTable: false,
+                cancellation.Token);
+            if (!result.IsSuccess)
+            {
+                variable.Error = result.Message;
+                return;
+            }
+
+            variable.SchemaMetadata = result.Schema;
+        }
+        finally
+        {
+            SchemaBusy = false;
+        }
+    }
+
+    private void AddFunction()
+    {
+        var ordinal = Functions.Count + 1;
+        var name = $"function{ordinal}";
+        while (Functions.Any(function =>
+                   string.Equals(function.Name, name, StringComparison.OrdinalIgnoreCase)))
+        {
+            name = $"function{++ordinal}";
+        }
+
+        Functions.Add(new WorkflowFunctionEditor
+        {
+            Name = name,
+            Parameters = "value",
+            Expression = "value"
+        });
+        ValidationIssues = [];
     }
 
     private void AddNode(PaletteTool tool)
@@ -689,7 +988,7 @@ else
             }
 
             var sourceLoaded = await LoadNodeSchemaAsync(sourceNode);
-            if (targetLoaded && sourceLoaded && GetMappings(SelectedNode).Count == 0)
+            if (targetLoaded && sourceLoaded && GetBindings(SelectedNode).Count == 0)
             {
                 AutoMapColumns();
             }
@@ -849,41 +1148,62 @@ else
         SetSettingStringArray(SelectedNode, "columns", selected);
     }
 
-    private string? GetMappedTarget(DesignerNode node, string sourceColumn) =>
-        GetMappings(node).GetValueOrDefault(sourceColumn);
+    private static WorkflowValueBinding? GetBinding(
+        DesignerNode node,
+        string targetColumn) =>
+        GetBindings(node).FirstOrDefault(binding =>
+            string.Equals(
+                binding.TargetColumn,
+                targetColumn,
+                StringComparison.OrdinalIgnoreCase));
 
-    private void SetColumnMapping(string sourceColumn, ChangeEventArgs eventArgs)
+    private void SetBindingKind(string targetColumn, ChangeEventArgs eventArgs)
     {
         if (SelectedNode is null)
         {
             return;
         }
 
-        var targetColumn = eventArgs.Value?.ToString();
-        var settings = ParseSettings(SelectedNode);
-        var mappings = settings["mappings"] as JsonObject ?? new JsonObject();
-        settings["mappings"] = mappings;
-        _ = mappings.Remove(sourceColumn);
-        if (!string.IsNullOrWhiteSpace(targetColumn))
+        var bindings = GetBindings(SelectedNode)
+            .Where(binding => !string.Equals(
+                binding.TargetColumn,
+                targetColumn,
+                StringComparison.OrdinalIgnoreCase))
+            .ToList();
+        if (Enum.TryParse<WorkflowValueBindingKind>(
+                eventArgs.Value?.ToString(),
+                out var kind))
         {
-            foreach (var duplicate in mappings
-                         .Where(mapping =>
-                             mapping.Value is JsonValue jsonValue &&
-                             jsonValue.TryGetValue<string>(out var existingTarget) &&
-                             string.Equals(
-                                 existingTarget,
-                                 targetColumn,
-                                 StringComparison.OrdinalIgnoreCase))
-                         .Select(mapping => mapping.Key)
-                         .ToArray())
+            var defaultValue = kind switch
             {
-                _ = mappings.Remove(duplicate);
-            }
-            mappings[sourceColumn] = targetColumn;
+                WorkflowValueBindingKind.Variable => AvailableVariableNames.FirstOrDefault()
+                    ?? string.Empty,
+                _ => string.Empty
+            };
+            bindings.Add(new(targetColumn, kind, defaultValue));
         }
 
-        SelectedNode.SettingsJson = settings.ToJsonString();
-        ValidationIssues = [];
+        SetBindings(SelectedNode, bindings);
+    }
+
+    private void SetBindingValue(string targetColumn, ChangeEventArgs eventArgs)
+    {
+        if (SelectedNode is null)
+        {
+            return;
+        }
+
+        var value = eventArgs.Value?.ToString() ?? string.Empty;
+        var bindings = GetBindings(SelectedNode).ToList();
+        var index = bindings.FindIndex(binding => string.Equals(
+            binding.TargetColumn,
+            targetColumn,
+            StringComparison.OrdinalIgnoreCase));
+        if (index >= 0)
+        {
+            bindings[index] = bindings[index] with { Value = value };
+            SetBindings(SelectedNode, bindings);
+        }
     }
 
     private void AutoMapColumns()
@@ -896,23 +1216,18 @@ else
             return;
         }
 
-        var writableTargets = targetSchema.Columns
-            .Where(column => column.IsWritable)
+        var sources = GetMappingSourceColumns(SelectedNode, sourceNode, sourceSchema)
             .ToDictionary(column => column.Name, StringComparer.OrdinalIgnoreCase);
-        var settings = ParseSettings(SelectedNode);
-        var mappings = new JsonObject();
-        foreach (var source in GetMappingSourceColumns(SelectedNode, sourceNode, sourceSchema))
-        {
-            if (writableTargets.TryGetValue(source.Name, out var target) &&
-                source.DataType == target.DataType)
-            {
-                mappings[source.Name] = target.Name;
-            }
-        }
-
-        settings["mappings"] = mappings;
-        SelectedNode.SettingsJson = settings.ToJsonString();
-        ValidationIssues = [];
+        var bindings = targetSchema.Columns
+            .Where(target => target.IsWritable
+                && sources.TryGetValue(target.Name, out var source)
+                && source.DataType == target.DataType)
+            .Select(target => new WorkflowValueBinding(
+                target.Name,
+                WorkflowValueBindingKind.Column,
+                target.Name))
+            .ToArray();
+        SetBindings(SelectedNode, bindings);
     }
 
     private void ClearMappings()
@@ -922,34 +1237,57 @@ else
             return;
         }
 
-        var settings = ParseSettings(SelectedNode);
-        settings["mappings"] = new JsonObject();
-        SelectedNode.SettingsJson = settings.ToJsonString();
-        ValidationIssues = [];
+        SetBindings(SelectedNode, []);
     }
 
-    private static IReadOnlyDictionary<string, string> GetMappings(DesignerNode node)
+    private static IReadOnlyList<WorkflowValueBinding> GetBindings(DesignerNode node)
     {
         try
         {
             using var document = JsonDocument.Parse(node.SettingsJson);
-            if (!document.RootElement.TryGetProperty("mappings", out var mappings) ||
-                mappings.ValueKind != JsonValueKind.Object)
+            if (!document.RootElement.TryGetProperty("bindings", out var bindings) ||
+                bindings.ValueKind != JsonValueKind.Array)
             {
-                return new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+                return [];
             }
 
-            return mappings.EnumerateObject()
-                .Where(property => property.Value.ValueKind == JsonValueKind.String)
-                .ToDictionary(
-                    property => property.Name,
-                    property => property.Value.GetString() ?? string.Empty,
-                    StringComparer.OrdinalIgnoreCase);
+            return bindings.EnumerateArray()
+                .Where(item => item.ValueKind == JsonValueKind.Object
+                    && item.TryGetProperty("targetColumn", out _)
+                    && item.TryGetProperty("kind", out _)
+                    && item.TryGetProperty("value", out _))
+                .Select(item => new WorkflowValueBinding(
+                    item.GetProperty("targetColumn").GetString() ?? string.Empty,
+                    Enum.TryParse<WorkflowValueBindingKind>(
+                        item.GetProperty("kind").GetString(),
+                        ignoreCase: true,
+                        out var kind)
+                        ? kind
+                        : WorkflowValueBindingKind.Column,
+                    item.GetProperty("value").GetString() ?? string.Empty))
+                .ToArray();
         }
         catch (JsonException)
         {
-            return new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            return [];
         }
+    }
+
+    private void SetBindings(
+        DesignerNode node,
+        IReadOnlyList<WorkflowValueBinding> bindings)
+    {
+        var settings = ParseSettings(node);
+        settings["bindings"] = new JsonArray(bindings
+            .Select(binding => new JsonObject
+            {
+                ["targetColumn"] = binding.TargetColumn,
+                ["kind"] = binding.Kind.ToString(),
+                ["value"] = binding.Value
+            })
+            .ToArray<JsonNode?>());
+        node.SettingsJson = settings.ToJsonString();
+        ValidationIssues = [];
     }
 
     private static IReadOnlyList<string>? GetSettingStringArray(
@@ -1191,7 +1529,9 @@ else
             node.X,
             node.Y,
             node.SettingsJson)).ToArray(),
-        Edges.Select(edge => new WorkflowEdge(edge.From, edge.To)).ToArray());
+        Edges.Select(edge => new WorkflowEdge(edge.From, edge.To)).ToArray(),
+        Variables.Select(variable => variable.ToDomain()).ToArray(),
+        Functions.Select(function => function.ToDomain()).ToArray());
 
     private string? NormalizeCron() => string.IsNullOrWhiteSpace(CronExpression)
         ? null
@@ -1242,10 +1582,10 @@ else
         WorkflowNodeKind.SelectColumns => "{\"columns\":[]}",
         WorkflowNodeKind.FilterRows => "{\"conditions\":[]}",
         WorkflowNodeKind.Join => "{\"leftNodeId\":\"\",\"rightNodeId\":\"\",\"leftKeys\":[],\"rightKeys\":[],\"type\":\"inner\",\"maximumBufferedRows\":100000}",
-        WorkflowNodeKind.SqlTarget => "{\"connectionId\":\"\",\"schema\":\"dbo\",\"object\":\"\",\"mode\":\"insert\"}",
-        WorkflowNodeKind.MySqlTarget => "{\"connectionId\":\"\",\"schema\":\"warehouse\",\"object\":\"\",\"mode\":\"insert\"}",
-        WorkflowNodeKind.PostgreSqlTarget => "{\"connectionId\":\"\",\"schema\":\"public\",\"object\":\"\",\"mode\":\"insert\"}",
-        WorkflowNodeKind.OracleTarget => "{\"connectionId\":\"\",\"schema\":\"APP\",\"object\":\"\",\"mode\":\"insert\"}",
+        WorkflowNodeKind.SqlTarget => "{\"connectionId\":\"\",\"schema\":\"dbo\",\"object\":\"\",\"mode\":\"insert\",\"bindings\":[]}",
+        WorkflowNodeKind.MySqlTarget => "{\"connectionId\":\"\",\"schema\":\"warehouse\",\"object\":\"\",\"mode\":\"insert\",\"bindings\":[]}",
+        WorkflowNodeKind.PostgreSqlTarget => "{\"connectionId\":\"\",\"schema\":\"public\",\"object\":\"\",\"mode\":\"insert\",\"bindings\":[]}",
+        WorkflowNodeKind.OracleTarget => "{\"connectionId\":\"\",\"schema\":\"APP\",\"object\":\"\",\"mode\":\"insert\",\"bindings\":[]}",
         WorkflowNodeKind.FtpTarget => "{\"connectionId\":\"\",\"remotePath\":\"/outbound/result.csv\",\"format\":\"csv\",\"includeHeader\":true,\"delimiter\":\",\",\"mode\":\"createNew\"}",
         WorkflowNodeKind.CsvTarget => "{\"connectionId\":\"\",\"relativePath\":\"outbound/result.csv\",\"mode\":\"createNew\",\"includeHeader\":true}",
         WorkflowNodeKind.ExcelTarget => "{\"connectionId\":\"\",\"relativePath\":\"outbound/result.xlsx\",\"worksheet\":\"Results\",\"mode\":\"createNew\"}",
@@ -1331,6 +1671,76 @@ else
     private sealed record PaletteGroup(string Name, PaletteTool[] Tools);
     private sealed record PaletteTool(string Name, string Description, WorkflowNodeKind Kind, string Icon, string Tone, bool IsOperational);
     private sealed record DesignerEdge(string From, string To);
+
+    private sealed class WorkflowVariableEditor
+    {
+        public WorkflowVariableEditor()
+        {
+        }
+
+        public WorkflowVariableEditor(WorkflowVariable variable)
+        {
+            Name = variable.Name;
+            Kind = variable.Kind;
+            DataType = variable.DataType;
+            Value = variable.Value ?? string.Empty;
+            ConnectionId = variable.ConnectionId;
+            Schema = variable.Schema ?? string.Empty;
+            Object = variable.Object ?? string.Empty;
+            ValueColumn = variable.ValueColumn ?? string.Empty;
+            FilterColumn = variable.FilterColumn ?? string.Empty;
+            FilterValue = variable.FilterValue ?? string.Empty;
+        }
+
+        public string Name { get; set; } = string.Empty;
+        public WorkflowVariableKind Kind { get; set; }
+        public WorkflowValueType DataType { get; set; }
+        public string Value { get; set; } = string.Empty;
+        public Guid? ConnectionId { get; set; }
+        public string Schema { get; set; } = string.Empty;
+        public string Object { get; set; } = string.Empty;
+        public string ValueColumn { get; set; } = string.Empty;
+        public string FilterColumn { get; set; } = string.Empty;
+        public string FilterValue { get; set; } = string.Empty;
+        public string? Error { get; set; }
+        public WorkflowObjectSchemaDto? SchemaMetadata { get; set; }
+
+        public WorkflowVariable ToDomain() => new(
+            Name,
+            Kind,
+            DataType,
+            Kind == WorkflowVariableKind.Literal ? Value : null,
+            Kind == WorkflowVariableKind.Database ? ConnectionId : null,
+            Kind == WorkflowVariableKind.Database ? Schema : null,
+            Kind == WorkflowVariableKind.Database ? Object : null,
+            Kind == WorkflowVariableKind.Database ? ValueColumn : null,
+            Kind == WorkflowVariableKind.Database ? FilterColumn : null,
+            Kind == WorkflowVariableKind.Database ? FilterValue : null);
+    }
+
+    private sealed class WorkflowFunctionEditor
+    {
+        public WorkflowFunctionEditor()
+        {
+        }
+
+        public WorkflowFunctionEditor(WorkflowFunction function)
+        {
+            Name = function.Name;
+            Parameters = string.Join(", ", function.Parameters);
+            Expression = function.Expression;
+        }
+
+        public string Name { get; set; } = string.Empty;
+        public string Parameters { get; set; } = string.Empty;
+        public string Expression { get; set; } = string.Empty;
+
+        public WorkflowFunction ToDomain() => new(
+            Name,
+            Parameters
+                .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries),
+            Expression);
+    }
 
     private sealed class DesignerNode(
         string id,

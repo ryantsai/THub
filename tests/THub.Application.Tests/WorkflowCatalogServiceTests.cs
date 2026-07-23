@@ -68,12 +68,14 @@ public sealed class WorkflowCatalogServiceTests
     public async Task LoadAllowsStructurallyIncompleteDraftGraph()
     {
         repository.Workflow = WorkflowManagementTestData.CreateDraft(
-            "{\"schemaVersion\":1,\"nodes\":[],\"edges\":[]}");
+            "{\"schemaVersion\":2,\"variables\":[],\"functions\":[],\"nodes\":[],\"edges\":[]}");
 
         var result = await CreateService().LoadAsync(repository.Workflow.Id);
 
         Assert.True(result.IsSuccess);
-        Assert.Equal("{\"schemaVersion\":1,\"nodes\":[],\"edges\":[]}", result.Value!.GraphJson);
+        Assert.Equal(
+            "{\"schemaVersion\":2,\"variables\":[],\"functions\":[],\"nodes\":[],\"edges\":[]}",
+            result.Value!.GraphJson);
     }
 
     [Fact]
@@ -133,7 +135,7 @@ public sealed class WorkflowCatalogServiceTests
             "Orders",
             null,
             "CONTOSO\\owner",
-            "{\"schemaVersion\":1,\"nodes\":[],\"edges\":[]}"));
+            "{\"schemaVersion\":2,\"variables\":[],\"functions\":[],\"nodes\":[],\"edges\":[]}"));
 
         Assert.True(result.IsSuccess);
         Assert.Equal(1, repository.CreateCalls);
@@ -258,7 +260,7 @@ public sealed class WorkflowCatalogServiceTests
     public async Task PublishRejectsInvalidPersistedDraftGraph()
     {
         repository.Workflow = WorkflowManagementTestData.CreateDraft(
-            "{\"schemaVersion\":1,\"nodes\":[],\"edges\":[]}");
+            "{\"schemaVersion\":2,\"variables\":[],\"functions\":[],\"nodes\":[],\"edges\":[]}");
 
         var result = await CreateService().PublishAsync(new(
             repository.Workflow.Id,
