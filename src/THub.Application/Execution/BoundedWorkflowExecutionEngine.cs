@@ -169,7 +169,8 @@ public sealed class BoundedWorkflowExecutionEngine
                         WorkflowExecutionEventKind.NodeSkipped,
                         GetUtcNow(),
                         node.Node.Id,
-                        ReasonCode: "execution.preflight.failed"),
+                        ReasonCode: "execution.preflight.failed",
+                        NodeKind: node.Node.Kind),
                     CancellationToken.None).ConfigureAwait(false);
             }
 
@@ -256,7 +257,8 @@ public sealed class BoundedWorkflowExecutionEngine
                                 WorkflowExecutionEventKind.NodeSkipped,
                                 GetUtcNow(),
                                 plannedNode.Node.Id,
-                                ReasonCode: skipped.ReasonCode),
+                                ReasonCode: skipped.ReasonCode,
+                                NodeKind: plannedNode.Node.Kind),
                             executionToken).ConfigureAwait(false);
                         await ReleaseConsumedInputsAsync(
                             plannedNode,
@@ -480,6 +482,7 @@ public sealed class BoundedWorkflowExecutionEngine
             var reporter = new EventProgressReporter(
                 workflowRunId,
                 node.Id,
+                node.Kind,
                 attempt,
                 WriteEventAsync,
                 _timeProvider);
@@ -489,7 +492,8 @@ public sealed class BoundedWorkflowExecutionEngine
                     WorkflowExecutionEventKind.NodeStarted,
                     GetUtcNow(),
                     node.Id,
-                    attempt),
+                    attempt,
+                    NodeKind: node.Kind),
                 executionToken).ConfigureAwait(false);
 
             try
@@ -562,7 +566,8 @@ public sealed class BoundedWorkflowExecutionEngine
                         GetUtcNow(),
                         node.Id,
                         attempt,
-                        reporter.Total),
+                        reporter.Total,
+                        NodeKind: node.Kind),
                     CancellationToken.None).ConfigureAwait(false);
                 return new NodeExecution(succeeded, materializedOutput);
             }
@@ -612,7 +617,8 @@ public sealed class BoundedWorkflowExecutionEngine
                             node.Id,
                             attempt,
                             reporter.Total,
-                            error),
+                            error,
+                            NodeKind: node.Kind),
                         CancellationToken.None).ConfigureAwait(false);
                     return new NodeExecution(cancelled, null);
                 }
@@ -630,7 +636,8 @@ public sealed class BoundedWorkflowExecutionEngine
                             attempt,
                             reporter.Total,
                             error,
-                            delay),
+                            delay,
+                            NodeKind: node.Kind),
                         executionToken).ConfigureAwait(false);
 
                     try
@@ -664,7 +671,8 @@ public sealed class BoundedWorkflowExecutionEngine
                                 node.Id,
                                 attempt,
                                 reporter.Total,
-                                cancellationError),
+                                cancellationError,
+                                NodeKind: node.Kind),
                             CancellationToken.None).ConfigureAwait(false);
                         return new NodeExecution(stopped, null);
                     }
@@ -686,7 +694,8 @@ public sealed class BoundedWorkflowExecutionEngine
                         node.Id,
                         attempt,
                         reporter.Total,
-                        error),
+                        error,
+                        NodeKind: node.Kind),
                     CancellationToken.None).ConfigureAwait(false);
                 return new NodeExecution(failed, null);
             }
@@ -807,7 +816,8 @@ public sealed class BoundedWorkflowExecutionEngine
                         GetUtcNow(),
                         node.Node.Id,
                         Error: error,
-                        ReasonCode: "execution.cancelled"),
+                        ReasonCode: "execution.cancelled",
+                        NodeKind: node.Node.Kind),
                     CancellationToken.None).ConfigureAwait(false);
             }
         }
@@ -991,6 +1001,7 @@ public sealed class BoundedWorkflowExecutionEngine
 
         private readonly Guid _workflowRunId;
         private readonly string _nodeId;
+        private readonly WorkflowNodeKind _nodeKind;
         private readonly int _attempt;
         private readonly Func<WorkflowExecutionEvent, CancellationToken, ValueTask> _writeEvent;
         private readonly TimeProvider _timeProvider;
@@ -1003,12 +1014,14 @@ public sealed class BoundedWorkflowExecutionEngine
         public EventProgressReporter(
             Guid workflowRunId,
             string nodeId,
+            WorkflowNodeKind nodeKind,
             int attempt,
             Func<WorkflowExecutionEvent, CancellationToken, ValueTask> writeEvent,
             TimeProvider timeProvider)
         {
             _workflowRunId = workflowRunId;
             _nodeId = nodeId;
+            _nodeKind = nodeKind;
             _attempt = attempt;
             _writeEvent = writeEvent;
             _timeProvider = timeProvider;
@@ -1039,7 +1052,8 @@ public sealed class BoundedWorkflowExecutionEngine
                         now,
                         _nodeId,
                         _attempt,
-                        _total),
+                        _total,
+                        NodeKind: _nodeKind),
                     cancellationToken).ConfigureAwait(false);
                 _lastEmitted = _total;
                 _lastEmittedAtUtc = now;

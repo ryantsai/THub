@@ -1,4 +1,5 @@
 using THub.Domain.Runs;
+using THub.Domain.Workflows;
 
 namespace THub.Application.Execution;
 
@@ -26,7 +27,8 @@ public sealed record WorkflowExecutionEvent(
     WorkflowNodeProgress? Progress = null,
     ExecutionError? Error = null,
     TimeSpan? RetryDelay = null,
-    string? ReasonCode = null);
+    string? ReasonCode = null,
+    WorkflowNodeKind? NodeKind = null);
 
 public interface IWorkflowExecutionEventSink
 {

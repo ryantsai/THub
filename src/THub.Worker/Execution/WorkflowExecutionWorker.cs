@@ -152,7 +152,7 @@ public sealed class WorkflowExecutionWorker(
             }
             else
             {
-                var engine = engineFactory.Create(claim.WorkflowRunId, _leaseOwner, _options);
+                var engine = engineFactory.Create(claim, _leaseOwner, _options);
                 result = await engine.ExecuteSerializedAsync(
                     claim.WorkflowRunId,
                     claim.GraphJson,

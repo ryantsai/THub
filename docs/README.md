@@ -9,6 +9,9 @@
 - [Data model](data-model.md): current THub/Quartz schemas plus accepted immutable workflow, lease/step, publication/token/grant/change-set, Email outbox, and audit persistence targets.
 - [Security architecture](security.md): Windows management authentication, isolated managed-bearer publications, Spreadsheet role grants/staging, connectors, Email secrets/outbox, and gated executables/webhooks.
 - [Deployment and operations](deployment.md): separate Web/Publications IIS boundaries, worker/database deployment, Quartz and Serilog configuration, least-privilege identities, health, and recovery.
+- [Workflow operation tracing convention](operation-tracing.md): required lifecycle,
+  structured fields, levels, and data-safety rules for every current and future
+  executable operation.
 - [Architecture Decision Records](adr/README.md): accepted, proposed, and superseded decisions with rationale and consequences, including ADR-0010 through ADR-0012.
 
 ## Product planning
@@ -20,4 +23,6 @@
 - Update the focused architecture document when implementation or operational assumptions change.
 - Add/supersede an ADR for a material technology, boundary, security, persistence, or execution decision.
 - Keep planned and implemented behavior distinguishable.
+- Require every new executable operation to follow the workflow operation tracing
+  convention.
 - Prefer links to one authoritative explanation over duplicating instructions across documents.

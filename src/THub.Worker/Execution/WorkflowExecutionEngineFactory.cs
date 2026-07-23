@@ -13,14 +13,22 @@ internal sealed class WorkflowExecutionEngineFactory(
     IExecutionErrorClassifier errorClassifier,
     IWorkflowExecutionEventSinkFactory eventSinkFactory,
     WorkflowGraphSerializer graphSerializer,
-    TimeProvider timeProvider)
+    TimeProvider timeProvider,
+    ILogger<WorkflowOperationTraceSink> traceLogger)
 {
     public BoundedWorkflowExecutionEngine Create(
-        Guid workflowRunId,
+        WorkflowRunExecutionClaim claim,
         string leaseOwner,
         WorkflowExecutionWorkerOptions options)
     {
+        ArgumentNullException.ThrowIfNull(claim);
         var timeouts = options.CreateTimeouts();
+        var eventSink = new WorkflowOperationTraceSink(
+            eventSinkFactory.Create(claim.WorkflowRunId, leaseOwner),
+            traceLogger,
+            claim.WorkflowId,
+            claim.WorkflowVersionId,
+            claim.WorkflowVersion);
         return new BoundedWorkflowExecutionEngine(
             planner,
             new WorkflowNodeExecutorRegistry(executors),
@@ -29,7 +37,7 @@ internal sealed class WorkflowExecutionEngineFactory(
             retryPolicies,
             retryScheduler,
             errorClassifier,
-            eventSinkFactory.Create(workflowRunId, leaseOwner),
+            eventSink,
             options.CreateLimits(),
             timeProvider,
             graphSerializer,

@@ -321,6 +321,15 @@ Required operational signals:
 
 Serilog writes structured console output and daily rolling JSON files by default. Each file rolls at 50 MB and 14 files are retained. Create `%PROGRAMDATA%\THub\Logs` and grant each executable host identity write access only to its required destination, or configure other approved absolute paths. Route logs to centralized storage with retention and redaction controls. Windows Event Log is suitable for service lifecycle/errors but should not be the only workflow telemetry store.
 
+Every workflow node attempt emits a structured operation trace after its matching
+durable execution transition succeeds. The trace covers start, bounded aggregate
+progress, retry, success, failure, cancellation, and skip outcomes. The Worker enables
+Debug only for the operation-trace source so progress is captured without increasing
+framework logging globally. All future executable operations must follow the
+[workflow operation tracing convention](operation-tracing.md), including its stable
+field names and prohibition on payloads, secrets, settings, SQL, headers, URLs, and
+paths.
+
 Default file names are `thub-web-.json`, `thub-worker-.json`, and `thub-publications-.json`. Development writes to each project's `logs` directory, which is excluded from Git. Production should alert on unwritable log destinations and disk pressure; local rolling files are a resilience buffer, not a substitute for centralized searchable telemetry.
 
 ## Recovery

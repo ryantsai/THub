@@ -31,6 +31,9 @@ on THub. It applies below the repository root unless a deeper `AGENTS.md` overri
   logs, errors, tests, fixtures, commands, and generated artifacts.
 - Treat persisted configuration, workflow JSON, paths, identifiers, and external data as
   untrusted at their execution boundaries.
+- Require every new executable workflow operation to follow
+  [docs/operation-tracing.md](docs/operation-tracing.md), including its lifecycle,
+  structured-field, and data-safety conventions.
 - Keep documentation synchronized when behavior, configuration, commands, support
   boundaries, or operational assumptions change.
 - Add or supersede an ADR for an architectural reversal; never rewrite an accepted ADR
