@@ -75,7 +75,7 @@ Responsibilities:
 - require exactly one managed opaque bearer credential on each `/api/v1/publications/{slug}/schema` or `/rows` request and bind it to the immutable active REST version;
 - apply process-local request/concurrency admission, then atomically record an accepted token use before any source query;
 - enforce typed allow-listed filters/sorts, deterministic keyset pagination, schema-fingerprint checks, SQL/request timeouts, cancellation, cell/row/response limits, and Problem Details;
-- query only the configured SQL Server table or view through Windows-integrated, read-only connections;
+- query only the configured SQL Server table or view through integrated or referenced database authentication with read-only connection intent;
 - provide structured request logging, HTTPS/HSTS behavior, and a basic `/healthz` process-liveness endpoint.
 
 The admission partition is one token plus one active version and is process-local. The initial topology therefore remains one publication-host instance; it does not yet provide an aggregate limit across every token for a publication. `/healthz` does not prove control-plane or source SQL readiness, and internet exposure, alternate JWT/Entra authentication, and multi-host scale require a new decision.
@@ -251,6 +251,7 @@ Publication-management permission does not itself grant access to editor data. E
 ### Secrets and untrusted configuration
 
 - Persist secret references, not credentials, inside connection or node JSON.
+- Resolve database authentication through the provider-neutral Application contract from ADR-0013; SQL-specific connection-string construction remains in Infrastructure.
 - Resolve secrets only at the execution boundary and under the worker identity.
 - Treat all workflow JSON as untrusted, even when authored by an authenticated designer.
 - Never interpolate user-provided SQL identifiers or fragments without validation/allow-listing.

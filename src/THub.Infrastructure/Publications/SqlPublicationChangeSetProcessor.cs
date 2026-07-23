@@ -9,6 +9,7 @@ using THub.Application.Connections;
 using THub.Application.Publications;
 using THub.Domain.Connections;
 using THub.Domain.Publications;
+using THub.Infrastructure.Connections;
 using THub.Infrastructure.Persistence;
 
 namespace THub.Infrastructure.Publications;
@@ -18,6 +19,7 @@ public sealed class SqlPublicationChangeSetProcessor(
     IPublicationChangeSetClaimStore claimStore,
     IPublicationSourceSchemaInspector schemaInspector,
     ConnectionConfigurationSerializer configurationSerializer,
+    SqlServerConnectionStringFactory connectionStringFactory,
     TimeProvider timeProvider,
     ILogger<SqlPublicationChangeSetProcessor> logger) : IPublicationChangeSetProcessor
 {
@@ -223,7 +225,12 @@ public sealed class SqlPublicationChangeSetProcessor(
         PublicationChangeSetClaim claim,
         CancellationToken cancellationToken)
     {
-        var connectionString = BuildWriteConnectionString(context.Configuration).ConnectionString;
+        var connectionString = (await connectionStringFactory.CreateAsync(
+            context.Configuration,
+            "THub governed publication editor",
+            ApplicationIntent.ReadWrite,
+            enlist: true,
+            cancellationToken).ConfigureAwait(false)).ConnectionString;
         await using var connection = new SqlConnection(connectionString);
         await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
         await using var transaction = (SqlTransaction)await connection
@@ -577,21 +584,13 @@ public sealed class SqlPublicationChangeSetProcessor(
     private static string QualifiedName(PublicationVersion version) =>
         $"{SqlPublicationQueryPlanner.QuoteIdentifier(version.SourceSchema)}.{SqlPublicationQueryPlanner.QuoteIdentifier(version.SourceObject)}";
 
-    internal static SqlConnectionStringBuilder BuildWriteConnectionString(
-        SqlServerConnectionConfiguration configuration)
-    {
-        var builder = SqlPublicationSourceDataReader.BuildConnectionString(configuration);
-        builder.ApplicationIntent = ApplicationIntent.ReadWrite;
-        builder.ApplicationName = "THub governed publication editor";
-        return builder;
-    }
-
     private static bool IsExpectedApplyFailure(Exception exception) => exception is SqlException
         or TimeoutException
         or InvalidOperationException
         or ArgumentException
         or JsonException
         or OverflowException
+        or DatabaseCredentialUnavailableException
         or ConnectionConfigurationException;
 
     private sealed record PublicationApplyContext(

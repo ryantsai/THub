@@ -10,6 +10,7 @@ namespace THub.Infrastructure.Connections;
 public sealed class DataConnectionProbe(
     ConnectionConfigurationSerializer serializer,
     ApprovedPathResolver pathResolver,
+    SqlServerConnectionStringFactory connectionStringFactory,
     ILogger<DataConnectionProbe> logger) : IDataConnectionProbe
 {
     public async Task<ConnectionProbeResult> ProbeAsync(
@@ -24,7 +25,7 @@ public sealed class DataConnectionProbe(
             return configuration switch
             {
                 SqlServerConnectionConfiguration sql =>
-                    await ProbeSqlAsync(sql, stopwatch, cancellationToken),
+                    await ProbeSqlAsync(sql, stopwatch, connectionStringFactory, cancellationToken),
                 FileConnectionConfiguration file => ProbeFile(file, stopwatch),
                 _ => new ConnectionProbeResult(
                     false,
@@ -41,6 +42,7 @@ public sealed class DataConnectionProbe(
             or IOException
             or UnauthorizedAccessException
             or InvalidOperationException
+            or DatabaseCredentialUnavailableException
             or ConnectionConfigurationException)
         {
             logger.LogWarning(
@@ -58,20 +60,15 @@ public sealed class DataConnectionProbe(
     private static async Task<ConnectionProbeResult> ProbeSqlAsync(
         SqlServerConnectionConfiguration configuration,
         Stopwatch stopwatch,
+        SqlServerConnectionStringFactory connectionStringFactory,
         CancellationToken cancellationToken)
     {
-        var builder = new SqlConnectionStringBuilder
-        {
-            DataSource = configuration.Server,
-            InitialCatalog = configuration.Database,
-            IntegratedSecurity = true,
-            Encrypt = configuration.Encrypt,
-            TrustServerCertificate = configuration.TrustServerCertificate,
-            ConnectTimeout = configuration.ConnectTimeoutSeconds,
-            ApplicationName = "THub connection probe",
-            MultipleActiveResultSets = false,
-            PersistSecurityInfo = false
-        };
+        var builder = await connectionStringFactory.CreateAsync(
+            configuration,
+            "THub connection probe",
+            ApplicationIntent.ReadWrite,
+            enlist: false,
+            cancellationToken);
 
         await using var connection = new SqlConnection(builder.ConnectionString);
         await connection.OpenAsync(cancellationToken);
@@ -82,7 +79,7 @@ public sealed class DataConnectionProbe(
         return new ConnectionProbeResult(
             true,
             stopwatch.Elapsed,
-            "SQL Server accepted the service identity.",
+            "SQL Server accepted the configured database identity.",
             version);
     }
 

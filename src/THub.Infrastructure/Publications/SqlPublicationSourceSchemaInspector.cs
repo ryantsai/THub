@@ -8,11 +8,13 @@ using THub.Application.Connections;
 using THub.Application.Publications;
 using THub.Domain.Connections;
 using THub.Domain.Publications;
+using THub.Infrastructure.Connections;
 
 namespace THub.Infrastructure.Publications;
 
 public sealed class SqlPublicationSourceSchemaInspector(
     ConnectionConfigurationSerializer configurationSerializer,
+    SqlServerConnectionStringFactory connectionStringFactory,
     ILogger<SqlPublicationSourceSchemaInspector> logger) : IPublicationSourceSchemaInspector
 {
     private const int MaximumColumns = 1_024;
@@ -33,8 +35,13 @@ public sealed class SqlPublicationSourceSchemaInspector(
         try
         {
             var configuration = RequireSqlConfiguration(connection);
-            await using var sqlConnection = new SqlConnection(
-                SqlPublicationSourceDataReader.BuildConnectionString(configuration).ConnectionString);
+            var connectionString = await connectionStringFactory.CreateAsync(
+                configuration,
+                "THub publication schema inspection",
+                ApplicationIntent.ReadOnly,
+                enlist: false,
+                cancellationToken).ConfigureAwait(false);
+            await using var sqlConnection = new SqlConnection(connectionString.ConnectionString);
             await sqlConnection.OpenAsync(cancellationToken).ConfigureAwait(false);
             const string commandText = """
                 SELECT TOP (@take)
@@ -124,8 +131,13 @@ public sealed class SqlPublicationSourceSchemaInspector(
         try
         {
             var configuration = RequireSqlConfiguration(connection);
-            await using var sqlConnection = new SqlConnection(
-                SqlPublicationSourceDataReader.BuildConnectionString(configuration).ConnectionString);
+            var connectionString = await connectionStringFactory.CreateAsync(
+                configuration,
+                "THub publication schema inspection",
+                ApplicationIntent.ReadOnly,
+                enlist: false,
+                cancellationToken).ConfigureAwait(false);
+            await using var sqlConnection = new SqlConnection(connectionString.ConnectionString);
             await sqlConnection.OpenAsync(cancellationToken).ConfigureAwait(false);
             var discovered = await ReadColumnsAsync(
                     sqlConnection,
@@ -599,6 +611,7 @@ public sealed class SqlPublicationSourceSchemaInspector(
         or InvalidOperationException
         or ArgumentException
         or ConnectionConfigurationException
+        or DatabaseCredentialUnavailableException
         or OverflowException;
 
     private sealed record DiscoveredObject(

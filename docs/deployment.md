@@ -21,7 +21,7 @@ Web, publication, and worker processes may initially share a Windows machine, bu
 ## Environment assumptions to confirm
 
 - Whether IIS, worker, SQL Server, and users are in one AD forest/domain.
-- Whether source SQL connections use Windows integrated authentication.
+- Whether each source SQL connection uses Windows integrated or referenced database authentication.
 - Whether file locations include UNC shares.
 - Whether outbound internet access is allowed.
 - The internal DNS name, certificate, firewall allow-list, and consumer networks for `THub.Publications`.
@@ -120,6 +120,15 @@ Reviewed migrations create immutable workflow versions, run claim/cancellation f
 For local Development/debugging, all three executable hosts use `THub.Debug` on `(localdb)\MSSQLLocalDB`. Development settings are defined only in `appsettings.Development.json`, and those files are excluded from publish output.
 
 Every non-Development host must receive the real SQL Server `ConnectionStrings:THub` through environment-specific external configuration or an organization-approved configuration provider. Web, Worker, and Publications register Infrastructure and fail startup when it is missing. Base settings intentionally contain no production fallback connection string.
+
+Configured source/target SQL connections independently select Windows integrated authentication or database username/password authentication. For database authentication, the Connections UI stores only a reference such as `warehouse_reader`. Supply its values to every host that uses that connection through external configuration:
+
+```powershell
+$env:ConnectionCredentials__warehouse_reader__Username = 'thub_warehouse_reader'
+$env:ConnectionCredentials__warehouse_reader__Password = '<supply-through-approved-secret-system>'
+```
+
+The Web host needs the credential to test/discover the connection, the Worker needs it for workflow execution and approved editor writes, and Publications needs it for active REST reads. Give each host only the credential references and database grants it requires. The built-in resolver uses `IConfiguration`, so environment variables are a portable baseline rather than a requirement; key-per-file and vault-backed .NET configuration providers can supply the same keys. Missing references fail closed. Never place these values in checked-in `appsettings` files.
 
 The worker supports:
 

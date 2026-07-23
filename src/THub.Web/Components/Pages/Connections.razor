@@ -53,7 +53,7 @@ else
         @if (ShowEditor)
         {
             <section class="panel connection-editor" aria-label="Connection editor">
-                <div class="panel-head"><div><h2>@(Edit.Id is null ? "New connection" : "Edit connection")</h2><p>Credentials are never stored in connection metadata. SQL connections use the service identity.</p></div><button class="close-editor" type="button" title="Close" @onclick="CloseEditor">×</button></div>
+                <div class="panel-head"><div><h2>@(Edit.Id is null ? "New connection" : "Edit connection")</h2><p>Credentials are never stored in connection metadata. Database authentication uses a secret reference.</p></div><button class="close-editor" type="button" title="Close" @onclick="CloseEditor">×</button></div>
                 <div class="connection-form">
                     <label><span>Name</span><input maxlength="200" @bind="Edit.Name" disabled="@Busy" /></label>
                     <label><span>Connector</span>
@@ -68,6 +68,16 @@ else
                     {
                         <label><span>Server</span><input placeholder="sql01.contoso.local" maxlength="253" @bind="Edit.Server" disabled="@Busy" /></label>
                         <label><span>Database</span><input placeholder="Warehouse" maxlength="128" @bind="Edit.Database" disabled="@Busy" /></label>
+                        <label><span>Authentication</span>
+                            <select @bind="Edit.AuthenticationKind" disabled="@Busy">
+                                <option value="@DatabaseAuthenticationKind.Integrated">Windows integrated</option>
+                                <option value="@DatabaseAuthenticationKind.UserPassword">Database username/password</option>
+                            </select>
+                        </label>
+                        @if (Edit.AuthenticationKind == DatabaseAuthenticationKind.UserPassword)
+                        {
+                            <label><span>Credential secret reference</span><input placeholder="warehouse_writer" maxlength="200" autocomplete="off" spellcheck="false" @bind="Edit.CredentialSecretReference" disabled="@Busy" /><small>Reference only; configure its Username and Password in each host's external secret provider.</small></label>
+                        }
                         <label class="check"><input type="checkbox" @bind="Edit.Encrypt" disabled="@Busy" /><span>Require transport encryption</span></label>
                         <label class="check"><input type="checkbox" @bind="Edit.TrustServerCertificate" disabled="@Busy" /><span>Trust server certificate (development only)</span></label>
                         <label><span>Connect timeout (seconds)</span><input type="number" min="1" max="60" @bind="Edit.ConnectTimeoutSeconds" disabled="@Busy" /></label>
@@ -294,7 +304,7 @@ else
     private static string KindIcon(ConnectionKind kind) => kind == ConnectionKind.SqlServer ? "database" : "folder";
     private static string KindLabel(ConnectionKind kind) => kind switch
     {
-        ConnectionKind.SqlServer => "Windows-integrated SQL Server",
+        ConnectionKind.SqlServer => "SQL Server",
         ConnectionKind.CsvFile => "Bounded CSV file root",
         ConnectionKind.ExcelFile => "Bounded XLSX/XLSM root",
         _ => kind.ToString()
@@ -315,6 +325,8 @@ else
         public DateTimeOffset UpdatedAtUtc { get; set; }
         public string Server { get; set; } = string.Empty;
         public string Database { get; set; } = string.Empty;
+        public DatabaseAuthenticationKind AuthenticationKind { get; set; } = DatabaseAuthenticationKind.Integrated;
+        public string CredentialSecretReference { get; set; } = string.Empty;
         public bool Encrypt { get; set; } = true;
         public bool TrustServerCertificate { get; set; }
         public int ConnectTimeoutSeconds { get; set; } = 15;
@@ -342,6 +354,8 @@ else
             {
                 model.Server = sql.Server;
                 model.Database = sql.Database;
+                model.AuthenticationKind = sql.Authentication.Kind;
+                model.CredentialSecretReference = sql.Authentication.CredentialSecretReference ?? string.Empty;
                 model.Encrypt = sql.Encrypt;
                 model.TrustServerCertificate = sql.TrustServerCertificate;
                 model.ConnectTimeoutSeconds = sql.ConnectTimeoutSeconds;
@@ -368,7 +382,12 @@ else
                 TrustServerCertificate,
                 ConnectTimeoutSeconds,
                 CommandTimeoutSeconds,
-                MaximumBatchRows)
+                MaximumBatchRows,
+                new DatabaseAuthenticationConfiguration(
+                    AuthenticationKind,
+                    AuthenticationKind == DatabaseAuthenticationKind.UserPassword
+                        ? CredentialSecretReference
+                        : null))
             : new FileConnectionConfiguration(
                 Kind,
                 ApprovedRoot,

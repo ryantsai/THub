@@ -6,12 +6,14 @@ using THub.Application.Execution;
 using THub.Domain.Connections;
 using THub.Domain.Runs;
 using THub.Domain.Workflows;
+using THub.Infrastructure.Connections;
 
 namespace THub.Infrastructure.Execution;
 
 public sealed class SqlSourceNodeExecutor(
     ExecutionConnectionResolver connectionResolver,
-    WorkflowNodeSettingsValidator settingsValidator) : IWorkflowNodeExecutor
+    WorkflowNodeSettingsValidator settingsValidator,
+    SqlServerConnectionStringFactory connectionStringFactory) : IWorkflowNodeExecutor
 {
     public WorkflowNodeExecutorDescriptor Descriptor { get; } =
         WorkflowNodeExecutorDescriptor.Source(WorkflowNodeKind.SqlSource);
@@ -25,7 +27,12 @@ public sealed class SqlSourceNodeExecutor(
             settings.ConnectionId,
             ConnectionKind.SqlServer,
             cancellationToken);
-        var connectionString = SqlExecutionSupport.CreateConnectionString(connection);
+        var connectionString = (await connectionStringFactory.CreateAsync(
+            connection,
+            "THub workflow execution",
+            ApplicationIntent.ReadWrite,
+            enlist: true,
+            cancellationToken)).ConnectionString;
         var metadata = await SqlExecutionSupport.LoadObjectMetadataAsync(
             connectionString,
             connection.CommandTimeoutSeconds,
@@ -116,7 +123,8 @@ public sealed class SqlSourceNodeExecutor(
 
 public sealed class SqlTargetNodeExecutor(
     ExecutionConnectionResolver connectionResolver,
-    WorkflowNodeSettingsValidator settingsValidator) : IWorkflowNodeExecutor
+    WorkflowNodeSettingsValidator settingsValidator,
+    SqlServerConnectionStringFactory connectionStringFactory) : IWorkflowNodeExecutor
 {
     public WorkflowNodeExecutorDescriptor Descriptor { get; } =
         WorkflowNodeExecutorDescriptor.Target(WorkflowNodeKind.SqlTarget);
@@ -131,7 +139,12 @@ public sealed class SqlTargetNodeExecutor(
             settings.ConnectionId,
             ConnectionKind.SqlServer,
             cancellationToken);
-        var connectionString = SqlExecutionSupport.CreateConnectionString(connection);
+        var connectionString = (await connectionStringFactory.CreateAsync(
+            connection,
+            "THub workflow execution",
+            ApplicationIntent.ReadWrite,
+            enlist: true,
+            cancellationToken)).ConnectionString;
         var metadata = await SqlExecutionSupport.LoadObjectMetadataAsync(
             connectionString,
             connection.CommandTimeoutSeconds,
@@ -329,19 +342,6 @@ internal static class SqlExecutionSupport
             AND objectMetadata.[type] IN (N'U', N'V')
         ORDER BY columnMetadata.[column_id];
         """;
-
-    public static string CreateConnectionString(SqlServerConnectionConfiguration configuration) =>
-        new SqlConnectionStringBuilder
-        {
-            DataSource = configuration.Server,
-            InitialCatalog = configuration.Database,
-            IntegratedSecurity = true,
-            Encrypt = configuration.Encrypt,
-            TrustServerCertificate = configuration.TrustServerCertificate,
-            ConnectTimeout = configuration.ConnectTimeoutSeconds,
-            ApplicationName = "THub.Worker",
-            MultipleActiveResultSets = false
-        }.ConnectionString;
 
     public static async Task OpenSourceAsync(
         SqlConnection connection,

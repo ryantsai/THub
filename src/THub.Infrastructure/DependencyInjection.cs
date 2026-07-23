@@ -28,6 +28,7 @@ public static class DependencyInjection
         AddControlPlanePersistence(services, configuration);
 
         services.AddSingleton<ApprovedPathResolver>();
+        AddDatabaseAuthentication(services);
         services.AddSingleton<IDataConnectionStore, SqlDataConnectionStore>();
         services.AddSingleton<IDataConnectionProbe, DataConnectionProbe>();
         services.AddScoped<IWorkflowManagementRepository, SqlWorkflowManagementRepository>();
@@ -56,6 +57,7 @@ public static class DependencyInjection
         services.AddSingleton<IWorkflowScheduleSource, SqlWorkflowScheduleSource>();
         services.AddSingleton<IScheduledWorkflowRunEnqueuer, SqlScheduledWorkflowRunEnqueuer>();
         services.AddSingleton<ApprovedPathResolver>();
+        AddDatabaseAuthentication(services);
         services.AddSingleton<IWorkflowRunExecutionStore, SqlWorkflowRunExecutionStore>();
         services.AddSingleton<IWorkflowExecutionEventSinkFactory, SqlWorkflowExecutionEventSinkFactory>();
         services.AddSingleton<IWorkflowStepRunLocator, SqlWorkflowStepRunLocator>();
@@ -87,6 +89,7 @@ public static class DependencyInjection
     {
         ArgumentNullException.ThrowIfNull(services);
         AddControlPlanePersistence(services, configuration);
+        AddDatabaseAuthentication(services);
 
         services.AddScoped<IPublicationCatalogStore, SqlPublicationCatalogStore>();
         services.AddScoped<IPublicationTokenStore, SqlPublicationTokenStore>();
@@ -132,5 +135,11 @@ public static class DependencyInjection
         services.AddSingleton(smtpOptions);
         services.AddSingleton<ISecretResolver, UnavailableSmtpSecretResolver>();
         services.AddScoped<IAlertSender, MailKitAlertSender>();
+    }
+
+    private static void AddDatabaseAuthentication(IServiceCollection services)
+    {
+        services.AddSingleton<IDatabaseCredentialResolver, ConfigurationDatabaseCredentialResolver>();
+        services.AddSingleton<SqlServerConnectionStringFactory>();
     }
 }

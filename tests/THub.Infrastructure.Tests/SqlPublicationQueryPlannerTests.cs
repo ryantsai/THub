@@ -2,6 +2,7 @@ using THub.Application.Connections;
 using THub.Application.Publications;
 using THub.Domain.Publications;
 using THub.Infrastructure.Publications;
+using THub.Infrastructure.Connections;
 using THub.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 
@@ -19,7 +20,12 @@ public sealed class SqlPublicationQueryPlannerTests
             trustServerCertificate: false,
             connectTimeoutSeconds: 7);
 
-        var builder = SqlPublicationSourceDataReader.BuildConnectionString(configuration);
+        var builder = SqlServerConnectionStringFactory.Build(
+            configuration,
+            credential: null,
+            "THub governed publication reader",
+            Microsoft.Data.SqlClient.ApplicationIntent.ReadOnly,
+            enlist: false);
 
         Assert.True(builder.IntegratedSecurity);
         Assert.True(builder.Encrypt);
@@ -42,7 +48,12 @@ public sealed class SqlPublicationQueryPlannerTests
             encrypt: true,
             trustServerCertificate: false);
 
-        var builder = SqlPublicationChangeSetProcessor.BuildWriteConnectionString(configuration);
+        var builder = SqlServerConnectionStringFactory.Build(
+            configuration,
+            credential: null,
+            "THub governed publication editor",
+            Microsoft.Data.SqlClient.ApplicationIntent.ReadWrite,
+            enlist: true);
 
         Assert.True(builder.IntegratedSecurity);
         Assert.Equal(Microsoft.Data.SqlClient.ApplicationIntent.ReadWrite, builder.ApplicationIntent);
@@ -50,6 +61,28 @@ public sealed class SqlPublicationQueryPlannerTests
         Assert.False(builder.PersistSecurityInfo);
         Assert.Equal(string.Empty, builder.UserID);
         Assert.Equal(string.Empty, builder.Password);
+    }
+
+    [Fact]
+    public void BuildConnectionString_UsesResolvedDatabaseCredential()
+    {
+        var configuration = new SqlServerConnectionConfiguration(
+            "sql.internal.example",
+            "Operations",
+            authentication: new DatabaseAuthenticationConfiguration(
+                DatabaseAuthenticationKind.UserPassword,
+                "operations_reader"));
+
+        var builder = SqlServerConnectionStringFactory.Build(
+            configuration,
+            new DatabaseCredential("db_reader", "not-logged"),
+            "THub governed publication reader",
+            Microsoft.Data.SqlClient.ApplicationIntent.ReadOnly,
+            enlist: false);
+
+        Assert.False(builder.IntegratedSecurity);
+        Assert.Equal("db_reader", builder.UserID);
+        Assert.Equal("not-logged", builder.Password);
     }
 
     [Fact]

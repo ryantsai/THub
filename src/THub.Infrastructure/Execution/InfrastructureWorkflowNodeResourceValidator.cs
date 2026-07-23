@@ -4,7 +4,9 @@ using THub.Application.Execution;
 using THub.Domain.Alerts;
 using THub.Domain.Connections;
 using THub.Domain.Workflows;
+using THub.Infrastructure.Connections;
 using THub.Infrastructure.Files;
+using Microsoft.Data.SqlClient;
 
 namespace THub.Infrastructure.Execution;
 
@@ -14,6 +16,7 @@ namespace THub.Infrastructure.Execution;
 /// </summary>
 public sealed class InfrastructureWorkflowNodeResourceValidator(
     ExecutionConnectionResolver connectionResolver,
+    SqlServerConnectionStringFactory connectionStringFactory,
     ApprovedPathResolver pathResolver,
     IEmailAlertAdministrationStore emailProfiles) : IWorkflowNodeResourceValidator
 {
@@ -21,6 +24,8 @@ public sealed class InfrastructureWorkflowNodeResourceValidator(
         connectionResolver ?? throw new ArgumentNullException(nameof(connectionResolver));
     private readonly ApprovedPathResolver _pathResolver =
         pathResolver ?? throw new ArgumentNullException(nameof(pathResolver));
+    private readonly SqlServerConnectionStringFactory _connectionStringFactory =
+        connectionStringFactory ?? throw new ArgumentNullException(nameof(connectionStringFactory));
     private readonly IEmailAlertAdministrationStore _emailProfiles =
         emailProfiles ?? throw new ArgumentNullException(nameof(emailProfiles));
 
@@ -83,7 +88,12 @@ public sealed class InfrastructureWorkflowNodeResourceValidator(
             ConnectionKind.SqlServer,
             cancellationToken).ConfigureAwait(false);
         var metadata = await SqlExecutionSupport.LoadObjectMetadataAsync(
-            SqlExecutionSupport.CreateConnectionString(connection),
+            (await _connectionStringFactory.CreateAsync(
+                connection,
+                "THub workflow preflight",
+                ApplicationIntent.ReadWrite,
+                enlist: true,
+                cancellationToken).ConfigureAwait(false)).ConnectionString,
             connection.CommandTimeoutSeconds,
             settings.Schema,
             settings.Object,
@@ -101,7 +111,12 @@ public sealed class InfrastructureWorkflowNodeResourceValidator(
             ConnectionKind.SqlServer,
             cancellationToken).ConfigureAwait(false);
         var metadata = await SqlExecutionSupport.LoadObjectMetadataAsync(
-            SqlExecutionSupport.CreateConnectionString(connection),
+            (await _connectionStringFactory.CreateAsync(
+                connection,
+                "THub workflow preflight",
+                ApplicationIntent.ReadWrite,
+                enlist: true,
+                cancellationToken).ConfigureAwait(false)).ConnectionString,
             connection.CommandTimeoutSeconds,
             settings.Schema,
             settings.Object,

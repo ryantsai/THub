@@ -8,6 +8,7 @@ using THub.Application.Connections;
 using THub.Application.Publications;
 using THub.Domain.Connections;
 using THub.Domain.Publications;
+using THub.Infrastructure.Connections;
 using THub.Infrastructure.Persistence;
 
 namespace THub.Infrastructure.Publications;
@@ -15,6 +16,7 @@ namespace THub.Infrastructure.Publications;
 public sealed class SqlPublicationSourceDataReader(
     IDbContextFactory<THubDbContext> contextFactory,
     ConnectionConfigurationSerializer configurationSerializer,
+    SqlServerConnectionStringFactory connectionStringFactory,
     IPublicationSourceSchemaInspector schemaInspector,
     ILogger<SqlPublicationSourceDataReader> logger) : IPublicationSourceDataReader
 {
@@ -328,28 +330,6 @@ public sealed class SqlPublicationSourceDataReader(
         }
     }
 
-    internal static SqlConnectionStringBuilder BuildConnectionString(
-        SqlServerConnectionConfiguration configuration)
-    {
-        ArgumentNullException.ThrowIfNull(configuration);
-        return new SqlConnectionStringBuilder
-        {
-            DataSource = configuration.Server,
-            InitialCatalog = configuration.Database,
-            IntegratedSecurity = true,
-            Encrypt = configuration.Encrypt,
-            TrustServerCertificate = configuration.TrustServerCertificate,
-            ConnectTimeout = configuration.ConnectTimeoutSeconds,
-            ApplicationName = "THub governed publication reader",
-            ApplicationIntent = ApplicationIntent.ReadOnly,
-            MultipleActiveResultSets = false,
-            PersistSecurityInfo = false,
-            Enlist = false,
-            ConnectRetryCount = 1,
-            ConnectRetryInterval = 1,
-        };
-    }
-
     private async Task<PublicationSqlSource?> LoadSourceAsync(
         Guid connectionId,
         CancellationToken cancellationToken)
@@ -368,7 +348,12 @@ public sealed class SqlPublicationSourceDataReader(
             return null;
         }
 
-        var builder = BuildConnectionString(configuration);
+        var builder = await connectionStringFactory.CreateAsync(
+            configuration,
+            "THub governed publication reader",
+            ApplicationIntent.ReadOnly,
+            enlist: false,
+            cancellationToken).ConfigureAwait(false);
         return new PublicationSqlSource(
             builder.ConnectionString,
             dataConnection,
@@ -667,6 +652,7 @@ public sealed class SqlPublicationSourceDataReader(
         or InvalidOperationException
         or ArgumentException
         or ConnectionConfigurationException
+        or DatabaseCredentialUnavailableException
         or OverflowException;
 
     private static PublicationSourceReadResult<PublicationSourceRowPage> UnavailableRows() =>

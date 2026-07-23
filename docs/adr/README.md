@@ -27,6 +27,7 @@ Accepted ADRs are not immutable. Supersede them when evidence changes; do not si
 | [0010](0010-durable-leased-workflow-execution.md) | Accepted | Immutable versions and leased durable workflow execution |
 | [0011](0011-isolated-governed-data-publications.md) | Accepted | Isolated REST publications and staged Spreadsheet editors |
 | [0012](0012-durable-email-alert-delivery.md) | Accepted | Durable Email alert outbox and SMTP delivery |
+| [0013](0013-provider-neutral-database-authentication.md) | Accepted | Provider-neutral referenced database credentials |
 
 ## Creating an ADR
 

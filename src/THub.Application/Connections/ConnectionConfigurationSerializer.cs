@@ -13,7 +13,8 @@ public sealed class ConnectionConfigurationSerializer
         "schemaVersion",
         "server",
         "database",
-        "integratedSecurity",
+        "authenticationKind",
+        "credentialSecretReference",
         "encrypt",
         "trustServerCertificate",
         "connectTimeoutSeconds",
@@ -44,7 +45,13 @@ public sealed class ConnectionConfigurationSerializer
                 case SqlServerConnectionConfiguration sql:
                     writer.WriteString("server", sql.Server);
                     writer.WriteString("database", sql.Database);
-                    writer.WriteBoolean("integratedSecurity", true);
+                    writer.WriteString("authenticationKind", ToWireValue(sql.Authentication.Kind));
+                    if (sql.Authentication.CredentialSecretReference is not null)
+                    {
+                        writer.WriteString(
+                            "credentialSecretReference",
+                            sql.Authentication.CredentialSecretReference);
+                    }
                     writer.WriteBoolean("encrypt", sql.Encrypt);
                     writer.WriteBoolean("trustServerCertificate", sql.TrustServerCertificate);
                     writer.WriteNumber("connectTimeoutSeconds", sql.ConnectTimeoutSeconds);
@@ -130,11 +137,11 @@ public sealed class ConnectionConfigurationSerializer
     private static SqlServerConnectionConfiguration ReadSql(JsonElement root)
     {
         EnsureOnlyProperties(root, SqlProperties);
-        if (!Require(root, "integratedSecurity").GetBoolean())
-        {
-            throw new ConnectionConfigurationException(
-                "SQL Server v1 connections require Windows integrated security.");
-        }
+        var authentication = new DatabaseAuthenticationConfiguration(
+            ParseAuthenticationKind(Require(root, "authenticationKind").GetString()),
+            root.TryGetProperty("credentialSecretReference", out var reference)
+                ? reference.GetString()
+                : null);
 
         return new SqlServerConnectionConfiguration(
             Require(root, "server").GetString() ?? string.Empty,
@@ -143,8 +150,24 @@ public sealed class ConnectionConfigurationSerializer
             Require(root, "trustServerCertificate").GetBoolean(),
             Require(root, "connectTimeoutSeconds").GetInt32(),
             Require(root, "commandTimeoutSeconds").GetInt32(),
-            Require(root, "maximumBatchRows").GetInt32());
+            Require(root, "maximumBatchRows").GetInt32(),
+            authentication);
     }
+
+    private static string ToWireValue(DatabaseAuthenticationKind kind) => kind switch
+    {
+        DatabaseAuthenticationKind.Integrated => "integrated",
+        DatabaseAuthenticationKind.UserPassword => "userPassword",
+        _ => throw new ArgumentOutOfRangeException(nameof(kind))
+    };
+
+    private static DatabaseAuthenticationKind ParseAuthenticationKind(string? value) => value switch
+    {
+        "integrated" => DatabaseAuthenticationKind.Integrated,
+        "userPassword" => DatabaseAuthenticationKind.UserPassword,
+        _ => throw new ConnectionConfigurationException(
+            "The database authentication kind is not supported.")
+    };
 
     private static FileConnectionConfiguration ReadFile(ConnectionKind kind, JsonElement root)
     {

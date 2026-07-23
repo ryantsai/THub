@@ -103,7 +103,7 @@ Represents an approved connector configuration.
 | `ConfigurationJson` | Non-secret, connector-versioned configuration |
 | `CreatedBy`, `CreatedAtUtc` | Audit metadata |
 
-Examples of safe configuration include database/server aliases, sheet names, delimiters, and a secret reference. Raw passwords, tokens, or embedded connection strings containing credentials are not safe configuration.
+Examples of safe configuration include database/server aliases, sheet names, delimiters, an authentication kind, and a credential secret reference. SQL connection schema v1 supports `Integrated` and `UserPassword`. Raw passwords, tokens, or embedded connection strings containing credentials are not safe configuration.
 
 ### `quartz.QRTZ_*`
 

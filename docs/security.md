@@ -70,9 +70,9 @@ For UNC paths or Windows-integrated remote SQL connections, confirm SPNs, delega
 
 Connection configuration and workflow graphs contain a secret reference, never the secret value.
 
-Acceptable secret providers may include Windows DPAPI-protected storage, Windows Credential Manager, Azure Key Vault, or another organization-approved vault. The provider decision remains open.
+Database credentials follow [ADR-0013](adr/0013-provider-neutral-database-authentication.md). Connection metadata stores an authentication kind and reference only. The initial asynchronous resolver reads the referenced username/password through `IConfiguration`, allowing environment, key-per-file, Azure Key Vault, or another approved provider to own secret storage. A deployment may replace the resolver with a Vault/OpenBao or other organization-approved adapter. Windows Credential Manager is not the default because Web, Worker, and Publications normally use separate Windows profiles.
 
-Managed publication tokens are not stored as reversible secret references: THub returns the full random token once, then persists only its selector, display prefix, verifier algorithm/version, and one-way verifier. Publication SQL connections use the host's Windows identity and store no database password. Email profiles and any future credential-bearing source connections store secret references rather than credential values. SMTP references are resolved only by the Worker immediately before a send under the Worker identity.
+Managed publication tokens are not stored as reversible secret references: THub returns the full random token once, then persists only its selector, display prefix, verifier algorithm/version, and one-way verifier. Publication SQL connections use either the host's Windows identity or a referenced database credential and never store a database password. Email profiles also store references rather than credential values. SMTP references are resolved only by the Worker immediately before a send under the Worker identity.
 
 Never:
 

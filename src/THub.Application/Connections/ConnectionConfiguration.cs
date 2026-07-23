@@ -4,6 +4,83 @@ namespace THub.Application.Connections;
 
 public abstract record ConnectionConfiguration(ConnectionKind Kind);
 
+public enum DatabaseAuthenticationKind
+{
+    Integrated,
+    UserPassword
+}
+
+public sealed record DatabaseAuthenticationConfiguration
+{
+    public DatabaseAuthenticationConfiguration(
+        DatabaseAuthenticationKind kind,
+        string? credentialSecretReference = null)
+    {
+        if (kind == DatabaseAuthenticationKind.Integrated)
+        {
+            if (!string.IsNullOrWhiteSpace(credentialSecretReference))
+            {
+                throw new ArgumentException(
+                    "Integrated authentication cannot reference a database credential.",
+                    nameof(credentialSecretReference));
+            }
+
+            Kind = kind;
+            return;
+        }
+
+        ArgumentException.ThrowIfNullOrWhiteSpace(credentialSecretReference);
+        var normalized = credentialSecretReference.Trim();
+        if (normalized.Length > 200 ||
+            normalized.Any(character =>
+                !(char.IsAsciiLetterOrDigit(character) || character is '-' or '_' or '.')))
+        {
+            throw new ArgumentException(
+                "Credential references may contain only letters, numbers, dots, hyphens, and underscores.",
+                nameof(credentialSecretReference));
+        }
+
+        Kind = kind;
+        CredentialSecretReference = normalized;
+    }
+
+    public DatabaseAuthenticationKind Kind { get; }
+
+    public string? CredentialSecretReference { get; }
+
+    public static DatabaseAuthenticationConfiguration Integrated { get; } =
+        new(DatabaseAuthenticationKind.Integrated);
+}
+
+public sealed class DatabaseCredential
+{
+    public DatabaseCredential(string userName, string password)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(userName);
+        ArgumentNullException.ThrowIfNull(password);
+        if (userName.Length > 256 || password.Length is < 1 or > 4_096)
+        {
+            throw new ArgumentOutOfRangeException(
+                userName.Length > 256 ? nameof(userName) : nameof(password));
+        }
+
+        UserName = userName;
+        Password = password;
+    }
+
+    public string UserName { get; }
+
+    /// <summary>Secret material. Consumers must never persist, return, or log it.</summary>
+    public string Password { get; }
+}
+
+public interface IDatabaseCredentialResolver
+{
+    ValueTask<DatabaseCredential?> ResolveAsync(
+        string secretReference,
+        CancellationToken cancellationToken);
+}
+
 public sealed record SqlServerConnectionConfiguration : ConnectionConfiguration
 {
     public SqlServerConnectionConfiguration(
@@ -13,7 +90,8 @@ public sealed record SqlServerConnectionConfiguration : ConnectionConfiguration
         bool trustServerCertificate = false,
         int connectTimeoutSeconds = 15,
         int commandTimeoutSeconds = 30,
-        int maximumBatchRows = 1_000)
+        int maximumBatchRows = 1_000,
+        DatabaseAuthenticationConfiguration? authentication = null)
         : base(ConnectionKind.SqlServer)
     {
         Server = Require(server, nameof(server), 253);
@@ -38,6 +116,7 @@ public sealed record SqlServerConnectionConfiguration : ConnectionConfiguration
         ConnectTimeoutSeconds = InRange(connectTimeoutSeconds, 1, 60, nameof(connectTimeoutSeconds));
         CommandTimeoutSeconds = InRange(commandTimeoutSeconds, 1, 300, nameof(commandTimeoutSeconds));
         MaximumBatchRows = InRange(maximumBatchRows, 1, 10_000, nameof(maximumBatchRows));
+        Authentication = authentication ?? DatabaseAuthenticationConfiguration.Integrated;
     }
 
     public string Server { get; }
@@ -53,6 +132,8 @@ public sealed record SqlServerConnectionConfiguration : ConnectionConfiguration
     public int CommandTimeoutSeconds { get; }
 
     public int MaximumBatchRows { get; }
+
+    public DatabaseAuthenticationConfiguration Authentication { get; }
 
     private static string Require(string value, string parameterName, int maximumLength)
     {
