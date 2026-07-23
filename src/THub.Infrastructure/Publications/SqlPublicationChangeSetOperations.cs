@@ -38,6 +38,8 @@ public sealed class SqlPublicationChangeSetQueryStore(
             .OrderByDescending(changeSet => changeSet.SubmittedAtUtc)
             .ThenByDescending(changeSet => changeSet.Id)
             .Take(checked(take + 1))
+            .Include("_changes")
+            .AsSplitQuery()
             .ToListAsync(cancellationToken)
             .ConfigureAwait(false);
         var hasMore = rows.Count > take;

@@ -77,6 +77,37 @@ public sealed class PublicationSpreadsheetChangeMapperTests
     }
 
     [Fact]
+    public void Build_DecimalScaleDifferenceDoesNotCreateAChange()
+    {
+        var version = CreateVersion(
+            KeyColumn(),
+            new PublicationColumnDto(
+                1,
+                "Amount",
+                "amount",
+                PublicationDataType.Decimal,
+                false,
+                true,
+                true,
+                true,
+                true,
+                false,
+                null,
+                false,
+                false,
+                null));
+        var original = Values(("id", 1), ("amount", 22000.00m));
+        var current = Values(("id", 1), ("amount", 22000m));
+
+        var result = PublicationSpreadsheetChangeMapper.Build(
+            version,
+            [new PublicationSpreadsheetRow(original, current, false, false)]);
+
+        Assert.True(result.IsSuccess, result.Error);
+        Assert.Empty(result.Changes);
+    }
+
+    [Fact]
     public void Build_ExpandsCompositeForeignKeyUpdateToCompleteTuple()
     {
         var version = CreateVersion(

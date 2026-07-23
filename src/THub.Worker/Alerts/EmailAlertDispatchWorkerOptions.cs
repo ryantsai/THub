@@ -59,7 +59,7 @@ public sealed class EmailAlertDispatchWorkerOptions
             throw new InvalidOperationException(
                 $"Email delivery lease duration must exceed the SMTP operation timeout, "
                 + $"transition timeout, and {MinimumLeaseSafetyMarginSeconds}-second cleanup margin "
-                + $"({minimumLease} seconds total)." );
+                + $"({minimumLease} seconds total).");
         }
     }
 }

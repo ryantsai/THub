@@ -24,11 +24,14 @@ public sealed class PublicationEditorService(
         StagePublicationChangeSetCommand command,
         CancellationToken cancellationToken)
     {
-        if (command is null || command.PublicationId == Guid.Empty || command.Changes is null)
+        if (command is null ||
+            command.PublicationId == Guid.Empty ||
+            command.Changes is null ||
+            command.Changes.Count == 0)
         {
             return PublicationResultFactory.Validation<PublicationChangeSetDto>(
                 "publication.change_command_invalid",
-                "A publication, role set, and staged changes are required.");
+                "A publication, role set, and at least one staged change are required.");
         }
 
         var active = await FindActiveEditorVersionAsync(command.PublicationId, cancellationToken)

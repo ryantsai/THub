@@ -340,7 +340,9 @@ public static class PublicationSpreadsheetChangeMapper
     }
 
     private static bool Equivalent(object? left, object? right) =>
-        string.Equals(JsonSerializer.Serialize(left, JsonOptions), JsonSerializer.Serialize(right, JsonOptions), StringComparison.Ordinal);
+        left is byte[] leftBytes && right is byte[] rightBytes
+            ? leftBytes.AsSpan().SequenceEqual(rightBytes)
+            : Equals(left, right);
 
     private static string Serialize(IReadOnlyDictionary<string, object?> values) =>
         JsonSerializer.Serialize(values, JsonOptions);

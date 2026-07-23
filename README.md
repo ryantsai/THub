@@ -2,7 +2,7 @@
 
 THub is an intranet-first data workflow orchestration and visual-design platform inspired by SSIS, n8n, DolphinScheduler, Kestra, and Azure Data Factory. The v1 product boundary is Microsoft SQL Server plus local CSV and Excel files.
 
-> **Repository status:** functional v1 foundation. The persisted designer/catalog, schema-versioned graph validation, immutable checksummed workflow versions, manual and scheduled run queues, SQL-leased Worker execution, durable step attempts, bounded SQL/CSV/Excel nodes, select/filter/join transforms, Email alerts, and governed publications are implemented. Webhook, executable, and publication canvas nodes remain intentionally non-operational; production readiness still requires deployment-specific identities and secrets, live connector/browser verification, readiness/metrics, audit, and retention work.
+> **Repository status:** functional v1 foundation. The persisted designer/catalog, schema-versioned graph validation, immutable checksummed workflow versions, manual and scheduled run queues, SQL-leased Worker execution, durable step attempts, bounded SQL/CSV/Excel nodes, select/filter/join transforms, Email alerts, and governed publications are implemented. Webhook, executable, and publication canvas nodes remain intentionally non-operational; production readiness still requires deployment-specific identities, secrets, and connector verification, plus readiness/metrics, audit, and retention work.
 
 ## Architecture at a glance
 

@@ -6,6 +6,27 @@ namespace THub.Application.Tests;
 public sealed class PublicationEditorServiceTests
 {
     [Fact]
+    public async Task StageAsync_RejectsEmptyChangeSetBeforeLoadingPublication()
+    {
+        var service = CreateService(
+            new FakePublicationCatalogStore(),
+            new FakePublicationGrantStore(),
+            new FakePublicationChangeSetStore());
+
+        var result = await service.StageAsync(
+            new StagePublicationChangeSetCommand(
+                Guid.NewGuid(),
+                [PublicationRole.Administrator],
+                [],
+                "CONTOSO\\editor"),
+            CancellationToken.None);
+
+        Assert.False(result.IsSuccess);
+        Assert.Equal(PublicationProblemKind.Validation, result.Problem!.Kind);
+        Assert.Equal("publication.change_command_invalid", result.Problem.Code);
+    }
+
+    [Fact]
     public async Task StageAsync_ReturnsForbiddenWhenRoleCannotUpdate()
     {
         var (publication, version) = PublicationTestData.CreateActiveEditorPublication();
