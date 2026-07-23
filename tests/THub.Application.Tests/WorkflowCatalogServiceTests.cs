@@ -308,6 +308,34 @@ public sealed class WorkflowCatalogServiceTests
         Assert.Contains("current draft revision is 3", result.Issues[0].Message, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public async Task PermanentlyDeletesOnlyUnusedDraft()
+    {
+        repository.Workflow = WorkflowManagementTestData.CreateDraft();
+
+        var result = await CreateService().DeleteAsync(new(
+            repository.Workflow.Id,
+            repository.Workflow.DraftRevision));
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(repository.Workflow.Id, result.Value!.Id);
+        Assert.Equal(1, repository.DeleteCalls);
+    }
+
+    [Fact]
+    public async Task PublishedWorkflowMustBeArchivedInsteadOfDeleted()
+    {
+        repository.Workflow = WorkflowManagementTestData.CreatePublished().Workflow;
+
+        var result = await CreateService().DeleteAsync(new(
+            repository.Workflow.Id,
+            repository.Workflow.DraftRevision));
+
+        Assert.Equal(WorkflowOperationStatus.InvalidState, result.Status);
+        Assert.Equal("workflow.delete.requires-unused-draft", Assert.Single(result.Issues).Code);
+        Assert.Equal(0, repository.DeleteCalls);
+    }
+
     private WorkflowCatalogService CreateService() => new(
         repository,
         new WorkflowGraphSerializer(),

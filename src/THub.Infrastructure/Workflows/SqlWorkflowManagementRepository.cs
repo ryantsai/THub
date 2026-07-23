@@ -184,6 +184,59 @@ public sealed class SqlWorkflowManagementRepository(
             expectedDraftRevision,
             cancellationToken);
 
+    public async Task<WorkflowStoreWriteResult> DeleteWorkflowAsync(
+        Guid workflowId,
+        int expectedDraftRevision,
+        CancellationToken cancellationToken)
+    {
+        return await THubDbExecution.ExecuteAsync(
+            contextFactory,
+            async operationToken =>
+            {
+                await using var db = await contextFactory.CreateDbContextAsync(operationToken);
+                await using var transaction = await db.Database.BeginTransactionAsync(
+                    IsolationLevel.Serializable,
+                    operationToken);
+                var workflow = await db.Workflows.SingleOrDefaultAsync(
+                    candidate => candidate.Id == workflowId,
+                    operationToken);
+                if (workflow is null)
+                {
+                    return WorkflowStoreWriteResult.NotFound("The workflow was not found.");
+                }
+                if (workflow.DraftRevision != expectedDraftRevision)
+                {
+                    return WorkflowStoreWriteResult.Concurrency(workflow.DraftRevision);
+                }
+                if (workflow.Status != WorkflowStatus.Draft
+                    || workflow.PublishedVersionId is not null
+                    || await db.WorkflowVersions.AnyAsync(
+                        version => version.WorkflowId == workflowId,
+                        operationToken)
+                    || await db.WorkflowRuns.AnyAsync(
+                        run => run.WorkflowId == workflowId,
+                        operationToken)
+                    || await db.WorkflowAlertRules.AnyAsync(
+                        rule => rule.WorkflowId == workflowId,
+                        operationToken))
+                {
+                    return WorkflowStoreWriteResult.Conflict(
+                        "workflow.delete.requires-unused-draft",
+                        "Only an unpublished draft without versions, runs, or alert rules can be permanently deleted.");
+                }
+
+                await db.AccessResourceGrants
+                    .Where(grant => grant.ResourceKind == THub.Domain.Security.AccessResourceKind.Workflow
+                        && grant.ResourceId == workflowId)
+                    .ExecuteDeleteAsync(operationToken);
+                db.Workflows.Remove(workflow);
+                await db.SaveChangesAsync(operationToken);
+                await transaction.CommitAsync(operationToken);
+                return WorkflowStoreWriteResult.Success;
+            },
+            cancellationToken);
+    }
+
     public async Task<WorkflowStoreWriteResult> QueueRunAsync(
         WorkflowRun run,
         Guid expectedWorkflowVersionId,

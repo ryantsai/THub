@@ -481,6 +481,59 @@ public sealed class WorkflowCatalogService
         return MapWriteResult(write, MapDetails(workflow), "workflow.archive.conflict");
     }
 
+    public async Task<WorkflowOperationResult<DeletedWorkflowDto>> DeleteAsync(
+        DeleteWorkflowCommand command,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(command);
+        var commandIssue = ValidateWorkflowCommandIdentity(
+            command.WorkflowId,
+            command.ExpectedDraftRevision);
+        if (commandIssue is not null)
+        {
+            return WorkflowOperationResult<DeletedWorkflowDto>.Failure(
+                WorkflowOperationStatus.ValidationFailed,
+                commandIssue);
+        }
+
+        var workflow = await _repository.GetWorkflowAsync(command.WorkflowId, cancellationToken);
+        if (workflow is null)
+        {
+            return NotFound<DeletedWorkflowDto>("workflow.not-found", "The workflow was not found.");
+        }
+        if (workflow.DraftRevision != command.ExpectedDraftRevision)
+        {
+            return ConcurrencyFailure<DeletedWorkflowDto>(workflow.DraftRevision);
+        }
+        if (workflow.Status != WorkflowStatus.Draft
+            || workflow.PublishedVersionId is not null
+            || workflow.PublishedVersionNumber is not null)
+        {
+            return InvalidState<DeletedWorkflowDto>(
+                "workflow.delete.requires-unused-draft",
+                "Only an unpublished draft with no published history can be permanently deleted. Archive this workflow instead.");
+        }
+
+        var write = await _repository.DeleteWorkflowAsync(
+            workflow.Id,
+            command.ExpectedDraftRevision,
+            cancellationToken);
+        return write.Status switch
+        {
+            WorkflowStoreWriteStatus.Succeeded =>
+                WorkflowOperationResult<DeletedWorkflowDto>.Success(new(workflow.Id)),
+            WorkflowStoreWriteStatus.NotFound =>
+                NotFound<DeletedWorkflowDto>("workflow.not-found", "The workflow was not found."),
+            WorkflowStoreWriteStatus.ConcurrencyConflict =>
+                ConcurrencyFailure<DeletedWorkflowDto>(write.CurrentDraftRevision),
+            _ => WorkflowOperationResult<DeletedWorkflowDto>.Failure(
+                WorkflowOperationStatus.Conflict,
+                new WorkflowIssue(
+                    write.Code ?? "workflow.delete.conflict",
+                    write.Message ?? "The workflow could not be permanently deleted."))
+        };
+    }
+
     private async Task<WorkflowOperationResult<PublishedWorkflowDto>> ResumeAsync(
         WorkflowDefinition workflow,
         int expectedDraftRevision,

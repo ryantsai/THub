@@ -39,7 +39,7 @@ THub uses permission policies plus SQL-backed resource authorization rather than
 | System role | Intended permissions |
 | --- | --- |
 | System Administrator | Every platform permission and implicit access to every resource |
-| Developer | Create, view, edit, publish, execute, and schedule workflows; view runs and approved connections |
+| Developer | Create, view, edit, publish, execute, archive/delete, and schedule workflows; view runs and approved connections |
 
 Custom roles, permissions, Windows user/group assignments, workflow/connection grants, and editor-publication grants are authoritative in SQL Server. An unmapped authenticated user receives no default role. System-role capabilities are immutable; their assignments and all custom roles are managed under `/settings`.
 
@@ -73,6 +73,13 @@ Connection configuration and workflow graphs contain a secret reference, never t
 Connection credentials follow [ADR-0013](adr/0013-provider-neutral-database-authentication.md) and [ADR-0014](adr/0014-expand-relational-and-ftp-connectors.md). Connection metadata stores an authentication kind and reference only. The provider-neutral asynchronous resolver reads the referenced username/password through `IConfiguration`, allowing environment, key-per-file, Azure Key Vault, or another approved provider to own secret storage. Database and FTP adapters receive the credential only while opening the connection. A deployment may replace the resolver with a Vault/OpenBao or other organization-approved adapter. Windows Credential Manager is not the default because Web, Worker, and Publications normally use separate Windows profiles.
 
 Managed publication tokens are not stored as reversible secret references: THub returns the full random token once, then persists only its selector, display prefix, verifier algorithm/version, and one-way verifier. Publication SQL connections use either the host's Windows identity or a referenced database credential and never store a database password. Email profiles also store references rather than credential values. SMTP references are resolved only by the Worker immediately before a send under the Worker identity.
+
+The Developer system role also receives `workflow.delete`. That permission authorizes
+archive and is required for permanent deletion, which is additionally limited to unused
+drafts. Workflow exports contain connection identifiers, names, and kinds but never
+connection configuration, credentials, or secret references. Imports require
+`workflow.create`, create an unpublished draft, and report unresolved connection
+references rather than activating the package.
 
 Never:
 

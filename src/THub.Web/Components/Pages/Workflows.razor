@@ -5,10 +5,13 @@
 @using THub.Domain.Security
 @inject WorkflowCatalogService WorkflowCatalog
 @inject WorkflowRunService WorkflowRuns
+@inject WorkflowPackageService WorkflowPackages
 @inject AuthenticationStateProvider AuthenticationStateProvider
 @inject NotificationService Notifications
+@inject DialogService Dialogs
 @inject NavigationManager Navigation
 @inject AccessControlEvaluator AccessControl
+@inject IJSRuntime JS
 
 <PageTitle>Workflows · THub</PageTitle>
 
@@ -21,6 +24,8 @@
     @if (CanCreate)
     {
         <div class="heading-actions">
+            <RadzenButton Text="Import" Icon="upload_file" ButtonStyle="ButtonStyle.Light" Click="@OpenImportPickerAsync" />
+            <InputFile id="workflow-package-input" OnChange="@ImportAsync" accept=".json,.thub-workflow.json,application/json" hidden />
             <RadzenButton Text="New workflow" Icon="add" ButtonStyle="ButtonStyle.Primary" Click="@NewWorkflow" />
         </div>
     }
@@ -67,11 +72,22 @@
                                 {
                                     <a href="@($"/designer/{workflow.Id}")" aria-label="Open @workflow.Name">Open</a>
                                 }
+                                <button type="button" disabled="@Loading" @onclick="() => ExportAsync(workflow.Id)">Export</button>
                                 @if (workflow.Status == THub.Domain.Workflows.WorkflowStatus.Published)
                                 {
                                     @if (CanExecute.Contains(workflow.Id))
                                     {
                                         <button type="button" disabled="@Loading" @onclick="() => QueueAsync(workflow.Id)">Run now</button>
+                                    }
+                                }
+                                @if (CanDelete.Contains(workflow.Id)
+                                    && workflow.Status != THub.Domain.Workflows.WorkflowStatus.Archived)
+                                {
+                                    <button type="button" disabled="@Loading" @onclick="() => ArchiveAsync(workflow)">Archive</button>
+                                    @if (workflow.Status == THub.Domain.Workflows.WorkflowStatus.Draft
+                                        && workflow.PublishedVersionNumber is null)
+                                    {
+                                        <button type="button" disabled="@Loading" @onclick="() => DeleteAsync(workflow)">Delete</button>
                                     }
                                 }
                             </td>
@@ -91,6 +107,7 @@
     private bool CanCreate { get; set; }
     private HashSet<Guid> CanEdit { get; } = [];
     private HashSet<Guid> CanExecute { get; } = [];
+    private HashSet<Guid> CanDelete { get; } = [];
 
     private string Summary =>
         $"{Items.Count} shown · {Items.Count(item => item.Status == THub.Domain.Workflows.WorkflowStatus.Published)} published · " +
@@ -117,6 +134,7 @@
                     cancellationToken: cancellation.Token);
                 CanEdit.Clear();
                 CanExecute.Clear();
+                CanDelete.Clear();
                 var visible = new List<WorkflowListItemDto>();
                 foreach (var workflow in result.Value!.Items)
                 {
@@ -149,6 +167,16 @@
                     {
                         CanExecute.Add(workflow.Id);
                     }
+
+                    if (await AccessControl.HasPermissionAsync(
+                            authentication.User,
+                            Permissions.WorkflowDelete,
+                            AccessResourceKind.Workflow,
+                            workflow.Id,
+                            cancellation.Token))
+                    {
+                        CanDelete.Add(workflow.Id);
+                    }
                 }
 
                 Items = visible;
@@ -172,6 +200,197 @@
     }
 
     private void NewWorkflow() => Navigation.NavigateTo("/designer");
+
+    private async Task OpenImportPickerAsync() =>
+        await JS.InvokeVoidAsync("thub.clickElement", "workflow-package-input");
+
+    private async Task ExportAsync(Guid workflowId)
+    {
+        var state = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        if (!await AccessControl.HasPermissionAsync(
+                state.User,
+                Permissions.WorkflowView,
+                AccessResourceKind.Workflow,
+                workflowId,
+                cancellation.Token))
+        {
+            Notifications.Notify(NotificationSeverity.Error, "Not authorized", "Workflow view permission is required.");
+            return;
+        }
+
+        Loading = true;
+        try
+        {
+            var result = await WorkflowPackages.ExportAsync(workflowId, cancellation.Token);
+            if (!result.IsSuccess)
+            {
+                Notifications.Notify(
+                    NotificationSeverity.Error,
+                    "Export failed",
+                    result.Issues.FirstOrDefault()?.Message ?? "The workflow could not be exported.");
+                return;
+            }
+
+            await JS.InvokeVoidAsync(
+                "thub.downloadTextFile",
+                cancellation.Token,
+                result.Value!.FileName,
+                result.Value.Content);
+        }
+        finally
+        {
+            Loading = false;
+        }
+    }
+
+    private async Task ImportAsync(InputFileChangeEventArgs args)
+    {
+        var state = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        if (!await AccessControl.HasPermissionAsync(
+                state.User,
+                Permissions.WorkflowCreate,
+                cancellationToken: cancellation.Token))
+        {
+            Notifications.Notify(NotificationSeverity.Error, "Not authorized", "Workflow create permission is required.");
+            return;
+        }
+
+        Loading = true;
+        try
+        {
+            var file = args.File;
+            var maximumBytes = WorkflowPackageService.MaximumPackageCharacters * 4L;
+            await using var stream = file.OpenReadStream(maximumBytes, cancellation.Token);
+            using var reader = new StreamReader(stream);
+            var packageJson = await reader.ReadToEndAsync(cancellation.Token);
+            var result = await WorkflowPackages.ImportAsync(
+                packageJson,
+                state.User.Identity?.Name ?? "unknown",
+                cancellation.Token);
+            if (!result.IsSuccess)
+            {
+                Notifications.Notify(
+                    NotificationSeverity.Error,
+                    "Import failed",
+                    result.Issues.FirstOrDefault()?.Message ?? "The workflow package could not be imported.");
+                return;
+            }
+
+            var imported = result.Value!;
+            Notifications.Notify(new NotificationMessage
+            {
+                Severity = imported.Warnings.Count == 0
+                    ? NotificationSeverity.Success
+                    : NotificationSeverity.Warning,
+                Summary = "Workflow imported as a draft",
+                Detail = imported.Warnings.Count == 0
+                    ? "Connection references were resolved."
+                    : string.Join(" ", imported.Warnings),
+                Duration = 8_000
+            });
+            Navigation.NavigateTo($"/designer/{imported.Workflow.Id}");
+        }
+        catch (IOException exception)
+        {
+            Notifications.Notify(NotificationSeverity.Error, "Import failed", exception.Message);
+        }
+        finally
+        {
+            Loading = false;
+        }
+    }
+
+    private async Task ArchiveAsync(WorkflowListItemDto workflow)
+    {
+        var state = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        if (!await AccessControl.HasPermissionAsync(
+                state.User,
+                Permissions.WorkflowDelete,
+                AccessResourceKind.Workflow,
+                workflow.Id,
+                cancellation.Token))
+        {
+            Notifications.Notify(NotificationSeverity.Error, "Not authorized", "Workflow delete permission is required.");
+            return;
+        }
+
+        var confirmed = await Dialogs.Confirm(
+            $"Archive '{workflow.Name}'? Schedules and manual execution will stop, while versions and run history remain available.",
+            "Archive workflow",
+            new ConfirmOptions { OkButtonText = "Archive", CancelButtonText = "Cancel" });
+        if (confirmed != true)
+        {
+            return;
+        }
+
+        Loading = true;
+        try
+        {
+            var result = await WorkflowCatalog.ArchiveAsync(
+                new ArchiveWorkflowCommand(workflow.Id, workflow.DraftRevision),
+                cancellation.Token);
+            Notifications.Notify(
+                result.IsSuccess ? NotificationSeverity.Success : NotificationSeverity.Error,
+                result.IsSuccess ? "Workflow archived" : "Archive failed",
+                result.IsSuccess
+                    ? "Versions and run history were preserved."
+                    : result.Issues.FirstOrDefault()?.Message ?? "The workflow could not be archived.");
+            if (result.IsSuccess)
+            {
+                await LoadAsync();
+            }
+        }
+        finally
+        {
+            Loading = false;
+        }
+    }
+
+    private async Task DeleteAsync(WorkflowListItemDto workflow)
+    {
+        var state = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        if (!await AccessControl.HasPermissionAsync(
+                state.User,
+                Permissions.WorkflowDelete,
+                AccessResourceKind.Workflow,
+                workflow.Id,
+                cancellation.Token))
+        {
+            Notifications.Notify(NotificationSeverity.Error, "Not authorized", "Workflow delete permission is required.");
+            return;
+        }
+
+        var confirmed = await Dialogs.Confirm(
+            $"Permanently delete the unused draft '{workflow.Name}'? This cannot be undone.",
+            "Delete workflow",
+            new ConfirmOptions { OkButtonText = "Delete", CancelButtonText = "Cancel" });
+        if (confirmed != true)
+        {
+            return;
+        }
+
+        Loading = true;
+        try
+        {
+            var result = await WorkflowCatalog.DeleteAsync(
+                new DeleteWorkflowCommand(workflow.Id, workflow.DraftRevision),
+                cancellation.Token);
+            Notifications.Notify(
+                result.IsSuccess ? NotificationSeverity.Success : NotificationSeverity.Error,
+                result.IsSuccess ? "Draft deleted" : "Delete failed",
+                result.IsSuccess
+                    ? "The unused draft was permanently removed."
+                    : result.Issues.FirstOrDefault()?.Message ?? "The workflow could not be deleted.");
+            if (result.IsSuccess)
+            {
+                await LoadAsync();
+            }
+        }
+        finally
+        {
+            Loading = false;
+        }
+    }
 
     private async Task QueueAsync(Guid workflowId)
     {

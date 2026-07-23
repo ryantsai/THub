@@ -89,6 +89,15 @@ public interface IWorkflowManagementRepository
         CancellationToken cancellationToken);
 
     /// <summary>
+    /// Permanently deletes an unpublished draft with no immutable versions, runs, or
+    /// alert rules, conditional on its persisted draft revision.
+    /// </summary>
+    Task<WorkflowStoreWriteResult> DeleteWorkflowAsync(
+        Guid workflowId,
+        int expectedDraftRevision,
+        CancellationToken cancellationToken);
+
+    /// <summary>
     /// Atomically verifies that the workflow is still published on
     /// <paramref name="expectedWorkflowVersionId"/> and queues the run. Implementations
     /// should also enforce the configured active-run concurrency policy.

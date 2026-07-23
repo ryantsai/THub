@@ -9,6 +9,7 @@ public static class SecurityPermissions
     public const string WorkflowEdit = "workflow.edit";
     public const string WorkflowPublish = "workflow.publish";
     public const string WorkflowExecute = "workflow.execute";
+    public const string WorkflowDelete = "workflow.delete";
     public const string RunView = "run.view";
     public const string ScheduleManage = "schedule.manage";
     public const string ConnectionView = "connection.view";
@@ -29,6 +30,7 @@ public static class SecurityPermissions
         WorkflowEdit,
         WorkflowPublish,
         WorkflowExecute,
+        WorkflowDelete,
         RunView,
         ScheduleManage,
         ConnectionView,
@@ -50,6 +52,7 @@ public static class SecurityPermissions
         WorkflowEdit,
         WorkflowPublish,
         WorkflowExecute,
+        WorkflowDelete,
         RunView,
         ScheduleManage,
         ConnectionView,
@@ -68,6 +71,7 @@ public static class SecurityPermissions
                 WorkflowEdit,
                 WorkflowPublish,
                 WorkflowExecute,
+                WorkflowDelete,
                 ScheduleManage,
             ], StringComparer.Ordinal),
             [AccessResourceKind.Connection] = new HashSet<string>(
@@ -84,6 +88,7 @@ public static class SecurityPermissions
         WorkflowEdit,
         WorkflowPublish,
         WorkflowExecute,
+        WorkflowDelete,
         RunView,
         ScheduleManage,
         ConnectionView,

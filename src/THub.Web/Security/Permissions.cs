@@ -7,6 +7,7 @@ public static class Permissions
     public const string WorkflowEdit = Application.Security.SecurityPermissions.WorkflowEdit;
     public const string WorkflowPublish = Application.Security.SecurityPermissions.WorkflowPublish;
     public const string WorkflowExecute = Application.Security.SecurityPermissions.WorkflowExecute;
+    public const string WorkflowDelete = Application.Security.SecurityPermissions.WorkflowDelete;
     public const string RunView = Application.Security.SecurityPermissions.RunView;
     public const string ScheduleManage = Application.Security.SecurityPermissions.ScheduleManage;
     public const string ConnectionView = Application.Security.SecurityPermissions.ConnectionView;

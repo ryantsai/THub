@@ -30,6 +30,7 @@ public static class DependencyInjection
         services.AddScoped<PublicationGrantManagementService>();
         services.AddScoped<PublicationSourceInspectionService>();
         services.AddScoped<WorkflowCatalogService>();
+        services.AddScoped<WorkflowPackageService>();
         services.AddScoped<WorkflowRunService>();
         services.AddScoped<WorkflowRunHistoryService>();
         services.AddScoped<EmailAlertAdministrationService>();

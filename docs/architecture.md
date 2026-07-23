@@ -253,6 +253,12 @@ Authorization is permission-based. Windows groups map to application roles, and 
 
 Current permissions cover workflow view/edit/execute, schedule management, connection management, publication management, and administration.
 
+Workflow removal and package portability follow [ADR-0017](adr/0017-safe-workflow-lifecycle-and-package-portability.md).
+`workflow.delete` permits resource-authorized archive and the narrower permanent deletion
+of unused drafts. Export emits the current editable definition and non-secret connection
+identity hints. Import resolves those hints where possible and always creates a new
+unpublished draft; it does not restore immutable versions, run history, or active schedules.
+
 Publication-management permission does not itself grant access to editor data. Each editor publication independently maps SQL-backed system or custom roles to View, Insert, Update, Delete, and Approve capabilities. Application services enforce those grants for load, lookup, submit, review, and change-set queries. Worker apply accepts only an already approved set and revalidates publication/version/schema state, but the current change set does not retain a role snapshot and the worker does not re-evaluate submitter/reviewer grants after approval.
 
 ### Secrets and untrusted configuration
@@ -362,6 +368,6 @@ Internet exposure, additional publication instances, alternate JWT/Entra authent
 3. Integrate an organization-approved SMTP secret provider and add Email outbox monitoring and operator recovery surfaces.
 4. Add publication-host SQL readiness, centralized metrics, live SQL Server/browser coverage, and operator reconciliation for ambiguous editor applies.
 5. Resolve publication before/after classification and retention under PD-009; require a new ADR before internet exposure, alternate authentication, direct writes, or multi-host admission.
-6. Add complete audit/retention, import/export with secret redaction, readiness, and production monitoring.
+6. Add complete audit/retention, readiness, and production monitoring; extend the implemented redacted workflow-package format only through explicit schema compatibility.
 
 Architecture changes must be captured by a new or superseding ADR and reflected here.

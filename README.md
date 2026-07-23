@@ -28,6 +28,7 @@ Quartz owns schedule timing, persistence, misfire handling, and scheduler cluste
 | SQL Server metadata schema | Implemented | The migration chain includes workflows, runs, connections, durable alerts, and governed publication versions/tokens/grants/change sets |
 | Cron/time-zone scheduling | Implemented | Quartz persists one trigger per published schedule; THub transactionally owns queued runs |
 | Designer save/load/publish | Implemented | Draft graph JSON is canonicalized and saved with optimistic revision checks; publish creates and selects an immutable checksummed version transactionally |
+| Workflow lifecycle and packages | Implemented | Authorized archive preserves history; permanent delete is limited to unused drafts; versioned JSON export/import redacts connection configuration and imports as a new unpublished draft |
 | Immutable workflow versions and execution leases | Implemented | Runs reference exact versions; Workers atomically claim/heartbeat runs, recover expired leases, honor durable cancellation, and persist lease-checked step attempts |
 | Relational/file execution | Implemented v1 | SQL Server, MySQL, PostgreSQL, and Oracle table/view sources and transactional insert targets; bounded local and FTP/FTPS CSV, tab-delimited, and modern Excel sources plus create-new targets |
 | Connection authentication | Implemented v1 | SQL Server supports Windows integrated or referenced credentials; other databases and FTP use referenced username/password credentials through a replaceable external configuration resolver |

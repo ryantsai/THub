@@ -127,6 +127,9 @@ internal sealed class FakeWorkflowManagementRepository : IWorkflowManagementRepo
     public WorkflowStoreWriteResult CancellationResult { get; set; } =
         WorkflowStoreWriteResult.Success;
 
+    public WorkflowStoreWriteResult DeleteResult { get; set; } =
+        WorkflowStoreWriteResult.Success;
+
     public WorkflowListFilter? ReceivedListFilter { get; private set; }
 
     public WorkflowDefinition? CreatedWorkflow { get; private set; }
@@ -166,6 +169,8 @@ internal sealed class FakeWorkflowManagementRepository : IWorkflowManagementRepo
     public int QueueCalls { get; private set; }
 
     public int CancellationCalls { get; private set; }
+
+    public int DeleteCalls { get; private set; }
 
     public Task<WorkflowListPage> ListWorkflowsAsync(
         WorkflowListFilter filter,
@@ -251,6 +256,17 @@ internal sealed class FakeWorkflowManagementRepository : IWorkflowManagementRepo
         ResumedWorkflow = workflow;
         ReceivedExpectedDraftRevision = expectedDraftRevision;
         return Task.FromResult(ResumeResult);
+    }
+
+    public Task<WorkflowStoreWriteResult> DeleteWorkflowAsync(
+        Guid workflowId,
+        int expectedDraftRevision,
+        CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        DeleteCalls++;
+        ReceivedExpectedDraftRevision = expectedDraftRevision;
+        return Task.FromResult(DeleteResult);
     }
 
     public Task<WorkflowStoreWriteResult> QueueRunAsync(

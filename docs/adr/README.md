@@ -31,6 +31,7 @@ Accepted ADRs are not immutable. Supersede them when evidence changes; do not si
 | [0014](0014-expand-relational-and-ftp-connectors.md) | Accepted | MySQL, PostgreSQL, Oracle, and FTP/FTPS workflow connectors |
 | [0015](0015-bounded-workflow-variables-and-javascript-expressions.md) | Accepted | Bounded workflow variables and JavaScript value expressions |
 | [0016](0016-sql-backed-custom-role-and-resource-authorization.md) | Accepted | SQL-backed custom roles and resource authorization |
+| [0017](0017-safe-workflow-lifecycle-and-package-portability.md) | Accepted | Safe workflow removal and redacted portable packages |
 
 ## Creating an ADR
 

@@ -130,6 +130,12 @@ public sealed record ArchiveWorkflowCommand(
     Guid WorkflowId,
     int ExpectedDraftRevision);
 
+public sealed record DeleteWorkflowCommand(
+    Guid WorkflowId,
+    int ExpectedDraftRevision);
+
+public sealed record DeletedWorkflowDto(Guid Id);
+
 public sealed record QueueWorkflowRunCommand(
     Guid WorkflowId,
     string TriggeredBy);

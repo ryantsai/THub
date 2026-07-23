@@ -157,6 +157,12 @@ Quartz rows are operational projections, not the source of truth for workflow de
 
 The serializer requires the explicit `schemaVersion` envelope, rejects unknown/duplicate properties and unsupported versions, and canonicalizes saved documents. Each node retains a JSON `settings` object in the graph, but publish and Worker execution parse it through a strict kind-specific contract with required fields, bounds, allow-listed properties/operators/modes, graph-aware join inputs, and destination value bindings. Schema version 1 is intentionally unsupported because the application has not been released.
 
+Workflow package schema version 1 wraps the current editable metadata, schedule, graph,
+and non-secret connection identity hints. Import creates a new draft identity and does not
+copy immutable versions or runs. Archived workflows retain their relational history.
+Permanent deletion is restricted transactionally to unpublished drafts without versions,
+runs, or alert rules.
+
 ## Durable persistence slices
 
 These concepts are governed by accepted ADRs. Each subsection states whether its current persistence is implemented; unresolved invariants must not be collapsed into opaque UI state.
