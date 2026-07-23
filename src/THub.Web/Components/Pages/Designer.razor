@@ -277,6 +277,16 @@ else
                                     <input type="number" min="1" max="10000" value="@GetSettingInt(SelectedNode, "batchSize", 1000)" @onchange="SetBatchSize" />
                                 </label>
                             }
+                            else
+                            {
+                                <label>Write mode
+                                    <select aria-label="Database target write mode" value="@GetTargetMode(SelectedNode)" @onchange="SetTargetMode">
+                                        <option value="insert">Insert</option>
+                                        <option value="upsert" disabled="@(!CanTargetUpsert)">Upsert by primary key</option>
+                                        <option value="delete" disabled="@(!CanTargetDelete)">Delete incoming keys</option>
+                                    </select>
+                                </label>
+                            }
                             <div class="schema-actions">
                                 <button type="button" @onclick="LoadSelectedSchemaAsync" disabled="@SchemaBusy"><RadzenIcon Icon="schema" /> @(SchemaBusy ? "Loading…" : "Open schema")</button>
                                 @if (IsRelationalTarget(SelectedNode.Kind))
@@ -315,10 +325,10 @@ else
                                             @foreach (var column in selectedSchema.Columns)
                                             {
                                                 <div class="schema-column @(column.IsWritable ? null : "locked")">
-                                                    <RadzenIcon Icon="@(column.IsWritable ? "radio_button_unchecked" : "lock")" />
+                                                    <RadzenIcon Icon="@(column.IsKey ? "key" : column.IsWritable ? "radio_button_unchecked" : "lock")" />
                                                     <span class="column-name">@column.Name</span>
                                                     <code>@column.SourceTypeName</code>
-                                                    <small>@(column.IsWritable ? column.IsNullable ? "nullable" : "required" : "generated")</small>
+                                                    <small>@(column.IsKey ? "primary key" : column.IsWritable ? column.IsNullable ? "nullable" : "required" : "generated")</small>
                                                 </div>
                                             }
                                         </div>
@@ -340,7 +350,7 @@ else
                                         </div>
                                     </div>
                                     <div class="mapping-labels"><span>Destination</span><span>Value source</span><span>Value</span></div>
-                                    @foreach (var targetColumn in targetSchema.Columns.Where(column => column.IsWritable))
+                                    @foreach (var targetColumn in GetMappableTargetColumns(SelectedNode, targetSchema))
                                     {
                                         var binding = GetBinding(SelectedNode, targetColumn.Name);
                                         <div class="mapping-row @(binding is null ? "unmapped" : "mapped")">
@@ -456,6 +466,8 @@ else
     private System.Security.Claims.ClaimsPrincipal? CurrentUser { get; set; }
     private bool CanEdit { get; set; }
     private bool CanPublish { get; set; }
+    private bool CanTargetUpsert { get; set; }
+    private bool CanTargetDelete { get; set; }
     private IReadOnlyList<GraphValidationIssue> ValidationIssues { get; set; } = [];
     private IReadOnlyList<ConnectionSummary> Connections { get; set; } = [];
     private IReadOnlyList<EmailDeliveryProfileDto> EmailProfiles { get; set; } = [];
@@ -498,10 +510,10 @@ else
             new("Filter rows", "Apply typed conditions", WorkflowNodeKind.FilterRows, "filter_alt", "amber", true),
             new("Join", "Combine exactly two streams", WorkflowNodeKind.Join, "join_inner", "violet", true)]),
         new("Destinations", [
-            new("SQL target", "Insert into an approved table", WorkflowNodeKind.SqlTarget, "storage", "blue", true),
-            new("MySQL target", "Insert into an approved table", WorkflowNodeKind.MySqlTarget, "storage", "blue", true),
-            new("PostgreSQL target", "Insert into an approved table", WorkflowNodeKind.PostgreSqlTarget, "storage", "blue", true),
-            new("Oracle target", "Insert into an approved table", WorkflowNodeKind.OracleTarget, "storage", "blue", true),
+            new("SQL target", "Insert, upsert, or delete approved rows", WorkflowNodeKind.SqlTarget, "storage", "blue", true),
+            new("MySQL target", "Insert, upsert, or delete approved rows", WorkflowNodeKind.MySqlTarget, "storage", "blue", true),
+            new("PostgreSQL target", "Insert, upsert, or delete approved rows", WorkflowNodeKind.PostgreSqlTarget, "storage", "blue", true),
+            new("Oracle target", "Insert, upsert, or delete approved rows", WorkflowNodeKind.OracleTarget, "storage", "blue", true),
             new("FTP target", "Create CSV, tab text, or Excel", WorkflowNodeKind.FtpTarget, "cloud_upload", "green", true),
             new("CSV target", "Write beneath an approved root", WorkflowNodeKind.CsvTarget, "description", "green", true),
             new("Excel target", "Write an XLSX workbook", WorkflowNodeKind.ExcelTarget, "grid_on", "green", true)]),
@@ -532,6 +544,14 @@ else
                 authentication.User,
                 Permissions.WorkflowPublish,
                 cancellationToken: cancellation.Token);
+            CanTargetUpsert = await AccessControl.HasPermissionAsync(
+                authentication.User,
+                Permissions.WorkflowTargetUpsert,
+                cancellationToken: cancellation.Token);
+            CanTargetDelete = await AccessControl.HasPermissionAsync(
+                authentication.User,
+                Permissions.WorkflowTargetDelete,
+                cancellationToken: cancellation.Token);
         }
         else
         {
@@ -544,6 +564,18 @@ else
             CanPublish = await AccessControl.HasPermissionAsync(
                 authentication.User,
                 Permissions.WorkflowPublish,
+                AccessResourceKind.Workflow,
+                WorkflowId.Value,
+                cancellation.Token);
+            CanTargetUpsert = await AccessControl.HasPermissionAsync(
+                authentication.User,
+                Permissions.WorkflowTargetUpsert,
+                AccessResourceKind.Workflow,
+                WorkflowId.Value,
+                cancellation.Token);
+            CanTargetDelete = await AccessControl.HasPermissionAsync(
+                authentication.User,
+                Permissions.WorkflowTargetDelete,
                 AccessResourceKind.Workflow,
                 WorkflowId.Value,
                 cancellation.Token);
@@ -1003,6 +1035,39 @@ else
         SetSettingInt(SelectedNode, "batchSize", Math.Clamp(value, 1, 10_000));
     }
 
+    private static string GetTargetMode(DesignerNode node) =>
+        GetSettingString(node, "mode") ?? "insert";
+
+    private void SetTargetMode(ChangeEventArgs eventArgs)
+    {
+        if (SelectedNode is null)
+        {
+            return;
+        }
+
+        var mode = eventArgs.Value?.ToString();
+        if (mode is not ("insert" or "upsert" or "delete")
+            || mode == "upsert" && !CanTargetUpsert
+            || mode == "delete" && !CanTargetDelete)
+        {
+            return;
+        }
+
+        SetSettingString(SelectedNode, "mode", mode);
+        if (mode == "insert")
+        {
+            RemoveSetting(SelectedNode, "keyColumns");
+        }
+        else if (GetLoadedSchema(SelectedNode) is { } schema)
+        {
+            SetSettingStringArray(
+                SelectedNode,
+                "keyColumns",
+                schema.Columns.Where(column => column.IsKey).Select(column => column.Name).ToArray());
+        }
+        ClearMappings();
+    }
+
     private async Task LoadSelectedSchemaAsync()
     {
         if (SelectedNode is null)
@@ -1077,6 +1142,20 @@ else
         }
 
         LoadedSchemas[node.Id] = result.Schema!;
+        if (IsRelationalTarget(node.Kind)
+            && GetTargetMode(node) is "upsert" or "delete")
+        {
+            var keyColumns = result.Schema!.Columns
+                .Where(column => column.IsKey)
+                .Select(column => column.Name)
+                .ToArray();
+            if (keyColumns.Length == 0)
+            {
+                SchemaError = $"{node.Name}: Upsert and delete require a discoverable primary key.";
+                return false;
+            }
+            SetSettingStringArray(node, "keyColumns", keyColumns);
+        }
         return true;
     }
 
@@ -1272,9 +1351,9 @@ else
 
         var sources = GetMappingSourceColumns(SelectedNode, sourceNode, sourceSchema)
             .ToDictionary(column => column.Name, StringComparer.OrdinalIgnoreCase);
-        var bindings = targetSchema.Columns
-            .Where(target => target.IsWritable
-                && sources.TryGetValue(target.Name, out var source)
+        var bindings = GetMappableTargetColumns(SelectedNode, targetSchema)
+            .Where(target =>
+                sources.TryGetValue(target.Name, out var source)
                 && source.DataType == target.DataType)
             .Select(target => new WorkflowValueBinding(
                 target.Name,
@@ -1283,6 +1362,13 @@ else
             .ToArray();
         SetBindings(SelectedNode, bindings);
     }
+
+    private static IReadOnlyList<WorkflowSchemaColumnDto> GetMappableTargetColumns(
+        DesignerNode target,
+        WorkflowObjectSchemaDto schema) =>
+        GetTargetMode(target) == "delete"
+            ? schema.Columns.Where(column => column.IsKey).ToArray()
+            : schema.Columns.Where(column => column.IsWritable).ToArray();
 
     private void ClearMappings()
     {
@@ -1342,6 +1428,24 @@ else
             .ToArray<JsonNode?>());
         node.SettingsJson = settings.ToJsonString();
         ValidationIssues = [];
+    }
+
+    private void RemoveSetting(DesignerNode node, string propertyName)
+    {
+        try
+        {
+            var settings = ParseSettings(node);
+            _ = settings.Remove(propertyName);
+            node.SettingsJson = settings.ToJsonString();
+            ValidationIssues = [];
+        }
+        catch (JsonException)
+        {
+            Notifications.Notify(
+                NotificationSeverity.Error,
+                "Settings JSON is invalid",
+                "Repair the JSON object before changing the target mode.");
+        }
     }
 
     private static IReadOnlyList<string>? GetSettingStringArray(
@@ -1483,6 +1587,11 @@ else
             return;
         }
 
+        if (!await HasTargetMutationPermissionsAsync())
+        {
+            return;
+        }
+
         Busy = true;
         try
         {
@@ -1562,6 +1671,11 @@ else
             return;
         }
 
+        if (!await HasTargetMutationPermissionsAsync())
+        {
+            return;
+        }
+
         Busy = true;
         try
         {
@@ -1585,6 +1699,55 @@ else
         {
             Busy = false;
         }
+    }
+
+    private async Task<bool> HasTargetMutationPermissionsAsync()
+    {
+        var user = CurrentUser;
+        if (user is null)
+        {
+            return false;
+        }
+
+        var requirements = new[]
+        {
+            (
+                Required: Nodes.Any(node =>
+                    IsRelationalTarget(node.Kind)
+                    && GetTargetMode(node) == "upsert"),
+                Permission: Permissions.WorkflowTargetUpsert,
+                Message: "Workflow target upsert permission is required."),
+            (
+                Required: Nodes.Any(node =>
+                    IsRelationalTarget(node.Kind)
+                    && GetTargetMode(node) == "delete"),
+                Permission: Permissions.WorkflowTargetDelete,
+                Message: "Workflow target delete permission is required.")
+        };
+        foreach (var requirement in requirements.Where(item => item.Required))
+        {
+            var authorized = WorkflowId is null
+                ? await AccessControl.HasPermissionAsync(
+                    user,
+                    requirement.Permission,
+                    cancellationToken: cancellation.Token)
+                : await AccessControl.HasPermissionAsync(
+                    user,
+                    requirement.Permission,
+                    AccessResourceKind.Workflow,
+                    WorkflowId.Value,
+                    cancellation.Token);
+            if (!authorized)
+            {
+                Notifications.Notify(
+                    NotificationSeverity.Error,
+                    "Not authorized",
+                    requirement.Message);
+                return false;
+            }
+        }
+
+        return true;
     }
 
     private void NotifyIssues(string title, IReadOnlyList<WorkflowIssue> issues)

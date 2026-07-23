@@ -85,6 +85,7 @@ public sealed record SqlTargetNodeSettings(
     string Schema,
     string Object,
     string Mode,
+    IReadOnlyList<string> KeyColumns,
     IReadOnlyList<WorkflowValueBinding> Bindings) : WorkflowNodeSettings;
 
 public sealed record CsvTargetNodeSettings(
@@ -159,7 +160,7 @@ public sealed class WorkflowNodeSettingsValidator
     private static readonly HashSet<string> JoinProperties =
         ["leftNodeId", "rightNodeId", "leftKeys", "rightKeys", "type", "maximumBufferedRows"];
     private static readonly HashSet<string> SqlTargetProperties =
-        ["connectionId", "schema", "object", "mode", "bindings"];
+        ["connectionId", "schema", "object", "mode", "keyColumns", "bindings"];
     private static readonly HashSet<string> BindingProperties =
         ["targetColumn", "kind", "value"];
     private static readonly HashSet<string> CsvTargetProperties =
@@ -492,9 +493,58 @@ public sealed class WorkflowNodeSettingsValidator
     {
         EnsureOnly(root, SqlTargetProperties);
         var mode = ReadText(root, "mode", 32);
-        if (mode != "insert")
+        if (mode is not ("insert" or "upsert" or "delete"))
         {
-            throw Invalid("node.sql-target.mode.invalid", "SQL target v1 supports only explicit insert mode.");
+            throw Invalid(
+                "node.sql-target.mode.invalid",
+                "Database target mode must be 'insert', 'upsert', or 'delete'.");
+        }
+
+        var keyColumns = ReadOptionalStringArray(root, "keyColumns", 16) ?? [];
+        var bindings = ReadBindings(root);
+        if (mode == "insert" && keyColumns.Count > 0)
+        {
+            throw Invalid(
+                "node.sql-target.keys.unexpected",
+                "Insert mode cannot configure match key columns.");
+        }
+        if (mode is "upsert" or "delete")
+        {
+            if (keyColumns.Count == 0)
+            {
+                throw Invalid(
+                    "node.sql-target.keys.required",
+                    "Upsert and delete modes require explicit target key columns.");
+            }
+
+            var keySet = keyColumns.ToHashSet(StringComparer.OrdinalIgnoreCase);
+            var configuredKeys = bindings
+                .Where(binding => keySet.Contains(binding.TargetColumn))
+                .ToArray();
+            if (bindings.Count > 0
+                && (configuredKeys.Length != keyColumns.Count
+                    || configuredKeys.Any(binding =>
+                        binding.Kind != WorkflowValueBindingKind.Column)))
+            {
+                throw Invalid(
+                    "node.sql-target.keys.binding",
+                    "Every target key requires exactly one source-column binding.");
+            }
+            if (mode == "delete"
+                && bindings.Any(binding => !keySet.Contains(binding.TargetColumn)))
+            {
+                throw Invalid(
+                    "node.sql-target.delete.bindings",
+                    "Delete mode accepts bindings only for target key columns.");
+            }
+            if (mode == "upsert"
+                && bindings.Count > 0
+                && bindings.All(binding => keySet.Contains(binding.TargetColumn)))
+            {
+                throw Invalid(
+                    "node.sql-target.upsert.values",
+                    "Upsert mode requires at least one non-key value binding.");
+            }
         }
 
         return new(
@@ -502,7 +552,8 @@ public sealed class WorkflowNodeSettingsValidator
             ReadIdentifier(root, "schema"),
             ReadIdentifier(root, "object"),
             mode,
-            ReadBindings(root));
+            keyColumns,
+            bindings);
     }
 
     private static CsvTargetNodeSettings ReadCsvTarget(JsonElement root)

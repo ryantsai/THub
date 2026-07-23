@@ -9,7 +9,8 @@ public sealed record WorkflowSchemaColumnDto(
     string SourceTypeName,
     TabularDataType DataType,
     bool IsNullable,
-    bool IsWritable);
+    bool IsWritable,
+    bool IsKey);
 
 public sealed record WorkflowObjectSchemaDto(
     Guid ConnectionId,

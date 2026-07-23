@@ -32,6 +32,7 @@ Accepted ADRs are not immutable. Supersede them when evidence changes; do not si
 | [0015](0015-bounded-workflow-variables-and-javascript-expressions.md) | Accepted | Bounded workflow variables and JavaScript value expressions |
 | [0016](0016-sql-backed-custom-role-and-resource-authorization.md) | Accepted | SQL-backed custom roles and resource authorization |
 | [0017](0017-safe-workflow-lifecycle-and-package-portability.md) | Accepted | Safe workflow removal and redacted portable packages |
+| [0018](0018-primary-key-relational-target-mutations.md) | Accepted | Primary-key upsert and incoming-key delete for relational targets |
 
 ## Creating an ADR
 

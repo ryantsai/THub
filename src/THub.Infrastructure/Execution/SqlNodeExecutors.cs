@@ -165,10 +165,10 @@ public sealed class SqlTargetNodeExecutor(
         var mappings = BuildMappings(
             input.Schema,
             metadata,
-            settings.Bindings,
+            settings,
             context,
             expressionSession);
-        await InsertAsync(
+        await WriteAsync(
             connectionString,
             connection.CommandTimeoutSeconds,
             settings,
@@ -182,10 +182,13 @@ public sealed class SqlTargetNodeExecutor(
     private static IReadOnlyList<SqlTargetMapping> BuildMappings(
         TabularSchema sourceSchema,
         IReadOnlyList<SqlColumnMetadata> targetColumns,
-        IReadOnlyList<WorkflowValueBinding> configured,
+        SqlTargetNodeSettings settings,
         WorkflowNodeExecutionContext context,
         IWorkflowExpressionSession? expressionSession)
     {
+        ValidateKeyConfiguration(settings, targetColumns);
+        var configured = settings.Bindings;
+        var keySet = settings.KeyColumns.ToHashSet(StringComparer.OrdinalIgnoreCase);
         var targetByName = targetColumns.ToDictionary(column => column.Name, StringComparer.OrdinalIgnoreCase);
         var mappings = new List<SqlTargetMapping>();
         var mappedTargets = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -194,7 +197,7 @@ public sealed class SqlTargetNodeExecutor(
             foreach (var source in sourceSchema.Columns.Select((column, index) => (column, index)))
             {
                 if (targetByName.TryGetValue(source.column.Name, out var target)
-                    && target.CanWrite)
+                    && (target.CanWrite || settings.Mode == "delete" && target.IsKey))
                 {
                     mappings.Add(new(
                         target,
@@ -214,7 +217,8 @@ public sealed class SqlTargetNodeExecutor(
                         $"Configured target column '{binding.TargetColumn}' does not exist.");
                 }
 
-                if (!target.CanWrite)
+                if (!target.CanWrite
+                    && !(settings.Mode == "delete" && target.IsKey))
                 {
                     throw ExecutionFailure.Configuration(
                         "execution.sql.target.generated",
@@ -246,11 +250,29 @@ public sealed class SqlTargetNodeExecutor(
                 "No writable SQL target columns match the input schema.");
         }
 
-        var missingRequired = targetColumns.Where(column =>
-            column.CanWrite
-            && !column.IsNullable
-            && !column.HasDefault
-            && !mappedTargets.Contains(column.Name)).ToArray();
+        if (settings.Mode is "upsert" or "delete"
+            && settings.KeyColumns.Any(key => !mappedTargets.Contains(key)))
+        {
+            throw ExecutionFailure.Configuration(
+                "execution.sql.target.keys.missing",
+                "Every configured target key column must be mapped from an input column.");
+        }
+
+        if (settings.Mode == "upsert"
+            && mappings.All(mapping => keySet.Contains(mapping.Target.Name)))
+        {
+            throw ExecutionFailure.Configuration(
+                "execution.sql.target.upsert.values",
+                "Upsert requires at least one mapped non-key target column.");
+        }
+
+        var missingRequired = settings.Mode == "delete"
+            ? []
+            : targetColumns.Where(column =>
+                column.CanWrite
+                && !column.IsNullable
+                && !column.HasDefault
+                && !mappedTargets.Contains(column.Name)).ToArray();
         if (missingRequired.Length > 0)
         {
             throw ExecutionFailure.Configuration(
@@ -259,6 +281,27 @@ public sealed class SqlTargetNodeExecutor(
         }
 
         return mappings;
+    }
+
+    private static void ValidateKeyConfiguration(
+        SqlTargetNodeSettings settings,
+        IReadOnlyList<SqlColumnMetadata> targetColumns)
+    {
+        if (settings.Mode == "insert")
+        {
+            return;
+        }
+
+        var primaryKey = targetColumns
+            .Where(column => column.IsKey)
+            .Select(column => column.Name)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        if (primaryKey.Count == 0 || !primaryKey.SetEquals(settings.KeyColumns))
+        {
+            throw ExecutionFailure.Configuration(
+                "execution.sql.target.keys",
+                "Configured key columns must exactly match the discovered primary key.");
+        }
     }
 
     private static Func<TabularRow, CancellationToken, TabularValue> CreateValueFactory(
@@ -298,7 +341,7 @@ public sealed class SqlTargetNodeExecutor(
         return (row, _) => row.Values[sourceIndex];
     }
 
-    private static async Task InsertAsync(
+    private static async Task WriteAsync(
         string connectionString,
         int commandTimeoutSeconds,
         SqlTargetNodeSettings settings,
@@ -317,32 +360,54 @@ public sealed class SqlTargetNodeExecutor(
             await using var command = connection.CreateCommand();
             command.Transaction = transaction;
             command.CommandTimeout = commandTimeoutSeconds;
-            command.CommandText = $"INSERT INTO {SqlExecutionSupport.Quote(settings.Schema)}.{SqlExecutionSupport.Quote(settings.Object)} ({string.Join(", ", mappings.Select(mapping => SqlExecutionSupport.Quote(mapping.Target.Name)))}) VALUES ({string.Join(", ", mappings.Select((_, index) => $"@p{index}"))});";
+            command.CommandText = RelationalTargetMutationSql.Build(
+                ConnectionKind.SqlServer,
+                settings.Schema,
+                settings.Object,
+                settings.Mode,
+                mappings.Select(mapping => mapping.Target.Name).ToArray(),
+                settings.KeyColumns);
             for (var index = 0; index < mappings.Count; index++)
             {
                 command.Parameters.Add(SqlExecutionSupport.CreateParameter($"@p{index}", mappings[index].Target));
             }
 
+            var keyIndexes = settings.KeyColumns
+                .Select(key => mappings
+                    .Select((mapping, index) => (mapping, index))
+                    .Single(item => string.Equals(
+                        item.mapping.Target.Name,
+                        key,
+                        StringComparison.OrdinalIgnoreCase)).index)
+                .ToArray();
+            var keyTracker = settings.Mode == "insert"
+                ? null
+                : new RelationalMutationKeyTracker();
             await foreach (var batch in input.ReadBatchesAsync(cancellationToken).ConfigureAwait(false))
             {
                 await using (batch.ConfigureAwait(false))
                 {
+                    long rowsWritten = 0;
                     foreach (var row in batch.Rows)
                     {
                         cancellationToken.ThrowIfCancellationRequested();
+                        var values = new TabularValue[mappings.Count];
                         for (var index = 0; index < mappings.Count; index++)
                         {
+                            values[index] = mappings[index].ValueFactory(row, cancellationToken);
                             command.Parameters[index].Value = TabularExecutionSupport.ToProviderValue(
-                                mappings[index].ValueFactory(row, cancellationToken));
+                                values[index]);
                         }
 
-                        _ = await command.ExecuteNonQueryAsync(cancellationToken);
+                        keyTracker?.Add(keyIndexes.Select(index => values[index]).ToArray());
+                        var affected = await command.ExecuteNonQueryAsync(cancellationToken);
+                        rowsWritten += settings.Mode == "delete" ? affected : 1;
                     }
 
                     await context.Progress.ReportAsync(
                         new WorkflowNodeProgress(
                             RowsRead: batch.Rows.Count,
-                            RowsWritten: batch.Rows.Count,
+                            RowsWritten: rowsWritten,
                             BatchesProcessed: 1,
                             BytesRead: batch.EstimatedByteCount),
                         cancellationToken);
@@ -356,7 +421,7 @@ public sealed class SqlTargetNodeExecutor(
             await transaction.RollbackAsync(CancellationToken.None);
             throw ExecutionFailure.ExternalSideEffect(
                 "execution.sql.target.failed",
-                "The SQL target insert failed and its transaction was rolled back.",
+                "The SQL target mutation failed and its transaction was rolled back.",
                 exception);
         }
         catch
@@ -380,7 +445,8 @@ internal sealed record SqlColumnMetadata(
     bool HasDefault,
     int MaximumLength,
     byte Precision,
-    byte Scale);
+    byte Scale,
+    bool IsKey);
 
 internal static class SqlExecutionSupport
 {
@@ -396,7 +462,17 @@ internal static class SqlExecutionSupport
             columnMetadata.[max_length],
             columnMetadata.[precision],
             columnMetadata.[scale],
-            objectMetadata.[type]
+            objectMetadata.[type],
+            CONVERT(bit, CASE WHEN EXISTS (
+                SELECT 1
+                FROM sys.indexes AS keyIndex
+                INNER JOIN sys.index_columns AS keyColumn
+                    ON keyColumn.[object_id] = keyIndex.[object_id]
+                    AND keyColumn.[index_id] = keyIndex.[index_id]
+                WHERE keyIndex.[object_id] = objectMetadata.[object_id]
+                    AND keyIndex.[is_primary_key] = 1
+                    AND keyColumn.[column_id] = columnMetadata.[column_id]
+            ) THEN 1 ELSE 0 END)
         FROM sys.objects AS objectMetadata
         INNER JOIN sys.schemas AS schemaMetadata ON schemaMetadata.[schema_id] = objectMetadata.[schema_id]
         INNER JOIN sys.columns AS columnMetadata ON columnMetadata.[object_id] = objectMetadata.[object_id]
@@ -482,7 +558,8 @@ internal static class SqlExecutionSupport
                     reader.GetBoolean(6),
                     reader.GetInt16(7),
                     reader.GetByte(8),
-                    reader.GetByte(9)));
+                    reader.GetByte(9),
+                    reader.GetBoolean(11)));
             }
 
             if (columns.Count == 0)

@@ -88,7 +88,8 @@ public sealed class InfrastructureWorkflowSchemaInspector(
                 column.SqlTypeName,
                 column.DataType,
                 column.IsNullable,
-                column.CanWrite)).ToArray());
+                column.CanWrite,
+                column.IsKey)).ToArray());
     }
 
     private async Task<WorkflowSchemaInspectionResult> InspectRelationalAsync(
@@ -116,7 +117,8 @@ public sealed class InfrastructureWorkflowSchemaInspector(
                 column.SourceTypeName,
                 column.DataType,
                 column.IsNullable,
-                column.CanWrite)).ToArray());
+                column.CanWrite,
+                column.IsKey)).ToArray());
     }
 
     private static WorkflowSchemaInspectionResult Success(

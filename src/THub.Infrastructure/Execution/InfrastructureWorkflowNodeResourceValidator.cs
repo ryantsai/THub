@@ -145,7 +145,7 @@ public sealed class InfrastructureWorkflowNodeResourceValidator(
             settings.Object,
             allowView: false,
             cancellationToken).ConfigureAwait(false);
-        ValidateConfiguredTargetColumns(metadata, settings.Bindings);
+        ValidateConfiguredTargetColumns(metadata, settings);
     }
 
     private async Task ValidateRelationalTargetAsync(
@@ -168,24 +168,15 @@ public sealed class InfrastructureWorkflowNodeResourceValidator(
             settings.Schema,
             settings.Object,
             cancellationToken).ConfigureAwait(false);
-        if (settings.Bindings.Count == 0)
-        {
-            return;
-        }
-
-        var targetByName = metadata.ToDictionary(
-            column => column.Name,
-            StringComparer.OrdinalIgnoreCase);
-        foreach (var binding in settings.Bindings)
-        {
-            if (!targetByName.TryGetValue(binding.TargetColumn, out var target)
-                || !target.CanWrite)
-            {
-                throw ExecutionFailure.Configuration(
-                    "execution.database.target.mapping",
-                    "A configured database target binding is missing or generated.");
-            }
-        }
+        ValidateConfiguredTargetColumns(
+            settings,
+            metadata.Select(column => new TargetColumnPolicy(
+                column.Name,
+                column.CanWrite,
+                column.IsNullable,
+                HasDefault: false,
+                column.IsKey)).ToArray(),
+            "execution.database.target");
     }
 
     private async Task ValidateRelationalAsync(
@@ -363,48 +354,86 @@ public sealed class InfrastructureWorkflowNodeResourceValidator(
 
     private static void ValidateConfiguredTargetColumns(
         IReadOnlyList<SqlColumnMetadata> metadata,
-        IReadOnlyList<WorkflowValueBinding> bindings)
+        SqlTargetNodeSettings settings)
     {
-        if (bindings.Count == 0)
+        ValidateConfiguredTargetColumns(
+            settings,
+            metadata.Select(column => new TargetColumnPolicy(
+                column.Name,
+                column.CanWrite,
+                column.IsNullable,
+                column.HasDefault,
+                column.IsKey)).ToArray(),
+            "execution.sql.target");
+    }
+
+    private static void ValidateConfiguredTargetColumns(
+        SqlTargetNodeSettings settings,
+        IReadOnlyList<TargetColumnPolicy> metadata,
+        string errorPrefix)
+    {
+        var primaryKey = metadata
+            .Where(column => column.IsKey)
+            .Select(column => column.Name)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        if (settings.Mode is "upsert" or "delete"
+            && (primaryKey.Count == 0
+                || !primaryKey.SetEquals(settings.KeyColumns)))
+        {
+            throw ExecutionFailure.Configuration(
+                $"{errorPrefix}.keys",
+                "Configured key columns must exactly match the discovered primary key.");
+        }
+
+        if (settings.Bindings.Count == 0)
         {
             return;
         }
 
         var targetByName = metadata.ToDictionary(column => column.Name, StringComparer.OrdinalIgnoreCase);
         var mappedTargets = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        foreach (var binding in bindings)
+        foreach (var binding in settings.Bindings)
         {
             var targetName = binding.TargetColumn;
             if (!targetByName.TryGetValue(targetName, out var target))
             {
                 throw ExecutionFailure.Configuration(
-                    "execution.sql.target.column",
+                    $"{errorPrefix}.column",
                     $"Configured target column '{targetName}' does not exist.");
             }
 
-            if (!target.CanWrite)
+            var isDeleteKey = settings.Mode == "delete" && target.IsKey;
+            if (!target.CanWrite && !isDeleteKey)
             {
                 throw ExecutionFailure.Configuration(
-                    "execution.sql.target.generated",
+                    $"{errorPrefix}.generated",
                     $"Configured target column '{target.Name}' is identity, computed, or generated.");
             }
 
             if (!mappedTargets.Add(target.Name))
             {
                 throw ExecutionFailure.Configuration(
-                    "execution.sql.target.duplicate",
+                    $"{errorPrefix}.duplicate",
                     $"Target column '{target.Name}' is mapped more than once.");
             }
         }
 
-        if (metadata.Any(column => column.CanWrite
-                && !column.IsNullable
-                && !column.HasDefault
-                && !mappedTargets.Contains(column.Name)))
+        if (settings.Mode is "insert" or "upsert"
+            && metadata.Any(column => column.CanWrite
+                    && !column.IsNullable
+                    && !column.HasDefault
+                    && !mappedTargets.Contains(column.Name)))
         {
             throw ExecutionFailure.Configuration(
-                "execution.sql.target.required",
+                $"{errorPrefix}.required",
                 "One or more required SQL target columns are not mapped.");
         }
     }
+
+    private sealed record TargetColumnPolicy(
+        string Name,
+        bool CanWrite,
+        bool IsNullable,
+        bool HasDefault,
+        bool IsKey);
 }

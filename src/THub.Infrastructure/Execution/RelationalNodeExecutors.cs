@@ -178,10 +178,10 @@ public abstract class RelationalTargetNodeExecutor(
         var mappings = BuildMappings(
             input.Schema,
             metadata,
-            settings.Bindings,
+            settings,
             context,
             expressionSession);
-        await InsertAsync(
+        await WriteAsync(
             connection,
             configuration,
             settings,
@@ -195,10 +195,13 @@ public abstract class RelationalTargetNodeExecutor(
     private static IReadOnlyList<RelationalTargetMapping> BuildMappings(
         TabularSchema source,
         IReadOnlyList<RelationalColumnMetadata> target,
-        IReadOnlyList<WorkflowValueBinding> configured,
+        SqlTargetNodeSettings settings,
         WorkflowNodeExecutionContext context,
         IWorkflowExpressionSession? expressionSession)
     {
+        ValidateKeyConfiguration(settings, target);
+        var configured = settings.Bindings;
+        var keySet = settings.KeyColumns.ToHashSet(StringComparer.OrdinalIgnoreCase);
         var targetByName = target.ToDictionary(column => column.Name, StringComparer.OrdinalIgnoreCase);
         var mappings = new List<RelationalTargetMapping>();
         var used = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -207,7 +210,7 @@ public abstract class RelationalTargetNodeExecutor(
             foreach (var item in source.Columns.Select((column, index) => (column, index)))
             {
                 if (targetByName.TryGetValue(item.column.Name, out var targetColumn) &&
-                    targetColumn.CanWrite)
+                    (targetColumn.CanWrite || settings.Mode == "delete" && targetColumn.IsKey))
                 {
                     mappings.Add(new(
                         targetColumn,
@@ -221,7 +224,9 @@ public abstract class RelationalTargetNodeExecutor(
             foreach (var binding in configured)
             {
                 if (!targetByName.TryGetValue(binding.TargetColumn, out var targetColumn) ||
-                    !targetColumn.CanWrite || !used.Add(targetColumn.Name))
+                    (!targetColumn.CanWrite
+                        && !(settings.Mode == "delete" && targetColumn.IsKey))
+                    || !used.Add(targetColumn.Name))
                 {
                     throw ExecutionFailure.Configuration(
                         "execution.database.target.mapping",
@@ -237,11 +242,48 @@ public abstract class RelationalTargetNodeExecutor(
                         expressionSession)));
             }
         }
-        return mappings.Count > 0
-            ? mappings
-            : throw ExecutionFailure.Configuration(
+        if (mappings.Count == 0)
+        {
+            throw ExecutionFailure.Configuration(
                 "execution.database.target.mappings",
                 "No writable target columns match the input schema.");
+        }
+        if (settings.Mode is "upsert" or "delete"
+            && settings.KeyColumns.Any(key => !used.Contains(key)))
+        {
+            throw ExecutionFailure.Configuration(
+                "execution.database.target.keys.missing",
+                "Every configured target key column must be mapped from an input column.");
+        }
+        if (settings.Mode == "upsert"
+            && mappings.All(mapping => keySet.Contains(mapping.Target.Name)))
+        {
+            throw ExecutionFailure.Configuration(
+                "execution.database.target.upsert.values",
+                "Upsert requires at least one mapped non-key target column.");
+        }
+        return mappings;
+    }
+
+    private static void ValidateKeyConfiguration(
+        SqlTargetNodeSettings settings,
+        IReadOnlyList<RelationalColumnMetadata> targetColumns)
+    {
+        if (settings.Mode == "insert")
+        {
+            return;
+        }
+
+        var primaryKey = targetColumns
+            .Where(column => column.IsKey)
+            .Select(column => column.Name)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        if (primaryKey.Count == 0 || !primaryKey.SetEquals(settings.KeyColumns))
+        {
+            throw ExecutionFailure.Configuration(
+                "execution.database.target.keys",
+                "Configured key columns must exactly match the discovered primary key.");
+        }
     }
 
     private static Func<TabularRow, CancellationToken, TabularValue> CreateValueFactory(
@@ -281,7 +323,7 @@ public abstract class RelationalTargetNodeExecutor(
         return (row, _) => row.Values[sourceIndex];
     }
 
-    private static async Task InsertAsync(
+    private static async Task WriteAsync(
         DbConnection connection,
         RelationalDatabaseConnectionConfiguration configuration,
         SqlTargetNodeSettings settings,
@@ -299,33 +341,53 @@ public abstract class RelationalTargetNodeExecutor(
             await using var command = connection.CreateCommand();
             command.Transaction = transaction;
             command.CommandTimeout = configuration.CommandTimeoutSeconds;
-            var placeholders = mappings.Select((_, index) =>
-                configuration.Kind == ConnectionKind.Oracle ? $":p{index}" : $"@p{index}").ToArray();
-            command.CommandText =
-                $"INSERT INTO {RelationalExecutionSupport.QualifiedName(configuration.Kind, settings.Schema, settings.Object)} ({string.Join(", ", mappings.Select(mapping => RelationalExecutionSupport.Quote(configuration.Kind, mapping.Target.Name)))}) VALUES ({string.Join(", ", placeholders)})";
+            command.CommandText = RelationalTargetMutationSql.Build(
+                configuration.Kind,
+                settings.Schema,
+                settings.Object,
+                settings.Mode,
+                mappings.Select(mapping => mapping.Target.Name).ToArray(),
+                settings.KeyColumns);
             for (var index = 0; index < mappings.Count; index++)
             {
                 var parameter = command.CreateParameter();
                 parameter.ParameterName = $"p{index}";
                 command.Parameters.Add(parameter);
             }
+            var keyIndexes = settings.KeyColumns
+                .Select(key => mappings
+                    .Select((mapping, index) => (mapping, index))
+                    .Single(item => string.Equals(
+                        item.mapping.Target.Name,
+                        key,
+                        StringComparison.OrdinalIgnoreCase)).index)
+                .ToArray();
+            var keyTracker = settings.Mode == "insert"
+                ? null
+                : new RelationalMutationKeyTracker();
             await foreach (var batch in input.ReadBatchesAsync(cancellationToken).ConfigureAwait(false))
             {
                 await using (batch.ConfigureAwait(false))
                 {
+                    long rowsWritten = 0;
                     foreach (var row in batch.Rows)
                     {
+                        cancellationToken.ThrowIfCancellationRequested();
+                        var values = new TabularValue[mappings.Count];
                         for (var index = 0; index < mappings.Count; index++)
                         {
+                            values[index] = mappings[index].ValueFactory(row, cancellationToken);
                             command.Parameters[index].Value = TabularExecutionSupport.ToProviderValue(
-                                mappings[index].ValueFactory(row, cancellationToken));
+                                values[index]);
                         }
-                        _ = await command.ExecuteNonQueryAsync(cancellationToken);
+                        keyTracker?.Add(keyIndexes.Select(index => values[index]).ToArray());
+                        var affected = await command.ExecuteNonQueryAsync(cancellationToken);
+                        rowsWritten += settings.Mode == "delete" ? affected : 1;
                     }
                     await context.Progress.ReportAsync(
                         new WorkflowNodeProgress(
                             RowsRead: batch.Rows.Count,
-                            RowsWritten: batch.Rows.Count,
+                            RowsWritten: rowsWritten,
                             BatchesProcessed: 1,
                             BytesRead: batch.EstimatedByteCount),
                         cancellationToken);
@@ -389,7 +451,8 @@ internal sealed record RelationalColumnMetadata(
     string SourceTypeName,
     TabularDataType DataType,
     bool IsNullable,
-    bool CanWrite);
+    bool CanWrite,
+    bool IsKey);
 
 internal static class RelationalExecutionSupport
 {
@@ -417,7 +480,8 @@ internal static class RelationalExecutionSupport
             column.DataTypeName ?? column.DataType?.Name ?? "unknown",
             ToTabularType(column.DataType),
             column.AllowDBNull ?? true,
-            column.IsReadOnly != true && column.IsAutoIncrement != true)).ToArray();
+            column.IsReadOnly != true && column.IsAutoIncrement != true,
+            column.IsKey == true)).ToArray();
         return columns.Length > 0
             ? columns
             : throw ExecutionFailure.Configuration(

@@ -39,7 +39,7 @@ THub uses permission policies plus SQL-backed resource authorization rather than
 | System role | Intended permissions |
 | --- | --- |
 | System Administrator | Every platform permission and implicit access to every resource |
-| Developer | Create, view, edit, publish, execute, archive/delete, and schedule workflows; view runs and approved connections |
+| Developer | Create, view, edit, publish, execute, archive/delete, schedule workflows, and configure relational target upsert/delete; view runs and approved connections |
 
 Custom roles, permissions, Windows user/group assignments, workflow/connection grants, and editor-publication grants are authoritative in SQL Server. An unmapped authenticated user receives no default role. System-role capabilities are immutable; their assignments and all custom roles are managed under `/settings`.
 
@@ -81,6 +81,14 @@ connection configuration, credentials, or secret references. Imports require
 `workflow.create`, create an unpublished draft, and report unresolved connection
 references rather than activating the package.
 
+Relational target mutations are independently authorized. `workflow.target.upsert`
+permits primary-key upsert configuration and `workflow.target.delete` permits deletion
+of incoming primary keys. The designer reauthorizes these operations when a draft is
+saved and published, including resource-specific workflow grants. These permissions do
+not authorize arbitrary SQL, custom match predicates, update-only writes, table
+replacement, or deletion of target rows absent from the input. The Worker still requires
+a least-privilege target credential whose database grants permit the configured effect.
+
 Never:
 
 - commit credentials or tokens;
@@ -95,7 +103,8 @@ Never:
 - Store explicit allowed objects and operations in the workflow or publication definition.
 - Apply command timeouts, cancellation, row/batch limits, and least-privilege database accounts.
 - Keep preview queries bounded.
-- Treat merge/upsert/delete/replace modes as separately authorized, auditable capabilities.
+- Treat merge/upsert/delete/replace modes as separately authorized capabilities and add
+  durable audit records before claiming a complete privileged-operation audit trail.
 
 Provider-specific database connectors use their own maintained provider, identifier quoting, and metadata instead of a generic string-selected provider. MySQL, PostgreSQL, and Oracle connections require referenced database credentials. TLS certificate validation may be bypassed only through an explicit administrator setting; encryption with normal certificate validation is preferred.
 

@@ -4,6 +4,8 @@
 - Date: 2026-07-23
 - Deciders: Project maintainers
 - Supersedes: [ADR-0006](0006-v1-sql-server-and-local-file-connectors.md)
+- Relational target write-mode restriction partially superseded by:
+  [ADR-0018](0018-primary-key-relational-target-mutations.md)
 
 ## Context
 

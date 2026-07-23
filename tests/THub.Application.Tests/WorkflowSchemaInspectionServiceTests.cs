@@ -101,7 +101,7 @@ public sealed class WorkflowSchemaInspectionServiceTests
                     connection.Id,
                     schema,
                     objectName,
-                    [new("Id", "bigint", TabularDataType.Int64, false, true)]),
+                    [new("Id", "bigint", TabularDataType.Int64, false, true, true)]),
                 "Loaded."));
         }
     }

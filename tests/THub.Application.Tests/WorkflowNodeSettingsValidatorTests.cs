@@ -21,6 +21,10 @@ public sealed class WorkflowNodeSettingsValidatorTests
     [InlineData(WorkflowNodeKind.MySqlTarget, """{"connectionId":"11111111-1111-1111-1111-111111111111","schema":"warehouse","object":"Orders","mode":"insert"}""")]
     [InlineData(WorkflowNodeKind.PostgreSqlTarget, """{"connectionId":"11111111-1111-1111-1111-111111111111","schema":"public","object":"Orders","mode":"insert"}""")]
     [InlineData(WorkflowNodeKind.OracleTarget, """{"connectionId":"11111111-1111-1111-1111-111111111111","schema":"APP","object":"ORDERS","mode":"insert"}""")]
+    [InlineData(WorkflowNodeKind.SqlTarget, """{"connectionId":"11111111-1111-1111-1111-111111111111","schema":"dbo","object":"Orders","mode":"upsert","keyColumns":["Id"],"bindings":[{"targetColumn":"Id","kind":"Column","value":"Id"},{"targetColumn":"Name","kind":"Column","value":"Name"}]}""")]
+    [InlineData(WorkflowNodeKind.MySqlTarget, """{"connectionId":"11111111-1111-1111-1111-111111111111","schema":"warehouse","object":"Orders","mode":"upsert","keyColumns":["Id"]}""")]
+    [InlineData(WorkflowNodeKind.PostgreSqlTarget, """{"connectionId":"11111111-1111-1111-1111-111111111111","schema":"public","object":"Orders","mode":"delete","keyColumns":["Id"]}""")]
+    [InlineData(WorkflowNodeKind.OracleTarget, """{"connectionId":"11111111-1111-1111-1111-111111111111","schema":"APP","object":"ORDERS","mode":"delete","keyColumns":["ID"],"bindings":[{"targetColumn":"ID","kind":"Column","value":"Id"}]}""")]
     [InlineData(WorkflowNodeKind.FtpTarget, """{"connectionId":"11111111-1111-1111-1111-111111111111","remotePath":"/outbound/orders.xlsx","format":"excel","worksheet":"Orders","includeHeader":true,"mode":"createNew"}""")]
     [InlineData(WorkflowNodeKind.CsvTarget, """{"connectionId":"11111111-1111-1111-1111-111111111111","relativePath":"outbound/orders.csv","includeHeader":true}""")]
     [InlineData(WorkflowNodeKind.ExcelTarget, """{"connectionId":"11111111-1111-1111-1111-111111111111","relativePath":"outbound/orders.xlsx","worksheet":"Orders"}""")]
@@ -46,6 +50,36 @@ public sealed class WorkflowNodeSettingsValidatorTests
         var exception = Assert.Throws<WorkflowNodeSettingsException>(() => _validator.Parse(node));
 
         Assert.Equal("node.settings.property.unsupported", exception.Code);
+    }
+
+    [Theory]
+    [InlineData(
+        """{"connectionId":"11111111-1111-1111-1111-111111111111","schema":"dbo","object":"Orders","mode":"upsert"}""",
+        "node.sql-target.keys.required")]
+    [InlineData(
+        """{"connectionId":"11111111-1111-1111-1111-111111111111","schema":"dbo","object":"Orders","mode":"delete","keyColumns":["Id"],"bindings":[{"targetColumn":"Name","kind":"Column","value":"Name"}]}""",
+        "node.sql-target.keys.binding")]
+    [InlineData(
+        """{"connectionId":"11111111-1111-1111-1111-111111111111","schema":"dbo","object":"Orders","mode":"delete","keyColumns":["Id"],"bindings":[{"targetColumn":"Id","kind":"Variable","value":"id"}]}""",
+        "node.sql-target.keys.binding")]
+    [InlineData(
+        """{"connectionId":"11111111-1111-1111-1111-111111111111","schema":"dbo","object":"Orders","mode":"upsert","keyColumns":["Id"],"bindings":[{"targetColumn":"Id","kind":"Column","value":"Id"}]}""",
+        "node.sql-target.upsert.values")]
+    public void ParseRejectsUnsafeRelationalTargetMutationSettings(
+        string settingsJson,
+        string expectedCode)
+    {
+        var node = new WorkflowNode(
+            "target",
+            WorkflowNodeKind.SqlTarget,
+            "Target",
+            0,
+            0,
+            settingsJson);
+
+        var exception = Assert.Throws<WorkflowNodeSettingsException>(() => _validator.Parse(node));
+
+        Assert.Equal(expectedCode, exception.Code);
     }
 
     [Fact]
