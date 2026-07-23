@@ -2,6 +2,9 @@
 
 ## Architecture set
 
+- [Agent architecture guidance](agent-architecture.md): conditional project-boundary,
+  persistence, execution, security, UI, and validation-routing guidance referenced by
+  the root behavioral constitution.
 - [Architecture overview](architecture.md): management, publication, worker, and SQL boundaries; current-versus-target flows; failure model; observability; and roadmap.
 - [Data model](data-model.md): current THub/Quartz schemas plus accepted immutable workflow, lease/step, publication/token/grant/change-set, Email outbox, and audit persistence targets.
 - [Security architecture](security.md): Windows management authentication, isolated managed-bearer publications, Spreadsheet role grants/staging, connectors, Email secrets/outbox, and gated executables/webhooks.
