@@ -119,6 +119,37 @@ public sealed class PublicationDataServiceTests
     }
 
     [Fact]
+    public async Task CountEditorRowsAsync_AuthorizesAndUsesOnlyApprovedFilters()
+    {
+        var (publication, version) = PublicationTestData.CreateActiveEditorPublication();
+        var catalog = new FakePublicationCatalogStore();
+        catalog.Publications.Add(publication);
+        catalog.Versions.Add(version);
+        var grants = new FakePublicationGrantStore();
+        grants.Grants.Add(new PublicationGrant(
+            Guid.NewGuid(), publication.Id, PublicationRole.Viewer, true, false, false, false, false));
+        var source = new FakePublicationSourceDataReader
+        {
+            CountResult = new(
+                PublicationSourceReadStatus.Success,
+                new PublicationSourceRowCount(2_501)),
+        };
+        var service = CreateService(catalog, source, grants);
+
+        var result = await service.CountEditorRowsAsync(
+            publication.Id,
+            [PublicationRole.Viewer],
+            [new PublicationFilter("name", PublicationFilterOperator.StartsWith, "A")],
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess, result.Problem?.Message);
+        Assert.Equal(2_501, result.Value!.TotalCount);
+        var filter = Assert.Single(source.LastCountQuery!.Filters);
+        Assert.Equal("name", filter.ColumnAlias);
+        Assert.Equal("A", filter.Value);
+    }
+
+    [Fact]
     public async Task ReadForeignKeyLookupAsync_UsesOnlyConfiguredForeignKeyMetadata()
     {
         var (publication, version) = PublicationTestData.CreateActiveEditorPublication(withForeignKey: true);

@@ -118,6 +118,21 @@ public sealed record EmailAlertNodeSettings(
     string Body,
     int MaximumAttempts) : WorkflowNodeSettings;
 
+public enum EmailTargetDeliveryMode
+{
+    Inline,
+    Attachment
+}
+
+public sealed record EmailTargetNodeSettings(
+    Guid ProfileId,
+    IReadOnlyList<string> Recipients,
+    string Subject,
+    string Body,
+    EmailTargetDeliveryMode DeliveryMode,
+    string AttachmentFileName,
+    int MaximumAttempts) : WorkflowNodeSettings;
+
 public sealed record WebhookNodeSettings(
     Guid TrustedActionId,
     string Body) : WorkflowNodeSettings;
@@ -178,6 +193,8 @@ public sealed class WorkflowNodeSettingsValidator
         ["connectionId", "remotePath", "format", "includeHeader", "delimiter", "worksheet", "mode"];
     private static readonly HashSet<string> EmailProperties =
         ["profileId", "recipients", "subject", "body", "maximumAttempts"];
+    private static readonly HashSet<string> EmailTargetProperties =
+        ["profileId", "recipients", "subject", "body", "deliveryMode", "attachmentFileName", "maximumAttempts"];
     private static readonly HashSet<string> WebhookProperties =
         ["trustedActionId", "body"];
     private static readonly HashSet<string> ExecutableProperties =
@@ -359,6 +376,7 @@ public sealed class WorkflowNodeSettingsValidator
                 WorkflowNodeKind.FtpTarget => ReadFtpTarget(root),
                 WorkflowNodeKind.CsvTarget => ReadCsvTarget(root),
                 WorkflowNodeKind.ExcelTarget => ReadExcelTarget(root),
+                WorkflowNodeKind.EmailTarget => ReadEmailTarget(root),
                 WorkflowNodeKind.EmailAlert => ReadEmail(root),
                 WorkflowNodeKind.Webhook => ReadWebhook(root),
                 WorkflowNodeKind.Executable => ReadExecutable(root),
@@ -701,6 +719,68 @@ public sealed class WorkflowNodeSettingsValidator
             ReadText(root, "subject", 500),
             ReadMultilineText(root, "body", 100_000),
             ReadOptionalInt(root, "maximumAttempts", 1, 20) ?? 5);
+    }
+
+    private static EmailTargetNodeSettings ReadEmailTarget(JsonElement root)
+    {
+        EnsureOnly(root, EmailTargetProperties);
+        var modeText = ReadText(root, "deliveryMode", 32);
+        var deliveryMode = modeText switch
+        {
+            "inline" => EmailTargetDeliveryMode.Inline,
+            "attachment" => EmailTargetDeliveryMode.Attachment,
+            _ => throw Invalid(
+                "node.email-target.mode.invalid",
+                "Email target deliveryMode must be 'inline' or 'attachment'.")
+        };
+        var body = ReadMultilineText(root, "body", 100_000);
+        var dataPlaceholderCount = CountOccurrences(body, "{{data}}");
+        if (deliveryMode == EmailTargetDeliveryMode.Inline && dataPlaceholderCount != 1)
+        {
+            throw Invalid(
+                "node.email-target.data-placeholder",
+                "An inline Email target body must contain exactly one '{{data}}' placeholder.");
+        }
+        if (deliveryMode == EmailTargetDeliveryMode.Attachment && dataPlaceholderCount != 0)
+        {
+            throw Invalid(
+                "node.email-target.data-placeholder",
+                "An attachment Email target body cannot contain the '{{data}}' placeholder.");
+        }
+
+        var attachmentFileName = ReadText(root, "attachmentFileName", 128);
+        if (attachmentFileName != Path.GetFileName(attachmentFileName)
+            || !attachmentFileName.EndsWith(".csv", StringComparison.OrdinalIgnoreCase)
+            || attachmentFileName.IndexOfAny(
+                ['/', '\\', ':', '*', '?', '"', '<', '>', '|']) >= 0
+            || attachmentFileName.Any(char.IsControl))
+        {
+            throw Invalid(
+                "node.email-target.attachment-name.invalid",
+                "Email target attachmentFileName must be a safe .csv leaf file name.");
+        }
+
+        return new(
+            ReadGuid(root, "profileId"),
+            ReadStringArray(root, "recipients", 1, 100, 320),
+            ReadText(root, "subject", 500),
+            body,
+            deliveryMode,
+            attachmentFileName,
+            ReadOptionalInt(root, "maximumAttempts", 1, 20) ?? 5);
+    }
+
+    private static int CountOccurrences(string value, string search)
+    {
+        var count = 0;
+        var position = 0;
+        while ((position = value.IndexOf(search, position, StringComparison.Ordinal)) >= 0)
+        {
+            count++;
+            position += search.Length;
+        }
+
+        return count;
     }
 
     private static WebhookNodeSettings ReadWebhook(JsonElement root)

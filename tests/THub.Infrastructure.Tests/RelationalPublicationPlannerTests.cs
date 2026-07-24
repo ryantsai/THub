@@ -41,6 +41,30 @@ public sealed class RelationalPublicationPlannerTests
     }
 
     [Theory]
+    [InlineData(ConnectionKind.MySql, "`sales`.`Order Data`", "@__filter0")]
+    [InlineData(ConnectionKind.PostgreSql, "\"sales\".\"Order Data\"", "@__filter0")]
+    [InlineData(ConnectionKind.Oracle, "\"sales\".\"Order Data\"", ":__filter0")]
+    public void BuildCount_UsesProviderQuotingAndParameterizedFilters(
+        ConnectionKind kind,
+        string qualifiedName,
+        string parameterMarker)
+    {
+        var version = CreateVersion(PublicationConcurrencyMode.ReadOnly);
+
+        var plan = RelationalPublicationQueryPlanner.BuildCount(
+            kind,
+            version,
+            new PublicationSourceCountQuery(
+                [new PublicationFilter("name", PublicationFilterOperator.StartsWith, "A")]));
+
+        Assert.NotNull(plan);
+        Assert.Contains($"SELECT COUNT(*) FROM {qualifiedName}", plan.CommandText, StringComparison.Ordinal);
+        Assert.Contains(parameterMarker, plan.CommandText, StringComparison.Ordinal);
+        Assert.DoesNotContain("ORDER BY", plan.CommandText, StringComparison.OrdinalIgnoreCase);
+        Assert.Equal("A%", Assert.Single(plan.Parameters).Value);
+    }
+
+    [Theory]
     [InlineData(ConnectionKind.MySql, "`Name` = @set0", "`OrderId` = @where0")]
     [InlineData(ConnectionKind.PostgreSql, "\"Name\" = @set0", "\"OrderId\" = @where0")]
     [InlineData(ConnectionKind.Oracle, "\"Name\" = :set0", "\"OrderId\" = :where0")]

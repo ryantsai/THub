@@ -1,6 +1,6 @@
 # ADR-0012: Deliver Email alerts through a durable outbox
 
-- Status: Accepted
+- Status: Superseded by [ADR-0027](0027-email-workflow-destination.md)
 - Date: 2026-07-23
 - Deciders: Project maintainers
 

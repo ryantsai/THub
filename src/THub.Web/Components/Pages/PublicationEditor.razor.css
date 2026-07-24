@@ -128,9 +128,11 @@
 
 .toolbar-group {
     gap: 3px;
+    flex: 0 0 auto;
 }
 
 .toolbar-group > button,
+.toolbar-group > a,
 .sheet-info summary {
     min-height: 32px;
     padding: 0 9px;
@@ -146,11 +148,14 @@
     font-weight: 650;
     white-space: nowrap;
     cursor: pointer;
+    text-decoration: none;
 }
 
 .toolbar-group > button:hover,
 .toolbar-group > button:focus-visible,
 .toolbar-group > button.active,
+.toolbar-group > a:hover,
+.toolbar-group > a:focus-visible,
 .sheet-info summary:hover,
 .sheet-info[open] summary {
     border-color: #d7e2df;
@@ -175,6 +180,64 @@
 
 .toolbar-spacer {
     flex: 1 0 24px;
+}
+
+.toolbar-pagination {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    color: #64746f;
+    font-size: 9px;
+    white-space: nowrap;
+}
+
+.toolbar-pagination label {
+    min-height: 32px;
+    padding: 0 7px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    border: 1px solid #dce5e2;
+    border-radius: 5px;
+    background: #fff;
+}
+
+.toolbar-pagination select {
+    border: 0;
+    outline: 0;
+    background: transparent;
+    color: #344440;
+    font: inherit;
+    font-weight: 700;
+}
+
+.toolbar-pagination > button {
+    width: 30px;
+    height: 30px;
+    padding: 0;
+    display: grid;
+    place-items: center;
+    border: 1px solid transparent;
+    border-radius: 5px;
+    background: transparent;
+    color: #53645f;
+    cursor: pointer;
+}
+
+.toolbar-pagination > button:hover,
+.toolbar-pagination > button:focus-visible {
+    border-color: #d7e2df;
+    background: #edf4f2;
+}
+
+.toolbar-pagination > button:disabled {
+    opacity: .35;
+    cursor: default;
+}
+
+.toolbar-pagination ::deep .rzi {
+    font-size: 16px;
 }
 
 .toolbar-count {
@@ -312,7 +375,7 @@
 }
 
 .spreadsheet-shell {
-    height: calc(100vh - 214px);
+    height: calc(100vh - 172px);
     min-height: 30rem;
     margin: 0 calc(-1 * var(--page-gutter));
     overflow: hidden;
@@ -321,7 +384,7 @@
 }
 
 .editor-query-strip + .spreadsheet-shell {
-    height: calc(100vh - 292px);
+    height: calc(100vh - 250px);
 }
 
 .spreadsheet-shell ::deep .rz-spreadsheet {
@@ -343,32 +406,6 @@
 .spreadsheet-shell ::deep .publication-lookup-value .rzi {
     color: #24836a;
     font-size: 15px;
-}
-
-.editor-window-nav {
-    min-height: 42px;
-    margin: 0 calc(-1 * var(--page-gutter)) -36px;
-    padding: 5px 16px;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 12px;
-    background: #fbfcfc;
-    color: #74837f;
-    font-size: 9px;
-}
-
-.editor-window-nav > div {
-    display: flex;
-    align-items: center;
-    gap: 5px;
-}
-
-.editor-window-nav ::deep .rz-button {
-    min-height: 30px;
-    border-radius: 5px;
-    box-shadow: none;
-    font-size: 9px;
 }
 
 .drawer-scrim {
@@ -569,12 +606,12 @@
     }
 
     .spreadsheet-shell {
-        height: calc(100vh - 225px);
+        height: calc(100vh - 183px);
         min-height: 26rem;
     }
 
     .editor-query-strip + .spreadsheet-shell {
-        height: calc(100vh - 380px);
+        height: calc(100vh - 338px);
     }
 
     .editor-query-controls {

@@ -19,6 +19,7 @@ public enum WorkflowNodeKind
     FtpTarget,
     CsvTarget,
     ExcelTarget,
+    EmailTarget,
     EmailAlert,
     Webhook,
     Executable,

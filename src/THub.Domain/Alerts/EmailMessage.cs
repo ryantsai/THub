@@ -6,7 +6,12 @@ public sealed class EmailMessage
 {
     private readonly ReadOnlyCollection<string> _recipients;
 
-    public EmailMessage(IEnumerable<string> recipients, string subject, string body)
+    public EmailMessage(
+        IEnumerable<string> recipients,
+        string subject,
+        string body,
+        bool isBodyHtml = false,
+        EmailAttachment? attachment = null)
     {
         ArgumentNullException.ThrowIfNull(recipients);
 
@@ -46,6 +51,8 @@ public sealed class EmailMessage
         }
 
         Body = body;
+        IsBodyHtml = isBodyHtml;
+        Attachment = attachment;
         _recipients = Array.AsReadOnly(normalizedRecipients);
     }
 
@@ -54,4 +61,8 @@ public sealed class EmailMessage
     public string Subject { get; }
 
     public string Body { get; }
+
+    public bool IsBodyHtml { get; }
+
+    public EmailAttachment? Attachment { get; }
 }

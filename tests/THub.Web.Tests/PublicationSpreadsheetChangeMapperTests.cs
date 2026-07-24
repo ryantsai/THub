@@ -63,6 +63,50 @@ public sealed class PublicationSpreadsheetChangeMapperTests
     }
 
     [Fact]
+    public void TryNormalizeCellValue_AcceptsParseableDateText()
+    {
+        var column = TypedColumn(PublicationDataType.Date, isNullable: false);
+
+        var result = PublicationSpreadsheetChangeMapper.TryNormalizeCellValue(
+            "2026-07-25",
+            column,
+            out var normalized,
+            out var failure);
+
+        Assert.True(result);
+        Assert.Null(failure);
+        Assert.Equal(new DateOnly(2026, 7, 25), normalized);
+    }
+
+    [Fact]
+    public void TryNormalizeCellValue_EnforcesStringLengthAndDecimalScale()
+    {
+        var textColumn = TypedColumn(
+            PublicationDataType.String,
+            isNullable: false,
+            maximumLength: 3);
+        var decimalColumn = TypedColumn(
+            PublicationDataType.Decimal,
+            isNullable: false,
+            numericPrecision: 5,
+            numericScale: 2);
+
+        Assert.False(PublicationSpreadsheetChangeMapper.TryNormalizeCellValue(
+            "four",
+            textColumn,
+            out _,
+            out var textFailure));
+        Assert.Equal(PublicationCellValidationCode.MaximumLength, textFailure!.Code);
+
+        Assert.False(PublicationSpreadsheetChangeMapper.TryNormalizeCellValue(
+            "123.456",
+            decimalColumn,
+            out _,
+            out var decimalFailure));
+        Assert.Equal(PublicationCellValidationCode.NumericScale, decimalFailure!.Code);
+    }
+
+    [Fact]
     public void Build_UnchangedExistingRowProducesNoChange()
     {
         var version = CreateVersion(KeyColumn(), StringColumn("name", writable: true));
@@ -220,6 +264,30 @@ public sealed class PublicationSpreadsheetChangeMapperTests
                 "DisplayName",
                 ["DisplayName"],
                 PublicationLookupMode.ServerFiltered));
+
+    private static PublicationColumnDto TypedColumn(
+        PublicationDataType dataType,
+        bool isNullable,
+        int? maximumLength = null,
+        byte? numericPrecision = null,
+        byte? numericScale = null) => new(
+            1,
+            "Value",
+            "value",
+            dataType,
+            isNullable,
+            true,
+            true,
+            true,
+            true,
+            false,
+            null,
+            false,
+            false,
+            null,
+            maximumLength,
+            numericPrecision,
+            numericScale);
 
     private static Dictionary<string, object?> Values(params (string Key, object? Value)[] values) =>
         values.ToDictionary(value => value.Key, value => value.Value, StringComparer.Ordinal);

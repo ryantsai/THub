@@ -108,6 +108,23 @@ public sealed class SqlPublicationQueryPlannerTests
     }
 
     [Fact]
+    public void BuildCount_UsesApprovedParameterizedFiltersWithoutPaging()
+    {
+        var version = CreateVersion("Order]Data");
+
+        var plan = SqlPublicationQueryPlanner.BuildCount(
+            version,
+            new PublicationSourceCountQuery(
+                [new PublicationFilter("name", PublicationFilterOperator.Contains, "A%")]));
+
+        Assert.NotNull(plan);
+        Assert.Contains("SELECT COUNT_BIG(*) FROM [dbo].[Order]]Data]", plan.CommandText, StringComparison.Ordinal);
+        Assert.Contains("[Display]]Name] LIKE @__filter0", plan.CommandText, StringComparison.Ordinal);
+        Assert.DoesNotContain("ORDER BY", plan.CommandText, StringComparison.OrdinalIgnoreCase);
+        Assert.Equal("%A~%%", Assert.Single(plan.Parameters).Value);
+    }
+
+    [Fact]
     public void BuildRows_RejectsUnknownCallerAlias()
     {
         var version = CreateVersion("Orders");

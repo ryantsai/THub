@@ -37,6 +37,23 @@ public sealed class EmailPolicyAndTemplateTests
     }
 
     [Fact]
+    public void EmailAttachmentCopiesContentAndRequiresSafeBoundedCsvName()
+    {
+        var source = new byte[] { 1, 2, 3 };
+        var attachment = new EmailAttachment(
+            "results.csv",
+            "text/csv; charset=utf-8",
+            source);
+        source[0] = 9;
+
+        Assert.Equal(1, attachment.Content.Span[0]);
+        Assert.Throws<ArgumentException>(() =>
+            new EmailAttachment("../results.csv", "text/csv", new byte[] { 1 }));
+        Assert.Throws<ArgumentOutOfRangeException>(() =>
+            new EmailAttachment("results.csv", "text/csv", ReadOnlyMemory<byte>.Empty));
+    }
+
+    [Fact]
     public void RendersAllowedVariablesWithArbitraryDelimiterWhitespace()
     {
         var template = new EmailTemplate(

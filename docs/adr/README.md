@@ -26,7 +26,7 @@ Accepted ADRs are not immutable. Supersede them when evidence changes; do not si
 | [0009](0009-quartz-scheduling-and-serilog-observability.md) | Accepted | Quartz scheduling with THub run ownership and Serilog observability |
 | [0010](0010-durable-leased-workflow-execution.md) | Accepted | Immutable versions and leased durable workflow execution |
 | [0011](0011-isolated-governed-data-publications.md) | Accepted | Isolated REST publications and staged Spreadsheet editors |
-| [0012](0012-durable-email-alert-delivery.md) | Accepted | Durable Email alert outbox and SMTP delivery |
+| [0012](0012-durable-email-alert-delivery.md) | Superseded | Initial durable Email alert outbox and SMTP delivery |
 | [0013](0013-provider-neutral-database-authentication.md) | Superseded | Initial external provider-neutral referenced database credentials |
 | [0014](0014-expand-relational-and-ftp-connectors.md) | Accepted | MySQL, PostgreSQL, Oracle, and FTP/FTPS workflow connectors |
 | [0015](0015-bounded-workflow-variables-and-javascript-expressions.md) | Accepted | Bounded workflow variables and JavaScript value expressions |
@@ -40,6 +40,8 @@ Accepted ADRs are not immutable. Supersede them when evidence changes; do not si
 | [0023](0023-single-credential-encryption-key.md) | Accepted | One external AES-GCM credential encryption key with no persisted key version |
 | [0024](0024-local-csv-target-modes-and-file-name-templates.md) | Accepted | Approved-root local CSV append/replace modes and run-variable file-name templates |
 | [0025](0025-excel-and-ftp-target-modes-and-file-name-templates.md) | Accepted | Local Excel and FTP append/replace modes with staged publication and file-name templates |
+| [0026](0026-governed-editor-xlsx-export-and-page-sizing.md) | Accepted | Governed full-table XLSX export, explicit page counts, and editor pages up to 2,000 rows |
+| [0027](0027-email-workflow-destination.md) | Accepted | Bounded inline/CSV-attachment Email workflow destination and normalized SMTP rejection logging |
 
 ## Creating an ADR
 

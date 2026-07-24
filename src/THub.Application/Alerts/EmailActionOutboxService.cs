@@ -11,7 +11,8 @@ public sealed record QueueEmailActionCommand(
     string SubjectTemplate,
     string BodyTemplate,
     IReadOnlyDictionary<string, string?> Variables,
-    int MaximumAttempts = 5);
+    int MaximumAttempts = 5,
+    EmailMessage? PreparedMessage = null);
 
 public sealed record QueuedEmailActionDto(
     Guid DeliveryId,
@@ -50,8 +51,12 @@ public sealed class EmailActionOutboxService(
 
         try
         {
-            var template = new EmailTemplate(command.SubjectTemplate, command.BodyTemplate);
-            var message = template.Render(command.Recipients, command.Variables);
+            var message = command.PreparedMessage;
+            if (message is null)
+            {
+                var template = new EmailTemplate(command.SubjectTemplate, command.BodyTemplate);
+                message = template.Render(command.Recipients, command.Variables);
+            }
             var delivery = AlertDelivery.ForEmailAction(
                 command.WorkflowRunId,
                 command.WorkflowStepRunId,
@@ -78,6 +83,10 @@ public sealed class EmailActionOutboxService(
                     AlertResults.Conflict<QueuedEmailActionDto>(
                         "email.action_reference_changed",
                         "The run, step, or delivery profile changed before Email intent was saved."),
+                AlertEnqueueStatus.MessagePolicyRejected =>
+                    AlertResults.Validation<QueuedEmailActionDto>(
+                        "email.action_message_policy",
+                        "The Email message exceeds or violates the selected delivery profile policy."),
                 _ => AlertResults.Conflict<QueuedEmailActionDto>(
                     "email.action_enqueue_conflict",
                     "The Email action could not be queued because durable state changed.")

@@ -302,14 +302,34 @@ internal static class Serialization
     }
 
     public static string SerializeMessage(EmailMessage value) => JsonSerializer.Serialize(
-        new MessageContract(value.Recipients.ToArray(), value.Subject, value.Body),
+        new MessageContract(
+            value.Recipients.ToArray(),
+            value.Subject,
+            value.Body,
+            value.IsBodyHtml,
+            value.Attachment is null
+                ? null
+                : new AttachmentContract(
+                    value.Attachment.FileName,
+                    value.Attachment.MediaType,
+                    value.Attachment.Content.ToArray())),
         Options);
 
     public static EmailMessage DeserializeMessage(string value)
     {
         var contract = JsonSerializer.Deserialize<MessageContract>(value, Options)
             ?? throw new InvalidOperationException("Persisted Email message JSON is empty.");
-        return new EmailMessage(contract.Recipients, contract.Subject, contract.Body);
+        return new EmailMessage(
+            contract.Recipients,
+            contract.Subject,
+            contract.Body,
+            contract.IsBodyHtml,
+            contract.Attachment is null
+                ? null
+                : new EmailAttachment(
+                    contract.Attachment.FileName,
+                    contract.Attachment.MediaType,
+                    contract.Attachment.Content));
     }
 
     public static string SerializeStrings(IReadOnlyList<string> value) =>
@@ -332,5 +352,15 @@ internal static class Serialization
 
     private sealed record TemplateContract(string Subject, string Body);
 
-    private sealed record MessageContract(string[] Recipients, string Subject, string Body);
+    private sealed record AttachmentContract(
+        string FileName,
+        string MediaType,
+        byte[] Content);
+
+    private sealed record MessageContract(
+        string[] Recipients,
+        string Subject,
+        string Body,
+        bool IsBodyHtml = false,
+        AttachmentContract? Attachment = null);
 }

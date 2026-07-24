@@ -4,6 +4,7 @@
 - Date: 2026-07-23
 - Deciders: Project maintainers
 - Supersedes: [ADR-0007](0007-governed-data-publications.md)
+- Superseded in part by: [ADR-0026](0026-governed-editor-xlsx-export-and-page-sizing.md)
 
 ## Context
 

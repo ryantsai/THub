@@ -41,15 +41,22 @@ public sealed record PublicationRowPageDto(
     IReadOnlyList<PublicationRowDto> Rows,
     string? NextCursor);
 
+public sealed record PublicationRowCountDto(long TotalCount);
+
 public sealed record PublicationSourceReadQuery(
     int Take,
     string? Cursor,
     IReadOnlyList<PublicationFilter> Filters,
     IReadOnlyList<PublicationSort> Sorts);
 
+public sealed record PublicationSourceCountQuery(
+    IReadOnlyList<PublicationFilter> Filters);
+
 public sealed record PublicationSourceRowPage(
     IReadOnlyList<IReadOnlyDictionary<string, object?>> Rows,
     string? NextCursor);
+
+public sealed record PublicationSourceRowCount(long TotalCount);
 
 public sealed record PublicationForeignKeyLookupQuery(
     Guid PublicationId,
@@ -116,6 +123,11 @@ public sealed record PublicationSourceReadResult<T>(
 
 public interface IPublicationSourceDataReader
 {
+    Task<PublicationSourceReadResult<PublicationSourceRowCount>> CountRowsAsync(
+        PublicationVersion version,
+        PublicationSourceCountQuery query,
+        CancellationToken cancellationToken);
+
     Task<PublicationSourceReadResult<PublicationSourceRowPage>> ReadRowsAsync(
         PublicationVersion version,
         PublicationSourceReadQuery query,

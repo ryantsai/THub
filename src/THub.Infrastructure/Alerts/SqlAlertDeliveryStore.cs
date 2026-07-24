@@ -78,7 +78,7 @@ public sealed class SqlAlertDeliveryStore(
                 catch (InvalidOperationException)
                 {
                     return new AlertEnqueueStoreResult(
-                        AlertEnqueueStatus.ReferencedResourceUnavailable);
+                        AlertEnqueueStatus.MessagePolicyRejected);
                 }
 
                 db.AlertDeliveries.Add(delivery);

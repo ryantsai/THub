@@ -884,7 +884,7 @@ public sealed class BoundedWorkflowExecutionEngine
         WorkflowNodeKind.SqlTarget or WorkflowNodeKind.MySqlTarget
             or WorkflowNodeKind.PostgreSqlTarget or WorkflowNodeKind.OracleTarget
             or WorkflowNodeKind.FtpTarget or WorkflowNodeKind.CsvTarget
-            or WorkflowNodeKind.ExcelTarget =>
+            or WorkflowNodeKind.ExcelTarget or WorkflowNodeKind.EmailTarget =>
             role == WorkflowNodeRole.Target,
         WorkflowNodeKind.EmailAlert => role == WorkflowNodeRole.Action,
         _ => false

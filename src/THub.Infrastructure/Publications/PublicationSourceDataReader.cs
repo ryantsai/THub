@@ -12,6 +12,17 @@ public sealed class PublicationSourceDataReader(
     RelationalPublicationSourceDataReader relational)
     : IPublicationSourceDataReader
 {
+    public async Task<PublicationSourceReadResult<PublicationSourceRowCount>> CountRowsAsync(
+        PublicationVersion version,
+        PublicationSourceCountQuery query,
+        CancellationToken cancellationToken) =>
+        await ReadAsync(
+            version,
+            token => sqlServer.CountRowsAsync(version, query, token),
+            token => relational.CountRowsAsync(version, query, token),
+            () => new(PublicationSourceReadStatus.Unavailable, null),
+            cancellationToken).ConfigureAwait(false);
+
     public async Task<PublicationSourceReadResult<PublicationSourceRowPage>> ReadRowsAsync(
         PublicationVersion version,
         PublicationSourceReadQuery query,

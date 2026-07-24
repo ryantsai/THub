@@ -74,8 +74,23 @@ else if (Publication is not null && Version is not null && Workbook is not null 
         <div class="toolbar-divider"></div>
         <div class="toolbar-group">
             <button class="@(QueryOpen ? "active" : null)" type="button" @onclick="() => QueryOpen = !QueryOpen" disabled="@Busy"><RadzenIcon Icon="filter_alt" />@Localizer["Filter & sort"]@if (ActiveFilters.Count > 0){<span class="toolbar-count">@ActiveFilters.Count</span>}</button>
+            <a href="@($"/api/publications/{PublicationId:D}/export.xlsx")" title='@Localizer["Export all shared rows to XLSX"]'><RadzenIcon Icon="download" />@Localizer["Export XLSX"]</a>
         </div>
         <div class="toolbar-spacer"></div>
+        <div class="toolbar-pagination" aria-label='@Localizer["Table paging"]'>
+            <label>
+                <span>@Localizer["Rows per page"]</span>
+                <select value="@PageSize" @onchange="PageSizeChangedAsync" disabled="@Busy">
+                    @foreach (var size in AvailablePageSizes)
+                    {
+                        <option value="@size">@size.ToString("N0", CultureInfo.CurrentCulture)</option>
+                    }
+                </select>
+            </label>
+            <button type="button" title='@Localizer["Previous page"]' aria-label='@Localizer["Previous page"]' @onclick="PreviousWindowAsync" disabled="@(Busy || CursorHistory.Count <= 1)"><RadzenIcon Icon="chevron_left" /></button>
+            <span>@Localizer["Page {0} of {1}", CurrentPage, TotalPages] · @Localizer["{0} rows", TotalRowCount.ToString("N0", CultureInfo.CurrentCulture)]</span>
+            <button type="button" title='@Localizer["Next page"]' aria-label='@Localizer["Next page"]' @onclick="NextWindowAsync" disabled="@(Busy || NextCursor is null)"><RadzenIcon Icon="chevron_right" /></button>
+        </div>
         <div class="toolbar-group">
             <button class="@(ChangePanelOpen ? "active" : null)" type="button" @onclick="() => ChangePanelOpen = !ChangePanelOpen"><RadzenIcon Icon="history" />@Localizer["Change history"]@if (ChangeSets.Count > 0){<span class="toolbar-count">@ChangeSets.Count</span>}</button>
             <details class="sheet-info">
@@ -179,14 +194,6 @@ else if (Publication is not null && Version is not null && Workbook is not null 
         </CascadingValue>
     </section>
 
-    <div class="editor-window-nav">
-        <span>@Localizer["Page {0}", CursorHistory.Count]</span>
-        <div>
-            <RadzenButton Text='@Localizer["Previous window"]' Icon="chevron_left" Size="ButtonSize.Small" ButtonStyle="ButtonStyle.Light" Click="@PreviousWindowAsync" Disabled="@(Busy || CursorHistory.Count <= 1)" />
-            <RadzenButton Text='@Localizer["Next window"]' Icon="chevron_right" IconPosition="IconPosition.Right" Size="ButtonSize.Small" ButtonStyle="ButtonStyle.Light" Click="@NextWindowAsync" Disabled="@(Busy || NextCursor is null)" />
-        </div>
-    </div>
-
     @if (ChangePanelOpen)
     {
     <button class="drawer-scrim" type="button" aria-label='@Localizer["Close change history"]' @onclick="() => ChangePanelOpen = false"></button>
@@ -276,6 +283,7 @@ else if (Publication is not null && Version is not null && Workbook is not null 
 
 @code {
     private const string LookupCellType = "thub-publication-foreign-key";
+    private const string TypedCellType = "thub-publication-typed";
     private readonly CancellationTokenSource cancellation = new();
     private readonly Dictionary<Guid, string?> ReviewComments = [];
     private readonly List<string?> CursorHistory = [null];
@@ -297,6 +305,7 @@ else if (Publication is not null && Version is not null && Workbook is not null 
         new Dictionary<string, SpreadsheetCellType>(StringComparer.Ordinal)
         {
             [LookupCellType] = SpreadsheetCellType.Create<PublicationLookupCellRenderer, PublicationLookupCellEditor>(),
+            [TypedCellType] = SpreadsheetCellType.Create<PublicationTypedCellRenderer, PublicationTypedCellEditor>(),
         };
 
     [Parameter]
@@ -316,6 +325,8 @@ else if (Publication is not null && Version is not null && Workbook is not null 
     private PublicationChangeSetDetailDto? InspectedChangeSet { get; set; }
     private IReadOnlyList<Guid> Roles { get; set; } = [];
     private string? NextCursor { get; set; }
+    private int PageSize { get; set; } = 250;
+    private long TotalRowCount { get; set; }
     private string? Error { get; set; }
     private bool Loading { get; set; }
     private bool Busy { get; set; }
@@ -331,6 +342,16 @@ else if (Publication is not null && Version is not null && Workbook is not null 
     private bool QueryOpen { get; set; }
     private bool ChangePanelOpen { get; set; }
     private bool HasUnsavedChanges { get; set; }
+    private int CurrentPage => CursorHistory.Count;
+    private long TotalPages => Math.Max(
+        1,
+        (TotalRowCount / PageSize) + (TotalRowCount % PageSize == 0 ? 0 : 1));
+    private IReadOnlyList<int> AvailablePageSizes =>
+        Version is null
+            ? [250]
+            : [.. new[] { 250, 500, 1_000, 2_000 }
+                .Where(size => size <= Version.Settings.EditorWindowSize)
+                .DefaultIfEmpty(Version.Settings.EditorWindowSize)];
 
     private IReadOnlyList<PublicationFilterOperator> AvailableFilterOperators
     {
@@ -438,6 +459,7 @@ else if (Publication is not null && Version is not null && Workbook is not null 
             }
 
             Version = version.Value;
+            PageSize = Math.Min(250, Version.Settings.EditorWindowSize);
             Columns = Version.Columns.Where(column => column.IsReadable).OrderBy(column => column.Ordinal).ToArray();
             SpreadsheetContext = new PublicationSpreadsheetContext(DataService, PublicationId, Roles, Columns);
             CanInsert = await IsAllowedAsync(PublicationOperation.Insert);
@@ -483,7 +505,7 @@ else if (Publication is not null && Version is not null && Workbook is not null 
             PublicationId,
             Roles,
             new PublicationEditorRowsQuery(
-                Version.Settings.EditorWindowSize,
+                PageSize,
                 cursor,
                 ActiveFilters.ToArray(),
                 string.IsNullOrWhiteSpace(SortColumnAlias)
@@ -502,6 +524,18 @@ else if (Publication is not null && Version is not null && Workbook is not null 
             return new EditorRowModel(original, new Dictionary<string, object?>(original, StringComparer.Ordinal), false);
         }).ToList();
         NextCursor = result.Value.NextCursor;
+        var count = await DataService.CountEditorRowsAsync(
+            PublicationId,
+            Roles,
+            ActiveFilters.ToArray(),
+            cancellation.Token);
+        if (!count.IsSuccess || count.Value is null)
+        {
+            Error = count.Problem?.Message ?? Localizer["The total row count could not be loaded."];
+            return;
+        }
+
+        TotalRowCount = count.Value.TotalCount;
         if (SpreadsheetContext is not null)
         {
             var labelError = await SpreadsheetContext.ResolveLoadedLabelsAsync(
@@ -584,6 +618,10 @@ else if (Publication is not null && Version is not null && Workbook is not null 
                 if (column.ForeignKey is not null)
                 {
                     sheet.Cells.SetCustomType(new CellRef(rowIndex + 1, columnIndex), LookupCellType);
+                }
+                else if (editable)
+                {
+                    sheet.Cells.SetCustomType(new CellRef(rowIndex + 1, columnIndex), TypedCellType);
                 }
             }
         }
@@ -748,6 +786,24 @@ else if (Publication is not null && Version is not null && Workbook is not null 
 
         CursorHistory.RemoveAt(CursorHistory.Count - 1);
         await RunBusyAsync(() => LoadWindowAsync(CursorHistory[^1]));
+    }
+
+    private async Task PageSizeChangedAsync(ChangeEventArgs eventArgs)
+    {
+        if (!int.TryParse(
+                Convert.ToString(eventArgs.Value, CultureInfo.InvariantCulture),
+                NumberStyles.Integer,
+                CultureInfo.InvariantCulture,
+                out var requested) ||
+            !AvailablePageSizes.Contains(requested) ||
+            requested == PageSize ||
+            !await EnsureCleanWindowAsync())
+        {
+            return;
+        }
+
+        PageSize = requested;
+        await ResetQueryWindowAsync();
     }
 
     private Task ReloadWindowAsync() => RunBusyAsync(() => LoadWindowAsync(CursorHistory[^1]));

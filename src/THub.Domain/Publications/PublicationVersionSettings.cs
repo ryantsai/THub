@@ -3,7 +3,7 @@ namespace THub.Domain.Publications;
 public sealed class PublicationVersionSettings
 {
     public const int MaximumAllowedPageSize = 1_000;
-    public const int MaximumAllowedEditorWindowSize = 1_000;
+    public const int MaximumAllowedEditorWindowSize = 2_000;
     public const int MaximumAllowedRequestsPerWindow = 100_000;
     public const int MaximumAllowedRateLimitWindowSeconds = 3_600;
     public const int MaximumAllowedConcurrentRequests = 100;

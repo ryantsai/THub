@@ -235,7 +235,7 @@ public sealed class PublicationVersionTests
         Assert.Throws<ArgumentException>(() =>
             new PublicationVersionSettings(defaultPageSize: 101, maximumPageSize: 100));
         Assert.Throws<ArgumentOutOfRangeException>(() =>
-            new PublicationVersionSettings(editorWindowSize: 1_001));
+            new PublicationVersionSettings(editorWindowSize: 2_001));
         Assert.Throws<ArgumentOutOfRangeException>(() =>
             new PublicationVersionSettings(requestsPerWindow: 0));
         Assert.Throws<ArgumentOutOfRangeException>(() =>

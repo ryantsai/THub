@@ -2959,4 +2959,168 @@
   <data name="Select an approved file connection first" xml:space="preserve">
     <value>請先選擇已核准的檔案連線</value>
   </data>
+  <data name="Export all shared rows to XLSX" xml:space="preserve">
+    <value>將所有共享資料列匯出為 XLSX</value>
+  </data>
+  <data name="Export XLSX" xml:space="preserve">
+    <value>匯出 XLSX</value>
+  </data>
+  <data name="Table paging" xml:space="preserve">
+    <value>資料表分頁</value>
+  </data>
+  <data name="Rows per page" xml:space="preserve">
+    <value>每頁資料列數</value>
+  </data>
+  <data name="Previous page" xml:space="preserve">
+    <value>上一頁</value>
+  </data>
+  <data name="Next page" xml:space="preserve">
+    <value>下一頁</value>
+  </data>
+  <data name="{0} rows" xml:space="preserve">
+    <value>{0} 筆</value>
+  </data>
+  <data name="Maximum editor page rows" xml:space="preserve">
+    <value>編輯器每頁資料列上限</value>
+  </data>
+  <data name="Spreadsheet export failed" xml:space="preserve">
+    <value>試算表匯出失敗</value>
+  </data>
+  <data name="You do not have View access to this table." xml:space="preserve">
+    <value>您沒有此資料表的檢視權限。</value>
+  </data>
+  <data name="XLSX export requires an active spreadsheet publication." xml:space="preserve">
+    <value>XLSX 匯出需要已啟用的試算表發布。</value>
+  </data>
+  <data name="The active publication version is unavailable." xml:space="preserve">
+    <value>目前啟用的發布版本無法使用。</value>
+  </data>
+  <data name="The publication has no readable columns." xml:space="preserve">
+    <value>此發布沒有可讀取的資料行。</value>
+  </data>
+  <data name="This table contains {0} rows. Excel supports at most {1} data rows plus one header row per worksheet." xml:space="preserve">
+    <value>此資料表包含 {0} 筆資料。Excel 每個工作表最多支援 {1} 筆資料列，另加一列標題。</value>
+  </data>
+  <data name="The XLSX file could not be generated." xml:space="preserve">
+    <value>無法產生 XLSX 檔案。</value>
+  </data>
+  <data name="A cell exceeds Excel's {0}-character limit." xml:space="preserve">
+    <value>儲存格內容超過 Excel 的 {0} 個字元上限。</value>
+  </data>
+  <data name="The source schema changed after this publication version was activated." xml:space="preserve">
+    <value>此發布版本啟用後，來源結構已變更。</value>
+  </data>
+  <data name="The export cursor is invalid. Retry the export." xml:space="preserve">
+    <value>匯出游標無效，請重新匯出。</value>
+  </data>
+  <data name="The publication source is temporarily unavailable." xml:space="preserve">
+    <value>發布來源暫時無法使用。</value>
+  </data>
+  <data name="The total row count could not be loaded." xml:space="preserve">
+    <value>無法載入資料列總數。</value>
+  </data>
+  <data name="Email delivery profile" xml:space="preserve">
+    <value>電子郵件傳送設定檔</value>
+  </data>
+  <data name="Email destination settings" xml:space="preserve">
+    <value>電子郵件目的地設定</value>
+  </data>
+  <data name="Separate multiple addresses with commas, semicolons, or new lines." xml:space="preserve">
+    <value>多個地址請以逗號、分號或換行分隔。</value>
+  </data>
+  <data name="Delivery mode" xml:space="preserve">
+    <value>傳送模式</value>
+  </data>
+  <data name="Inline mail content" xml:space="preserve">
+    <value>內嵌於郵件內容</value>
+  </data>
+  <data name="CSV attachment" xml:space="preserve">
+    <value>CSV 附件</value>
+  </data>
+  <data name="Attachment file name" xml:space="preserve">
+    <value>附件檔名</value>
+  </data>
+  <data name="HTML body template" xml:space="preserve">
+    <value>HTML 本文範本</value>
+  </data>
+  <data name="Mail template variables" xml:space="preserve">
+    <value>郵件範本變數</value>
+  </data>
+  <data name="Place {0} exactly once where the HTML data table should appear." xml:space="preserve">
+    <value>請將 {0} 放置一次，作為 HTML 資料表顯示位置。</value>
+  </data>
+  <data name="The workflow data is attached as bounded UTF-8 CSV." xml:space="preserve">
+    <value>工作流程資料會以有界 UTF-8 CSV 附件傳送。</value>
+  </data>
+  <data name="Email" xml:space="preserve">
+    <value>電子郵件</value>
+  </data>
+  <data name="Send rows inline or as a CSV attachment" xml:space="preserve">
+    <value>將資料列內嵌於郵件或以 CSV 附件傳送</value>
+  </data>
+  <data name="ops@example.com, owner@example.com" xml:space="preserve">
+    <value>ops@example.com, owner@example.com</value>
+  </data>
+  <data name="Email target deliveryMode must be 'inline' or 'attachment'." xml:space="preserve">
+    <value>電子郵件目的地的 deliveryMode 必須為 'inline' 或 'attachment'。</value>
+  </data>
+  <data name="An inline Email target body must contain exactly one '{{data}}' placeholder." xml:space="preserve">
+    <value>內嵌電子郵件目的地的本文必須恰好包含一個 '{{data}}' 預留位置。</value>
+  </data>
+  <data name="An attachment Email target body cannot contain the '{{data}}' placeholder." xml:space="preserve">
+    <value>附件電子郵件目的地的本文不可包含 '{{data}}' 預留位置。</value>
+  </data>
+  <data name="Email target attachmentFileName must be a safe .csv leaf file name." xml:space="preserve">
+    <value>電子郵件目的地的 attachmentFileName 必須是安全的 .csv 檔名，不可包含路徑。</value>
+  </data>
+  <data name="Durable Email destination" xml:space="preserve">
+    <value>持久化電子郵件目的地</value>
+  </data>
+  <data name="Your access or the active publication changed during export. Retry after refreshing the page." xml:space="preserve">
+    <value>匯出期間您的存取權或啟用中的發布已變更。請重新整理頁面後再試一次。</value>
+  </data>
+  <data name="This table exposes {0} columns. Excel supports at most {1} columns per worksheet." xml:space="preserve">
+    <value>此資料表公開 {0} 個資料行。Excel 每個工作表最多支援 {1} 個資料行。</value>
+  </data>
+  <data name="The column metadata is unavailable." xml:space="preserve"><value>無法取得資料行中繼資料。</value></data>
+  <data name="Boolean value" xml:space="preserve"><value>布林值</value></data>
+  <data name="Empty (null)" xml:space="preserve"><value>空白（null）</value></data>
+  <data name="True" xml:space="preserve"><value>是</value></data>
+  <data name="False" xml:space="preserve"><value>否</value></data>
+  <data name="Cell value" xml:space="preserve"><value>儲存格值</value></data>
+  <data name="Use the picker or enter any date/time text that can be parsed in your locale." xml:space="preserve"><value>可使用選擇器，或輸入能以您地區設定解析的日期／時間文字。</value></data>
+  <data name="Apply" xml:space="preserve"><value>套用</value></data>
+  <data name="Choose date" xml:space="preserve"><value>選擇日期</value></data>
+  <data name="Choose time" xml:space="preserve"><value>選擇時間</value></data>
+  <data name="Choose date and time" xml:space="preserve"><value>選擇日期與時間</value></data>
+  <data name="Date" xml:space="preserve"><value>日期</value></data>
+  <data name="Date and time" xml:space="preserve"><value>日期與時間</value></data>
+  <data name="Date, time, and optional UTC offset" xml:space="preserve"><value>日期、時間及選填的 UTC 位移</value></data>
+  <data name="Time" xml:space="preserve"><value>時間</value></data>
+  <data name="Base64 value" xml:space="preserve"><value>Base64 值</value></data>
+  <data name="Optional" xml:space="preserve"><value>選填</value></data>
+  <data name="Required" xml:space="preserve"><value>必填</value></data>
+  <data name="Maximum {0} bytes" xml:space="preserve"><value>最多 {0} 個位元組</value></data>
+  <data name="Maximum {0} characters" xml:space="preserve"><value>最多 {0} 個字元</value></data>
+  <data name="Precision {0}, scale {1}" xml:space="preserve"><value>有效位數 {0}，小數位數 {1}</value></data>
+  <data name="A value is required for this column." xml:space="preserve"><value>此資料行為必填。</value></data>
+  <data name="Enter no more than {0} characters." xml:space="preserve"><value>輸入內容不得超過 {0} 個字元。</value></data>
+  <data name="The decoded value must not exceed {0} bytes." xml:space="preserve"><value>解碼後的值不得超過 {0} 個位元組。</value></data>
+  <data name="The value exceeds the database precision of {0} digits." xml:space="preserve"><value>此值超過資料庫的 {0} 位有效位數限制。</value></data>
+  <data name="Enter no more than {0} decimal places." xml:space="preserve"><value>小數位數不得超過 {0} 位。</value></data>
+  <data name="Enter a valid {0} value." xml:space="preserve"><value>請輸入有效的{0}值。</value></data>
+  <data name="Boolean" xml:space="preserve"><value>布林值</value></data>
+  <data name="Byte" xml:space="preserve"><value>位元組整數</value></data>
+  <data name="Int16" xml:space="preserve"><value>16 位元整數</value></data>
+  <data name="Int32" xml:space="preserve"><value>32 位元整數</value></data>
+  <data name="Int64" xml:space="preserve"><value>64 位元整數</value></data>
+  <data name="Decimal" xml:space="preserve"><value>十進位數值</value></data>
+  <data name="Single" xml:space="preserve"><value>單精度數值</value></data>
+  <data name="Double" xml:space="preserve"><value>雙精度數值</value></data>
+  <data name="DateTime" xml:space="preserve"><value>日期與時間</value></data>
+  <data name="DateTimeOffset" xml:space="preserve"><value>日期、時間及 UTC 位移</value></data>
+  <data name="Guid" xml:space="preserve"><value>GUID</value></data>
+  <data name="String" xml:space="preserve"><value>文字</value></data>
+  <data name="Binary" xml:space="preserve"><value>二進位資料</value></data>
+  <data name="Select a value…" xml:space="preserve"><value>請選擇值…</value></data>
 </root>

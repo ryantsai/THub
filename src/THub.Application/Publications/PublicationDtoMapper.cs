@@ -90,7 +90,10 @@ internal static class PublicationDtoMapper
             column.KeyOrdinal,
             column.IsConcurrencyToken,
             column.IsGenerated,
-            column.ForeignKey is null ? null : ToDto(column.ForeignKey));
+            column.ForeignKey is null ? null : ToDto(column.ForeignKey),
+            column.MaximumLength,
+            column.NumericPrecision,
+            column.NumericScale);
 
     private static PublicationForeignKeyDto ToDto(PublicationForeignKey foreignKey) =>
         new(

@@ -1,5 +1,7 @@
+using MailKit.Net.Smtp;
 using THub.Application.Alerts;
 using THub.Domain.Alerts;
+using THub.Domain.Runs;
 using THub.Infrastructure.Alerts;
 
 namespace THub.Infrastructure.Tests;
@@ -47,6 +49,19 @@ public sealed class MailKitAlertSenderTests
 
         Assert.Throws<InvalidOperationException>(() =>
             new MailKitAlertSender(new NullSecretResolver(), options));
+    }
+
+    [Fact]
+    public void ClassifiesSmtp552AsPermanentMessageTooLargeFailure()
+    {
+        var result = MailKitAlertSender.ClassifyCommandFailure(
+            552,
+            SmtpErrorCode.UnexpectedStatusCode);
+
+        Assert.False(result.Succeeded);
+        Assert.Equal("smtp.message_too_large", result.Error!.Code);
+        Assert.Equal(ExecutionErrorCategory.ResourceLimit, result.Error.Category);
+        Assert.False(result.Error.IsRetryable);
     }
 
     private static EmailDeliveryProfile CreateProfile() => new(

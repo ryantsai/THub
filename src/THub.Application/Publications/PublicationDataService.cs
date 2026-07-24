@@ -132,6 +132,77 @@ public sealed class PublicationDataService(
         return await ReadRowsAsync(version, validated.Value!, cancellationToken).ConfigureAwait(false);
     }
 
+    public async Task<PublicationResult<PublicationRowCountDto>> CountEditorRowsAsync(
+        Guid publicationId,
+        IReadOnlyCollection<Guid> roleIds,
+        IReadOnlyList<PublicationFilter>? filters,
+        CancellationToken cancellationToken)
+    {
+        var authorization = await RequireEditorAuthorizationService().AuthorizeAsync(
+                publicationId,
+                roleIds,
+                PublicationOperation.View,
+                cancellationToken)
+            .ConfigureAwait(false);
+        if (!authorization.IsSuccess)
+        {
+            return CopyFailure<PublicationAuthorizationDto, PublicationRowCountDto>(authorization);
+        }
+
+        var publication = await _catalogStore.FindAsync(publicationId, cancellationToken)
+            .ConfigureAwait(false);
+        if (publication is null)
+        {
+            return PublicationResultFactory.NotFound<PublicationRowCountDto>(
+                "publication.not_found",
+                "The publication was not found.");
+        }
+
+        if (publication.ActiveVersionId is not Guid versionId)
+        {
+            return PublicationResultFactory.Conflict<PublicationRowCountDto>(
+                "publication.not_active",
+                "The editor publication does not have an active version.");
+        }
+
+        var active = await FindActiveVersionAsync(
+                publicationId,
+                versionId,
+                PublicationKind.Editor,
+                cancellationToken)
+            .ConfigureAwait(false);
+        if (!active.IsSuccess)
+        {
+            return CopyFailure<PublicationVersion, PublicationRowCountDto>(active);
+        }
+
+        var version = active.Value!;
+        var validated = ValidateReadQuery(
+            version,
+            1,
+            version.Settings.EditorWindowSize,
+            null,
+            filters,
+            []);
+        if (!validated.IsSuccess)
+        {
+            return CopyFailure<PublicationSourceReadQuery, PublicationRowCountDto>(validated);
+        }
+
+        var sourceResult = await _sourceDataReader.CountRowsAsync(
+                version,
+                new PublicationSourceCountQuery(validated.Value!.Filters),
+                cancellationToken)
+            .ConfigureAwait(false);
+        if (sourceResult.Status != PublicationSourceReadStatus.Success || sourceResult.Value is null)
+        {
+            return MapSourceFailure<PublicationRowCountDto>(sourceResult.Status);
+        }
+
+        return PublicationResult<PublicationRowCountDto>.Success(
+            new PublicationRowCountDto(sourceResult.Value.TotalCount));
+    }
+
     public async Task<PublicationResult<PublicationLookupPageDto>> ReadForeignKeyLookupAsync(
         PublicationForeignKeyLookupQuery query,
         CancellationToken cancellationToken)

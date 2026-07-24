@@ -21,6 +21,10 @@ internal sealed record SqlPublicationReadPlan(
     IReadOnlyList<SqlPublicationSortTerm> Sorts,
     int Take);
 
+internal sealed record SqlPublicationCountPlan(
+    string CommandText,
+    IReadOnlyList<SqlParameter> Parameters);
+
 internal sealed record SqlPublicationPlanResult(
     SqlPublicationPlanStatus Status,
     SqlPublicationReadPlan? Plan);
@@ -29,6 +33,45 @@ internal static class SqlPublicationQueryPlanner
 {
     private const string OversizeAlias = "__thub_oversize";
     private const int AbsoluteMaximumCellBytes = 2 * 1_024 * 1_024;
+
+    public static SqlPublicationCountPlan? BuildCount(
+        PublicationVersion version,
+        PublicationSourceCountQuery query)
+    {
+        ArgumentNullException.ThrowIfNull(version);
+        ArgumentNullException.ThrowIfNull(query);
+        if (query.Filters.Count > 16)
+        {
+            return null;
+        }
+
+        var columns = version.Columns.ToDictionary(
+            column => column.PublicAlias,
+            StringComparer.OrdinalIgnoreCase);
+        var parameters = new List<SqlParameter>();
+        var whereParts = new List<string>();
+        for (var index = 0; index < query.Filters.Count; index++)
+        {
+            if (!TryBuildFilter(query.Filters[index], index, columns, parameters, out var clause))
+            {
+                return null;
+            }
+
+            whereParts.Add(clause);
+        }
+
+        var sql = new StringBuilder("SELECT COUNT_BIG(*) FROM ")
+            .Append(QuoteIdentifier(version.SourceSchema))
+            .Append('.')
+            .Append(QuoteIdentifier(version.SourceObject));
+        if (whereParts.Count > 0)
+        {
+            sql.Append(" WHERE ").AppendJoin(" AND ", whereParts.Select(part => $"({part})"));
+        }
+
+        sql.Append(';');
+        return new SqlPublicationCountPlan(sql.ToString(), parameters);
+    }
 
     public static SqlPublicationPlanResult BuildRows(
         PublicationVersion version,

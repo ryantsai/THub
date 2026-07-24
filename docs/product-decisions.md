@@ -7,7 +7,7 @@ These choices materially affect security, deployment, execution semantics, or pe
 | PD-001 | Are web, worker, SQL Server, and users in one AD domain/forest, and will IIS host the web app? | IIS, one domain-compatible intranet environment | Production authentication/deployment design |
 | PD-003 | What Windows identity runs the worker, and do file connections include UNC shares? | Dedicated least-privilege service identity; local roots only | File connector, Kerberos/delegation, ACL deployment |
 | PD-007 | Is `.xlsx`/`.xlsm` sufficient, or is legacy `.xls` mandatory? | Modern workbook formats only | Excel connector/library scope |
-| PD-009 | Required run/log/audit retention and data classification/masking policy? | Store bounded metadata; no row payload in logs | Telemetry schema, cleanup jobs, previews, publications |
+| PD-009 | Required run/log/audit/Email-outbox retention and data classification/masking policy? | Store bounded metadata and governed bounded Email-destination payloads; no row payload in logs | Telemetry schema, cleanup jobs, previews, publications, Email outbox capacity/retention |
 
 ## Resolved decisions
 

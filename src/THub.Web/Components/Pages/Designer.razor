@@ -374,9 +374,9 @@ else
                             </div>
                         </section>
                     }
-                    @if (SelectedNode.Kind == WorkflowNodeKind.EmailAlert)
+                    @if (SelectedNode.Kind is WorkflowNodeKind.EmailAlert or WorkflowNodeKind.EmailTarget)
                     {
-                        <label>Email delivery profile
+                        <label>@Localizer["Email delivery profile"]
                             <select value="@(GetSettingString(SelectedNode, "profileId"))" @onchange="SetSelectedEmailProfile">
                                 <option value="">@Localizer["Select an enabled profile…"]</option>
                                 @foreach (var profile in EmailProfiles.Where(profile => profile.IsEnabled))
@@ -385,6 +385,46 @@ else
                                 }
                             </select>
                         </label>
+                    }
+                    @if (SelectedNode.Kind == WorkflowNodeKind.EmailTarget)
+                    {
+                        <section class="csv-target-editor" aria-label='@Localizer["Email destination settings"]'>
+                            <label>@Localizer["Recipients"]
+                                <textarea rows="2" placeholder='@Localizer["ops@example.com, owner@example.com"]' @onchange="SetEmailRecipients">@GetEmailRecipients(SelectedNode)</textarea>
+                                <small>@Localizer["Separate multiple addresses with commas, semicolons, or new lines."]</small>
+                            </label>
+                            <label>@Localizer["Delivery mode"]
+                                <select value="@GetEmailTargetDeliveryMode(SelectedNode)" @onchange="SetEmailTargetDeliveryMode">
+                                    <option value="inline">@Localizer["Inline mail content"]</option>
+                                    <option value="attachment">@Localizer["CSV attachment"]</option>
+                                </select>
+                            </label>
+                            @if (GetEmailTargetDeliveryMode(SelectedNode) == "attachment")
+                            {
+                                <label>@Localizer["Attachment file name"]
+                                    <input value="@GetSettingString(SelectedNode, "attachmentFileName")" placeholder="thub-data.csv" @onchange='eventArgs => SetSettingString(SelectedNode, "attachmentFileName", eventArgs.Value?.ToString())' />
+                                </label>
+                            }
+                            <label>@Localizer["Subject template"]
+                                <input value="@GetSettingString(SelectedNode, "subject")" @onchange='eventArgs => SetSettingString(SelectedNode, "subject", eventArgs.Value?.ToString())' />
+                            </label>
+                            <label>@Localizer["HTML body template"]
+                                <textarea rows="7" @onchange='eventArgs => SetSettingString(SelectedNode, "body", eventArgs.Value?.ToString())'>@GetSettingString(SelectedNode, "body")</textarea>
+                            </label>
+                            <div class="csv-template-help">
+                                <strong>@Localizer["Mail template variables"]</strong>
+                                <code>{{run.id}}</code>
+                                @if (GetEmailTargetDeliveryMode(SelectedNode) == "inline")
+                                {
+                                    <code>{{data}}</code>
+                                    <small>@Localizer["Place {0} exactly once where the HTML data table should appear.", "{{data}}"]</small>
+                                }
+                                else
+                                {
+                                    <small>@Localizer["The workflow data is attached as bounded UTF-8 CSV."]</small>
+                                }
+                            </div>
+                        </section>
                     }
                     @if (SelectedNode.Kind is WorkflowNodeKind.Webhook or WorkflowNodeKind.Executable)
                     {
@@ -591,7 +631,7 @@ else
                     <strong>@Localizer["{0} validation issues", ValidationIssues.Count]</strong>
                     @foreach (var issue in ValidationIssues.Take(8))
                     {
-                        <button type="button" @onclick="() => SelectIssue(issue)"><span>@issue.Code</span>@issue.Message</button>
+                        <button type="button" @onclick="() => SelectIssue(issue)"><span>@issue.Code</span>@Localizer[issue.Message]</button>
                     }
                 </div>
             }
@@ -675,7 +715,8 @@ else
             new("Oracle target", "Insert, upsert, or delete approved rows", WorkflowNodeKind.OracleTarget, "storage", "blue", true),
             new("FTP target", "Create CSV, tab text, or Excel", WorkflowNodeKind.FtpTarget, "cloud_upload", "green", true),
             new("CSV target", "Write beneath an approved root", WorkflowNodeKind.CsvTarget, "description", "green", true),
-            new("Excel target", "Write an XLSX workbook", WorkflowNodeKind.ExcelTarget, "grid_on", "green", true)]),
+            new("Excel target", "Write an XLSX workbook", WorkflowNodeKind.ExcelTarget, "grid_on", "green", true),
+            new(Localizer["Email"], Localizer["Send rows inline or as a CSV attachment"], WorkflowNodeKind.EmailTarget, "forward_to_inbox", "rose", true)]),
         new("Actions", [
             new("Email alert", "Send an email when something happens", WorkflowNodeKind.EmailAlert, "mail", "rose", true),
             new("Webhook", "Call an authorized trusted destination", WorkflowNodeKind.Webhook, "webhook", "rose", TrustedActions.Any(action => action.Kind == TrustedActionKind.Webhook)),
@@ -1898,6 +1939,51 @@ else
         }
     }
 
+    private static string GetEmailRecipients(DesignerNode node) =>
+        string.Join(", ", GetSettingStringArray(node, "recipients") ?? []);
+
+    private void SetEmailRecipients(ChangeEventArgs eventArgs)
+    {
+        if (SelectedNode is null)
+        {
+            return;
+        }
+
+        var recipients = (eventArgs.Value?.ToString() ?? string.Empty)
+            .Split([',', ';', '\r', '\n'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+        SetSettingStringArray(SelectedNode, "recipients", recipients);
+    }
+
+    private static string GetEmailTargetDeliveryMode(DesignerNode node) =>
+        GetSettingString(node, "deliveryMode") ?? "inline";
+
+    private void SetEmailTargetDeliveryMode(ChangeEventArgs eventArgs)
+    {
+        var mode = eventArgs.Value?.ToString();
+        if (SelectedNode is null || mode is not ("inline" or "attachment"))
+        {
+            return;
+        }
+
+        var body = GetSettingString(SelectedNode, "body") ?? string.Empty;
+        var settings = ParseSettings(SelectedNode);
+        settings["deliveryMode"] = mode;
+        if (mode == "attachment")
+        {
+            settings["body"] = body.Replace("{{data}}", string.Empty, StringComparison.Ordinal);
+        }
+        else if (!body.Contains("{{data}}", StringComparison.Ordinal))
+        {
+            settings["body"] = string.IsNullOrWhiteSpace(body)
+                ? "{{data}}"
+                : body + Environment.NewLine + "{{data}}";
+        }
+        SelectedNode.SettingsJson = settings.ToJsonString();
+        ValidationIssues = [];
+    }
+
     private void SetSelectedTrustedAction(ChangeEventArgs eventArgs)
     {
         if (SelectedNode is not null)
@@ -1939,7 +2025,7 @@ else
             ValidationIssues.Count == 0 ? "Workflow is valid" : "Validation needs attention",
             ValidationIssues.Count == 0
                 ? $"{Nodes.Count} steps and {Edges.Count} links are ready to publish."
-                : ValidationIssues[0].Message);
+                : Localizer[ValidationIssues[0].Message].Value);
     }
 
     private async Task SaveDraftAsync()
@@ -2133,7 +2219,9 @@ else
         Notifications.Notify(
             NotificationSeverity.Error,
             title,
-            issues.Count == 0 ? "The operation failed." : string.Join(" ", issues.Take(3).Select(issue => issue.Message)));
+            issues.Count == 0
+                ? "The operation failed."
+                : string.Join(" ", issues.Take(3).Select(issue => Localizer[issue.Message].Value)));
     }
 
     private void SelectIssue(GraphValidationIssue issue)
@@ -2219,6 +2307,7 @@ else
         WorkflowNodeKind.FtpTarget => "{\"connectionId\":\"\",\"remotePath\":\"/outbound/export_{runStartedAtUtc:yyyyMMdd_HHmmss_fff}.csv\",\"format\":\"csv\",\"includeHeader\":true,\"delimiter\":\",\",\"mode\":\"createNew\"}",
         WorkflowNodeKind.CsvTarget => "{\"connectionId\":\"\",\"relativePath\":\"export_{runStartedAtUtc:yyyyMMdd_HHmmss_fff}.csv\",\"mode\":\"createNew\",\"includeHeader\":true,\"delimiter\":\",\"}",
         WorkflowNodeKind.ExcelTarget => "{\"connectionId\":\"\",\"relativePath\":\"export_{runStartedAtUtc:yyyyMMdd_HHmmss_fff}.xlsx\",\"worksheet\":\"Results\",\"includeHeader\":true,\"mode\":\"createNew\"}",
+        WorkflowNodeKind.EmailTarget => "{\"profileId\":\"\",\"recipients\":[],\"subject\":\"THub data export {{run.id}}\",\"body\":\"<p>Workflow data:</p>{{data}}\",\"deliveryMode\":\"inline\",\"attachmentFileName\":\"thub-data.csv\",\"maximumAttempts\":5}",
         WorkflowNodeKind.EmailAlert => "{\"profileId\":\"\",\"recipients\":[],\"subject\":\"THub workflow notification\",\"body\":\"The workflow reached this Email action.\",\"maximumAttempts\":5}",
         WorkflowNodeKind.Webhook => JsonSerializer.Serialize(new
         {
@@ -2232,7 +2321,7 @@ else
         _ => "{}"
     };
 
-    private static string SubtitleFor(WorkflowNodeKind kind) => kind switch
+    private string SubtitleFor(WorkflowNodeKind kind) => kind switch
     {
         WorkflowNodeKind.SqlSource => "Approved SQL table",
         WorkflowNodeKind.MySqlSource => "Approved MySQL object",
@@ -2251,6 +2340,7 @@ else
         WorkflowNodeKind.FtpTarget => "FTP file output",
         WorkflowNodeKind.CsvTarget => "CSV file output",
         WorkflowNodeKind.ExcelTarget => "Excel output",
+        WorkflowNodeKind.EmailTarget => Localizer["Durable Email destination"],
         WorkflowNodeKind.EmailAlert => "Durable Email outbox",
         WorkflowNodeKind.Webhook => "Trusted webhook",
         WorkflowNodeKind.Executable => "Trusted executable",
@@ -2270,6 +2360,7 @@ else
         WorkflowNodeKind.SelectColumns => "schema",
         WorkflowNodeKind.FilterRows => "filter_alt",
         WorkflowNodeKind.Join => "join_inner",
+        WorkflowNodeKind.EmailTarget => "forward_to_inbox",
         WorkflowNodeKind.EmailAlert => "mail",
         WorkflowNodeKind.Webhook => "webhook",
         _ => "terminal"
@@ -2285,7 +2376,7 @@ else
         WorkflowNodeKind.CsvSource or WorkflowNodeKind.CsvTarget or WorkflowNodeKind.ExcelSource or WorkflowNodeKind.ExcelTarget => "green",
         WorkflowNodeKind.SelectColumns or WorkflowNodeKind.Join => "violet",
         WorkflowNodeKind.FilterRows => "amber",
-        WorkflowNodeKind.EmailAlert or WorkflowNodeKind.Webhook => "rose",
+        WorkflowNodeKind.EmailTarget or WorkflowNodeKind.EmailAlert or WorkflowNodeKind.Webhook => "rose",
         _ => "slate"
     };
 

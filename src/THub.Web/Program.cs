@@ -1,6 +1,7 @@
 using System.Globalization;
 using Microsoft.AspNetCore.Authentication.Negotiate;
 using Microsoft.AspNetCore.Localization;
+using Microsoft.Extensions.Localization;
 using Radzen;
 using Serilog;
 using THub.Application;
@@ -9,6 +10,8 @@ using THub.Domain.Auditing;
 using THub.Infrastructure;
 using THub.Web;
 using THub.Web.Components;
+using THub.Web.Localization;
+using THub.Web.Publications;
 using THub.Web.Security;
 
 Log.Logger = new LoggerConfiguration()
@@ -70,6 +73,7 @@ try
     }
     builder.Services.AddTHubAuthorization(builder.Configuration);
     builder.Services.AddScoped<IAuditViewerAuthorization, AuditViewerAuthorization>();
+    builder.Services.AddScoped<PublicationXlsxExportService>();
     builder.Services.AddRadzenComponents();
     builder.Services.AddWebApplication();
     builder.Services.AddWebInfrastructure(builder.Configuration);
@@ -132,6 +136,33 @@ try
         status = "ready",
         timestampUtc = DateTimeOffset.UtcNow
     })).RequireAuthorization(Permissions.WorkflowView);
+    app.MapGet(
+        "/api/publications/{publicationId:guid}/export.xlsx",
+        async (
+            Guid publicationId,
+            HttpContext context,
+            PublicationRoleResolver roleResolver,
+            PublicationXlsxExportService exportService,
+            IStringLocalizer<SharedResource> localizer,
+            CancellationToken cancellationToken) =>
+        {
+            var roles = await roleResolver.ResolveAsync(context.User, cancellationToken);
+            var export = await exportService.CreateAsync(publicationId, roles, cancellationToken);
+            if (export.Stream is null)
+            {
+                return (IResult)Results.Problem(
+                    statusCode: export.StatusCode,
+                    title: localizer["Spreadsheet export failed"],
+                    detail: export.Error);
+            }
+
+            return Results.Stream(
+                export.Stream,
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                export.FileName,
+                enableRangeProcessing: false);
+        })
+        .RequireAuthorization();
     app.MapRazorComponents<App>()
         .AddInteractiveServerRenderMode();
 

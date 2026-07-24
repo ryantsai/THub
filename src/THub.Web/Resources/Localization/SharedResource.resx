@@ -2959,4 +2959,168 @@ subsidiary.example.com</value>
   <data name="Select an approved file connection first" xml:space="preserve">
     <value>Select an approved file connection first</value>
   </data>
+  <data name="Export all shared rows to XLSX" xml:space="preserve">
+    <value>Export all shared rows to XLSX</value>
+  </data>
+  <data name="Export XLSX" xml:space="preserve">
+    <value>Export XLSX</value>
+  </data>
+  <data name="Table paging" xml:space="preserve">
+    <value>Table paging</value>
+  </data>
+  <data name="Rows per page" xml:space="preserve">
+    <value>Rows per page</value>
+  </data>
+  <data name="Previous page" xml:space="preserve">
+    <value>Previous page</value>
+  </data>
+  <data name="Next page" xml:space="preserve">
+    <value>Next page</value>
+  </data>
+  <data name="{0} rows" xml:space="preserve">
+    <value>{0} rows</value>
+  </data>
+  <data name="Maximum editor page rows" xml:space="preserve">
+    <value>Maximum editor page rows</value>
+  </data>
+  <data name="Spreadsheet export failed" xml:space="preserve">
+    <value>Spreadsheet export failed</value>
+  </data>
+  <data name="You do not have View access to this table." xml:space="preserve">
+    <value>You do not have View access to this table.</value>
+  </data>
+  <data name="XLSX export requires an active spreadsheet publication." xml:space="preserve">
+    <value>XLSX export requires an active spreadsheet publication.</value>
+  </data>
+  <data name="The active publication version is unavailable." xml:space="preserve">
+    <value>The active publication version is unavailable.</value>
+  </data>
+  <data name="The publication has no readable columns." xml:space="preserve">
+    <value>The publication has no readable columns.</value>
+  </data>
+  <data name="This table contains {0} rows. Excel supports at most {1} data rows plus one header row per worksheet." xml:space="preserve">
+    <value>This table contains {0} rows. Excel supports at most {1} data rows plus one header row per worksheet.</value>
+  </data>
+  <data name="The XLSX file could not be generated." xml:space="preserve">
+    <value>The XLSX file could not be generated.</value>
+  </data>
+  <data name="A cell exceeds Excel's {0}-character limit." xml:space="preserve">
+    <value>A cell exceeds Excel's {0}-character limit.</value>
+  </data>
+  <data name="The source schema changed after this publication version was activated." xml:space="preserve">
+    <value>The source schema changed after this publication version was activated.</value>
+  </data>
+  <data name="The export cursor is invalid. Retry the export." xml:space="preserve">
+    <value>The export cursor is invalid. Retry the export.</value>
+  </data>
+  <data name="The publication source is temporarily unavailable." xml:space="preserve">
+    <value>The publication source is temporarily unavailable.</value>
+  </data>
+  <data name="The total row count could not be loaded." xml:space="preserve">
+    <value>The total row count could not be loaded.</value>
+  </data>
+  <data name="Email delivery profile" xml:space="preserve">
+    <value>Email delivery profile</value>
+  </data>
+  <data name="Email destination settings" xml:space="preserve">
+    <value>Email destination settings</value>
+  </data>
+  <data name="Separate multiple addresses with commas, semicolons, or new lines." xml:space="preserve">
+    <value>Separate multiple addresses with commas, semicolons, or new lines.</value>
+  </data>
+  <data name="Delivery mode" xml:space="preserve">
+    <value>Delivery mode</value>
+  </data>
+  <data name="Inline mail content" xml:space="preserve">
+    <value>Inline mail content</value>
+  </data>
+  <data name="CSV attachment" xml:space="preserve">
+    <value>CSV attachment</value>
+  </data>
+  <data name="Attachment file name" xml:space="preserve">
+    <value>Attachment file name</value>
+  </data>
+  <data name="HTML body template" xml:space="preserve">
+    <value>HTML body template</value>
+  </data>
+  <data name="Mail template variables" xml:space="preserve">
+    <value>Mail template variables</value>
+  </data>
+  <data name="Place {0} exactly once where the HTML data table should appear." xml:space="preserve">
+    <value>Place {0} exactly once where the HTML data table should appear.</value>
+  </data>
+  <data name="The workflow data is attached as bounded UTF-8 CSV." xml:space="preserve">
+    <value>The workflow data is attached as bounded UTF-8 CSV.</value>
+  </data>
+  <data name="Email" xml:space="preserve">
+    <value>Email</value>
+  </data>
+  <data name="Send rows inline or as a CSV attachment" xml:space="preserve">
+    <value>Send rows inline or as a CSV attachment</value>
+  </data>
+  <data name="ops@example.com, owner@example.com" xml:space="preserve">
+    <value>ops@example.com, owner@example.com</value>
+  </data>
+  <data name="Email target deliveryMode must be 'inline' or 'attachment'." xml:space="preserve">
+    <value>Email target deliveryMode must be 'inline' or 'attachment'.</value>
+  </data>
+  <data name="An inline Email target body must contain exactly one '{{data}}' placeholder." xml:space="preserve">
+    <value>An inline Email target body must contain exactly one '{{data}}' placeholder.</value>
+  </data>
+  <data name="An attachment Email target body cannot contain the '{{data}}' placeholder." xml:space="preserve">
+    <value>An attachment Email target body cannot contain the '{{data}}' placeholder.</value>
+  </data>
+  <data name="Email target attachmentFileName must be a safe .csv leaf file name." xml:space="preserve">
+    <value>Email target attachmentFileName must be a safe .csv leaf file name.</value>
+  </data>
+  <data name="Durable Email destination" xml:space="preserve">
+    <value>Durable Email destination</value>
+  </data>
+  <data name="Your access or the active publication changed during export. Retry after refreshing the page." xml:space="preserve">
+    <value>Your access or the active publication changed during export. Retry after refreshing the page.</value>
+  </data>
+  <data name="This table exposes {0} columns. Excel supports at most {1} columns per worksheet." xml:space="preserve">
+    <value>This table exposes {0} columns. Excel supports at most {1} columns per worksheet.</value>
+  </data>
+  <data name="The column metadata is unavailable." xml:space="preserve"><value>The column metadata is unavailable.</value></data>
+  <data name="Boolean value" xml:space="preserve"><value>Boolean value</value></data>
+  <data name="Empty (null)" xml:space="preserve"><value>Empty (null)</value></data>
+  <data name="True" xml:space="preserve"><value>True</value></data>
+  <data name="False" xml:space="preserve"><value>False</value></data>
+  <data name="Cell value" xml:space="preserve"><value>Cell value</value></data>
+  <data name="Use the picker or enter any date/time text that can be parsed in your locale." xml:space="preserve"><value>Use the picker or enter any date/time text that can be parsed in your locale.</value></data>
+  <data name="Apply" xml:space="preserve"><value>Apply</value></data>
+  <data name="Choose date" xml:space="preserve"><value>Choose date</value></data>
+  <data name="Choose time" xml:space="preserve"><value>Choose time</value></data>
+  <data name="Choose date and time" xml:space="preserve"><value>Choose date and time</value></data>
+  <data name="Date" xml:space="preserve"><value>Date</value></data>
+  <data name="Date and time" xml:space="preserve"><value>Date and time</value></data>
+  <data name="Date, time, and optional UTC offset" xml:space="preserve"><value>Date, time, and optional UTC offset</value></data>
+  <data name="Time" xml:space="preserve"><value>Time</value></data>
+  <data name="Base64 value" xml:space="preserve"><value>Base64 value</value></data>
+  <data name="Optional" xml:space="preserve"><value>Optional</value></data>
+  <data name="Required" xml:space="preserve"><value>Required</value></data>
+  <data name="Maximum {0} bytes" xml:space="preserve"><value>Maximum {0} bytes</value></data>
+  <data name="Maximum {0} characters" xml:space="preserve"><value>Maximum {0} characters</value></data>
+  <data name="Precision {0}, scale {1}" xml:space="preserve"><value>Precision {0}, scale {1}</value></data>
+  <data name="A value is required for this column." xml:space="preserve"><value>A value is required for this column.</value></data>
+  <data name="Enter no more than {0} characters." xml:space="preserve"><value>Enter no more than {0} characters.</value></data>
+  <data name="The decoded value must not exceed {0} bytes." xml:space="preserve"><value>The decoded value must not exceed {0} bytes.</value></data>
+  <data name="The value exceeds the database precision of {0} digits." xml:space="preserve"><value>The value exceeds the database precision of {0} digits.</value></data>
+  <data name="Enter no more than {0} decimal places." xml:space="preserve"><value>Enter no more than {0} decimal places.</value></data>
+  <data name="Enter a valid {0} value." xml:space="preserve"><value>Enter a valid {0} value.</value></data>
+  <data name="Boolean" xml:space="preserve"><value>Boolean</value></data>
+  <data name="Byte" xml:space="preserve"><value>Byte</value></data>
+  <data name="Int16" xml:space="preserve"><value>16-bit integer</value></data>
+  <data name="Int32" xml:space="preserve"><value>32-bit integer</value></data>
+  <data name="Int64" xml:space="preserve"><value>64-bit integer</value></data>
+  <data name="Decimal" xml:space="preserve"><value>Decimal</value></data>
+  <data name="Single" xml:space="preserve"><value>Single-precision number</value></data>
+  <data name="Double" xml:space="preserve"><value>Double-precision number</value></data>
+  <data name="DateTime" xml:space="preserve"><value>Date and time</value></data>
+  <data name="DateTimeOffset" xml:space="preserve"><value>Date, time, and UTC offset</value></data>
+  <data name="Guid" xml:space="preserve"><value>GUID</value></data>
+  <data name="String" xml:space="preserve"><value>Text</value></data>
+  <data name="Binary" xml:space="preserve"><value>Binary</value></data>
+  <data name="Select a value…" xml:space="preserve"><value>Select a value…</value></data>
 </root>

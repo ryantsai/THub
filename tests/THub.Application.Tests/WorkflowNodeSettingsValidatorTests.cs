@@ -28,6 +28,7 @@ public sealed class WorkflowNodeSettingsValidatorTests
     [InlineData(WorkflowNodeKind.FtpTarget, """{"connectionId":"11111111-1111-1111-1111-111111111111","remotePath":"/outbound/orders_{runStartedAtUtc:yyyyMMdd}.xlsx","format":"excel","worksheet":"Orders","includeHeader":true,"mode":"replace"}""")]
     [InlineData(WorkflowNodeKind.CsvTarget, """{"connectionId":"11111111-1111-1111-1111-111111111111","relativePath":"outbound/orders_{runStartedAtUtc:yyyyMMdd_HHmmss}.csv","includeHeader":true,"mode":"replace"}""")]
     [InlineData(WorkflowNodeKind.ExcelTarget, """{"connectionId":"11111111-1111-1111-1111-111111111111","relativePath":"outbound/orders_{runId}.xlsx","worksheet":"Orders","mode":"append"}""")]
+    [InlineData(WorkflowNodeKind.EmailTarget, """{"profileId":"11111111-1111-1111-1111-111111111111","recipients":["owner@example.test"],"subject":"Data {{run.id}}","body":"<p>Results</p>{{data}}","deliveryMode":"inline","attachmentFileName":"results.csv"}""")]
     [InlineData(WorkflowNodeKind.EmailAlert, """{"profileId":"11111111-1111-1111-1111-111111111111","recipients":["ops@example.test"],"subject":"Run {{run.id}}","body":"Done"}""")]
     [InlineData(WorkflowNodeKind.Webhook, """{"trustedActionId":"11111111-1111-1111-1111-111111111111","body":"{}"}""")]
     [InlineData(WorkflowNodeKind.Executable, """{"trustedActionId":"11111111-1111-1111-1111-111111111111"}""")]
@@ -274,6 +275,38 @@ public sealed class WorkflowNodeSettingsValidatorTests
         var settings = Assert.IsType<EmailAlertNodeSettings>(_validator.Parse(node));
 
         Assert.Contains(Environment.NewLine.Length == 2 ? "\n" : Environment.NewLine, settings.Body);
+    }
+
+    [Fact]
+    public void InlineEmailTargetRequiresExactlyOneDataPlaceholder()
+    {
+        var node = new WorkflowNode(
+            "email-target",
+            WorkflowNodeKind.EmailTarget,
+            "Email data",
+            0,
+            0,
+            """{"profileId":"11111111-1111-1111-1111-111111111111","recipients":["ops@example.test"],"subject":"Data","body":"No data slot","deliveryMode":"inline","attachmentFileName":"results.csv"}""");
+
+        var exception = Assert.Throws<WorkflowNodeSettingsException>(() => _validator.Parse(node));
+
+        Assert.Equal("node.email-target.data-placeholder", exception.Code);
+    }
+
+    [Fact]
+    public void AttachmentEmailTargetRequiresSafeCsvLeafName()
+    {
+        var node = new WorkflowNode(
+            "email-target",
+            WorkflowNodeKind.EmailTarget,
+            "Email data",
+            0,
+            0,
+            """{"profileId":"11111111-1111-1111-1111-111111111111","recipients":["ops@example.test"],"subject":"Data","body":"Attached","deliveryMode":"attachment","attachmentFileName":"../results.csv"}""");
+
+        var exception = Assert.Throws<WorkflowNodeSettingsException>(() => _validator.Parse(node));
+
+        Assert.Equal("node.email-target.attachment-name.invalid", exception.Code);
     }
 
     private static string SqlSourceSettings() =>

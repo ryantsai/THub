@@ -101,6 +101,7 @@ public static class DependencyInjection
         services.AddScoped<IWorkflowNodeExecutor, FtpTargetNodeExecutor>();
         services.AddScoped<IWorkflowNodeExecutor, CsvTargetNodeExecutor>();
         services.AddScoped<IWorkflowNodeExecutor, ExcelTargetNodeExecutor>();
+        services.AddScoped<IWorkflowNodeExecutor, EmailTargetNodeExecutor>();
         services.AddScoped<IWorkflowNodeExecutor, EmailAlertNodeExecutor>();
         services.AddHttpClient(WebhookNodeExecutor.ClientName)
             .ConfigureHttpClient(client => client.Timeout = Timeout.InfiniteTimeSpan)

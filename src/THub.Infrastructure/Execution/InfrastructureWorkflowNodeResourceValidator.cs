@@ -82,6 +82,9 @@ public sealed class InfrastructureWorkflowNodeResourceValidator(
             case EmailAlertNodeSettings email:
                 await ValidateEmailAsync(email, cancellationToken).ConfigureAwait(false);
                 break;
+            case EmailTargetNodeSettings emailTarget:
+                await ValidateEmailTargetAsync(emailTarget, cancellationToken).ConfigureAwait(false);
+                break;
             case WebhookNodeSettings webhook:
                 _ = await trustedActions.ResolveAsync(
                     webhook.TrustedActionId,
@@ -359,6 +362,59 @@ public sealed class InfrastructureWorkflowNodeResourceValidator(
             throw ExecutionFailure.Configuration(
                 "execution.email.policy",
                 "The Email action does not satisfy its delivery profile policy.",
+                exception);
+        }
+    }
+
+    private async Task ValidateEmailTargetAsync(
+        EmailTargetNodeSettings settings,
+        CancellationToken cancellationToken)
+    {
+        var profile = await _emailProfiles.FindProfileAsync(settings.ProfileId, cancellationToken)
+            .ConfigureAwait(false);
+        if (profile is null)
+        {
+            throw ExecutionFailure.Configuration(
+                "execution.email-target.profile.not_found",
+                "The configured Email delivery profile was not found.");
+        }
+
+        if (!profile.IsEnabled)
+        {
+            throw ExecutionFailure.Configuration(
+                "execution.email-target.profile.disabled",
+                "The configured Email delivery profile is disabled.");
+        }
+
+        try
+        {
+            var body = settings.DeliveryMode == EmailTargetDeliveryMode.Inline
+                ? settings.Body.Replace("{{data}}", "<table></table>", StringComparison.Ordinal)
+                : settings.Body;
+            var rendered = new EmailTemplate(settings.Subject, body).Render(
+                settings.Recipients,
+                new Dictionary<string, string?>(StringComparer.Ordinal)
+                {
+                    ["run.id"] = Guid.Empty.ToString("D")
+                });
+            var attachment = settings.DeliveryMode == EmailTargetDeliveryMode.Attachment
+                ? new EmailAttachment(
+                    settings.AttachmentFileName,
+                    "text/csv; charset=utf-8",
+                    new byte[] { 0 })
+                : null;
+            profile.ValidateMessage(new EmailMessage(
+                rendered.Recipients,
+                rendered.Subject,
+                rendered.Body,
+                isBodyHtml: true,
+                attachment));
+        }
+        catch (Exception exception) when (exception is ArgumentException or InvalidOperationException)
+        {
+            throw ExecutionFailure.Configuration(
+                "execution.email-target.policy",
+                "The Email target does not satisfy its delivery profile or template policy.",
                 exception);
         }
     }

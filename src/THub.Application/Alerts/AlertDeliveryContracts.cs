@@ -20,6 +20,7 @@ public enum AlertEnqueueStatus
     Enqueued,
     AlreadyEnqueued,
     ReferencedResourceUnavailable,
+    MessagePolicyRejected,
     Conflict
 }
 

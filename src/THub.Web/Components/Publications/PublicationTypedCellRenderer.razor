@@ -1,0 +1,8 @@
+@using Radzen.Blazor.Spreadsheet
+
+<span class="publication-typed-value">@Context.FormattedValue</span>
+
+@code {
+    [Parameter]
+    public SpreadsheetCellRenderContext Context { get; set; } = null!;
+}

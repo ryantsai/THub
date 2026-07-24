@@ -22,6 +22,65 @@ public sealed class RelationalPublicationSourceDataReader(
     IPublicationSourceSchemaInspector schemaInspector,
     ILogger<RelationalPublicationSourceDataReader> logger)
 {
+    public async Task<PublicationSourceReadResult<PublicationSourceRowCount>> CountRowsAsync(
+        PublicationVersion version,
+        PublicationSourceCountQuery query,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(version);
+        ArgumentNullException.ThrowIfNull(query);
+        try
+        {
+            var source = await LoadAndValidateAsync(version, cancellationToken).ConfigureAwait(false);
+            if (source.Status != PublicationSourceReadStatus.Success || source.Source is null)
+            {
+                return new(source.Status, null);
+            }
+
+            var plan = RelationalPublicationQueryPlanner.BuildCount(
+                source.Source.Configuration.Kind,
+                version,
+                query);
+            if (plan is null)
+            {
+                return UnavailableCount();
+            }
+
+            await using var connection = await connectionFactory.CreateAsync(
+                    source.Source.Configuration,
+                    cancellationToken)
+                .ConfigureAwait(false);
+            await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
+            await using var command = connection.CreateCommand();
+            ConfigureCommand(
+                command,
+                source.Source.Configuration,
+                version.Settings.CommandTimeoutSeconds);
+            command.CommandText = plan.CommandText;
+            AddParameters(command, plan.Parameters);
+            var scalar = await command.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false);
+            scalar = scalar is OracleDecimal oracleCount ? oracleCount.Value : scalar;
+            var totalCount = Convert.ToInt64(scalar, CultureInfo.InvariantCulture);
+            return totalCount < 0
+                ? UnavailableCount()
+                : new(
+                    PublicationSourceReadStatus.Success,
+                    new PublicationSourceRowCount(totalCount));
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception exception) when (IsExpectedSourceFailure(exception))
+        {
+            logger.LogWarning(
+                exception,
+                "Relational publication source count failed for version {PublicationVersionId}.",
+                version.Id);
+            return UnavailableCount();
+        }
+    }
+
     public async Task<PublicationSourceReadResult<PublicationSourceRowPage>> ReadRowsAsync(
         PublicationVersion version,
         PublicationSourceReadQuery query,
@@ -58,33 +117,64 @@ public sealed class RelationalPublicationSourceDataReader(
                     null);
             }
 
-            var plan = RelationalPublicationQueryPlanner.BuildRows(
-                source.Configuration.Kind,
-                version,
-                query,
-                source.Configuration.MaximumBatchRows);
-            if (plan.Status == SqlPublicationPlanStatus.InvalidCursor)
-            {
-                return new(PublicationSourceReadStatus.InvalidCursor, null);
-            }
-
-            if (plan.Plan is null)
-            {
-                return UnavailableRows();
-            }
-
             await using var connection = await connectionFactory.CreateAsync(
                     source.Configuration,
                     cancellationToken)
                 .ConfigureAwait(false);
             await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
-            return await ExecuteRowsAsync(
-                    connection,
-                    source.Configuration,
+            var rows = new List<IReadOnlyDictionary<string, object?>>(query.Take);
+            var cursor = query.Cursor;
+            long responseBytes = 2;
+            do
+            {
+                var batchTake = Math.Min(
+                    source.Configuration.MaximumBatchRows,
+                    query.Take - rows.Count);
+                var plan = RelationalPublicationQueryPlanner.BuildRows(
+                    source.Configuration.Kind,
                     version,
-                    plan.Plan,
-                    cancellationToken)
-                .ConfigureAwait(false);
+                    query with { Take = batchTake, Cursor = cursor },
+                    source.Configuration.MaximumBatchRows);
+                if (plan.Status == SqlPublicationPlanStatus.InvalidCursor)
+                {
+                    return new(PublicationSourceReadStatus.InvalidCursor, null);
+                }
+
+                if (plan.Plan is null)
+                {
+                    return UnavailableRows();
+                }
+
+                var batch = await ExecuteRowsAsync(
+                        connection,
+                        source.Configuration,
+                        version,
+                        plan.Plan,
+                        cancellationToken)
+                    .ConfigureAwait(false);
+                if (batch.Status != PublicationSourceReadStatus.Success || batch.Value is null)
+                {
+                    return batch;
+                }
+
+                foreach (var row in batch.Value.Rows)
+                {
+                    responseBytes = checked(responseBytes + EstimateRowBytes(row));
+                    if (responseBytes > version.Settings.MaximumResponseBytes)
+                    {
+                        return UnavailableRows();
+                    }
+
+                    rows.Add(row);
+                }
+
+                cursor = batch.Value.NextCursor;
+            }
+            while (rows.Count < query.Take && cursor is not null);
+
+            return new(
+                PublicationSourceReadStatus.Success,
+                new PublicationSourceRowPage(rows, cursor));
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
@@ -722,6 +812,9 @@ public sealed class RelationalPublicationSourceDataReader(
         or OverflowException;
 
     private static PublicationSourceReadResult<PublicationSourceRowPage> UnavailableRows() =>
+        new(PublicationSourceReadStatus.Unavailable, null);
+
+    private static PublicationSourceReadResult<PublicationSourceRowCount> UnavailableCount() =>
         new(PublicationSourceReadStatus.Unavailable, null);
 
     private static PublicationSourceReadResult<PublicationSourceLookupPage> UnavailableLookup() =>

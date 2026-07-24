@@ -18,6 +18,20 @@ public sealed record PublicationSpreadsheetChangeMapResult(
     public bool IsSuccess => Error is null;
 }
 
+public enum PublicationCellValidationCode
+{
+    Required,
+    InvalidType,
+    MaximumLength,
+    MaximumBinaryLength,
+    NumericPrecision,
+    NumericScale,
+}
+
+public sealed record PublicationCellValidationFailure(
+    PublicationCellValidationCode Code,
+    int? Constraint = null);
+
 /// <summary>
 /// Converts the UI workbook snapshot into the bounded, typed change contract accepted by Application.
 /// Spreadsheet text is never forwarded directly to SQL.
@@ -177,9 +191,9 @@ public static class PublicationSpreadsheetChangeMapper
         foreach (var column in columns)
         {
             values.TryGetValue(column.PublicAlias, out var value);
-            if (!TryNormalize(value, column, out var typed))
+            if (!TryNormalizeCellValue(value, column, out var typed, out var failure))
             {
-                error = $"Row {rowIndex + 1}, column '{column.PublicAlias}' is not a valid {column.DataType} value.";
+                error = FormatFailure(rowIndex, column, failure!);
                 return null;
             }
 
@@ -190,15 +204,19 @@ public static class PublicationSpreadsheetChangeMapper
         return normalized;
     }
 
-    private static bool TryNormalize(
+    public static bool TryNormalizeCellValue(
         object? value,
         PublicationColumnDto column,
-        out object? normalized)
+        out object? normalized,
+        out PublicationCellValidationFailure? failure)
     {
         if (value is null || value is DBNull || value is string { Length: 0 } && column.DataType != PublicationDataType.String)
         {
             normalized = null;
-            return column.IsNullable;
+            failure = column.IsNullable
+                ? null
+                : new PublicationCellValidationFailure(PublicationCellValidationCode.Required);
+            return failure is null;
         }
 
         var text = Convert.ToString(value, CultureInfo.InvariantCulture) ?? string.Empty;
@@ -208,6 +226,7 @@ public static class PublicationSpreadsheetChangeMapper
                 if (value is bool boolean || bool.TryParse(text, out boolean))
                 {
                     normalized = boolean;
+                    failure = null;
                     return true;
                 }
                 break;
@@ -215,6 +234,7 @@ public static class PublicationSpreadsheetChangeMapper
                 if (value is byte byteValue || byte.TryParse(text, NumberStyles.Integer, CultureInfo.InvariantCulture, out byteValue))
                 {
                     normalized = byteValue;
+                    failure = null;
                     return true;
                 }
                 break;
@@ -222,6 +242,7 @@ public static class PublicationSpreadsheetChangeMapper
                 if (value is short shortValue || short.TryParse(text, NumberStyles.Integer, CultureInfo.InvariantCulture, out shortValue))
                 {
                     normalized = shortValue;
+                    failure = null;
                     return true;
                 }
                 break;
@@ -229,6 +250,7 @@ public static class PublicationSpreadsheetChangeMapper
                 if (value is int intValue || int.TryParse(text, NumberStyles.Integer, CultureInfo.InvariantCulture, out intValue))
                 {
                     normalized = intValue;
+                    failure = null;
                     return true;
                 }
                 break;
@@ -236,12 +258,18 @@ public static class PublicationSpreadsheetChangeMapper
                 if (value is long longValue || long.TryParse(text, NumberStyles.Integer, CultureInfo.InvariantCulture, out longValue))
                 {
                     normalized = longValue;
+                    failure = null;
                     return true;
                 }
                 break;
             case PublicationDataType.Decimal:
                 if (value is decimal decimalValue || decimal.TryParse(text, NumberStyles.Number, CultureInfo.InvariantCulture, out decimalValue))
                 {
+                    if (!FitsDecimalConstraints(decimalValue, column, out failure))
+                    {
+                        normalized = null;
+                        return false;
+                    }
                     normalized = decimalValue;
                     return true;
                 }
@@ -250,6 +278,7 @@ public static class PublicationSpreadsheetChangeMapper
                 if ((value is float singleValue || float.TryParse(text, NumberStyles.Float, CultureInfo.InvariantCulture, out singleValue)) && float.IsFinite(singleValue))
                 {
                     normalized = singleValue;
+                    failure = null;
                     return true;
                 }
                 break;
@@ -257,6 +286,7 @@ public static class PublicationSpreadsheetChangeMapper
                 if ((value is double doubleValue || double.TryParse(text, NumberStyles.Float, CultureInfo.InvariantCulture, out doubleValue)) && double.IsFinite(doubleValue))
                 {
                     normalized = doubleValue;
+                    failure = null;
                     return true;
                 }
                 break;
@@ -264,16 +294,19 @@ public static class PublicationSpreadsheetChangeMapper
                 if (value is DateOnly dateOnly)
                 {
                     normalized = dateOnly;
+                    failure = null;
                     return true;
                 }
                 if (value is DateTime dateTime)
                 {
                     normalized = DateOnly.FromDateTime(dateTime);
+                    failure = null;
                     return true;
                 }
-                if (DateOnly.TryParse(text, CultureInfo.InvariantCulture, DateTimeStyles.None, out dateOnly))
+                if (TryParseDate(text, out dateOnly))
                 {
                     normalized = dateOnly;
+                    failure = null;
                     return true;
                 }
                 break;
@@ -281,11 +314,13 @@ public static class PublicationSpreadsheetChangeMapper
                 if (value is DateTime timestamp)
                 {
                     normalized = timestamp;
+                    failure = null;
                     return true;
                 }
-                if (DateTime.TryParse(text, CultureInfo.InvariantCulture, DateTimeStyles.AllowWhiteSpaces | DateTimeStyles.RoundtripKind, out timestamp))
+                if (TryParseDateTime(text, out timestamp))
                 {
                     normalized = timestamp;
+                    failure = null;
                     return true;
                 }
                 break;
@@ -293,18 +328,21 @@ public static class PublicationSpreadsheetChangeMapper
                 if (value is DateTimeOffset offset)
                 {
                     normalized = offset;
+                    failure = null;
                     return true;
                 }
-                if (DateTimeOffset.TryParse(text, CultureInfo.InvariantCulture, DateTimeStyles.AllowWhiteSpaces | DateTimeStyles.RoundtripKind, out offset))
+                if (TryParseDateTimeOffset(text, out offset))
                 {
                     normalized = offset;
+                    failure = null;
                     return true;
                 }
                 break;
             case PublicationDataType.Time:
-                if (value is TimeOnly timeOnly || TimeOnly.TryParse(text, CultureInfo.InvariantCulture, DateTimeStyles.None, out timeOnly))
+                if (value is TimeOnly timeOnly || TryParseTime(text, out timeOnly))
                 {
                     normalized = timeOnly;
+                    failure = null;
                     return true;
                 }
                 break;
@@ -312,21 +350,50 @@ public static class PublicationSpreadsheetChangeMapper
                 if (value is Guid guid || Guid.TryParse(text, out guid))
                 {
                     normalized = guid;
+                    failure = null;
                     return true;
                 }
                 break;
             case PublicationDataType.String:
+                if (column.MaximumLength is int maximumLength && text.Length > maximumLength)
+                {
+                    normalized = null;
+                    failure = new PublicationCellValidationFailure(
+                        PublicationCellValidationCode.MaximumLength,
+                        maximumLength);
+                    return false;
+                }
                 normalized = text;
+                failure = null;
                 return true;
             case PublicationDataType.Binary:
                 if (value is byte[] bytes)
                 {
+                    if (column.MaximumLength is int maximumLength && bytes.Length > maximumLength)
+                    {
+                        normalized = null;
+                        failure = new PublicationCellValidationFailure(
+                            PublicationCellValidationCode.MaximumBinaryLength,
+                            maximumLength);
+                        return false;
+                    }
                     normalized = bytes;
+                    failure = null;
                     return true;
                 }
                 try
                 {
-                    normalized = Convert.FromBase64String(text);
+                    var parsed = Convert.FromBase64String(text);
+                    if (column.MaximumLength is int maximumLength && parsed.Length > maximumLength)
+                    {
+                        normalized = null;
+                        failure = new PublicationCellValidationFailure(
+                            PublicationCellValidationCode.MaximumBinaryLength,
+                            maximumLength);
+                        return false;
+                    }
+                    normalized = parsed;
+                    failure = null;
                     return true;
                 }
                 catch (FormatException)
@@ -336,8 +403,95 @@ public static class PublicationSpreadsheetChangeMapper
         }
 
         normalized = null;
+        failure = new PublicationCellValidationFailure(PublicationCellValidationCode.InvalidType);
         return false;
     }
+
+    private static bool FitsDecimalConstraints(
+        decimal value,
+        PublicationColumnDto column,
+        out PublicationCellValidationFailure? failure)
+    {
+        if (column.NumericScale is byte scale &&
+            decimal.Round(value, scale, MidpointRounding.ToEven) != value)
+        {
+            failure = new PublicationCellValidationFailure(
+                PublicationCellValidationCode.NumericScale,
+                scale);
+            return false;
+        }
+
+        if (column.NumericPrecision is byte precision)
+        {
+            var allowedScale = column.NumericScale ?? 0;
+            var allowedIntegralDigits = precision - allowedScale;
+            var integral = decimal.Truncate(value);
+            var integralDigits = integral == 0
+                ? 0
+                : integral.ToString("0", CultureInfo.InvariantCulture).TrimStart('-').Length;
+            if (integralDigits > allowedIntegralDigits)
+            {
+                failure = new PublicationCellValidationFailure(
+                    PublicationCellValidationCode.NumericPrecision,
+                    precision);
+                return false;
+            }
+        }
+
+        failure = null;
+        return true;
+    }
+
+    private static bool TryParseDate(string text, out DateOnly value) =>
+        DateOnly.TryParse(text, CultureInfo.CurrentCulture, DateTimeStyles.AllowWhiteSpaces, out value) ||
+        DateOnly.TryParse(text, CultureInfo.InvariantCulture, DateTimeStyles.AllowWhiteSpaces, out value);
+
+    private static bool TryParseDateTime(string text, out DateTime value) =>
+        DateTime.TryParse(
+            text,
+            CultureInfo.CurrentCulture,
+            DateTimeStyles.AllowWhiteSpaces | DateTimeStyles.RoundtripKind,
+            out value) ||
+        DateTime.TryParse(
+            text,
+            CultureInfo.InvariantCulture,
+            DateTimeStyles.AllowWhiteSpaces | DateTimeStyles.RoundtripKind,
+            out value);
+
+    private static bool TryParseDateTimeOffset(string text, out DateTimeOffset value) =>
+        DateTimeOffset.TryParse(
+            text,
+            CultureInfo.CurrentCulture,
+            DateTimeStyles.AllowWhiteSpaces | DateTimeStyles.RoundtripKind,
+            out value) ||
+        DateTimeOffset.TryParse(
+            text,
+            CultureInfo.InvariantCulture,
+            DateTimeStyles.AllowWhiteSpaces | DateTimeStyles.RoundtripKind,
+            out value);
+
+    private static bool TryParseTime(string text, out TimeOnly value) =>
+        TimeOnly.TryParse(text, CultureInfo.CurrentCulture, DateTimeStyles.AllowWhiteSpaces, out value) ||
+        TimeOnly.TryParse(text, CultureInfo.InvariantCulture, DateTimeStyles.AllowWhiteSpaces, out value);
+
+    private static string FormatFailure(
+        int rowIndex,
+        PublicationColumnDto column,
+        PublicationCellValidationFailure failure) =>
+        failure.Code switch
+        {
+            PublicationCellValidationCode.Required =>
+                $"Row {rowIndex + 1}, column '{column.PublicAlias}' is required.",
+            PublicationCellValidationCode.MaximumLength =>
+                $"Row {rowIndex + 1}, column '{column.PublicAlias}' cannot exceed {failure.Constraint} characters.",
+            PublicationCellValidationCode.MaximumBinaryLength =>
+                $"Row {rowIndex + 1}, column '{column.PublicAlias}' cannot exceed {failure.Constraint} bytes.",
+            PublicationCellValidationCode.NumericPrecision =>
+                $"Row {rowIndex + 1}, column '{column.PublicAlias}' exceeds numeric precision {failure.Constraint}.",
+            PublicationCellValidationCode.NumericScale =>
+                $"Row {rowIndex + 1}, column '{column.PublicAlias}' cannot have more than {failure.Constraint} decimal places.",
+            _ => $"Row {rowIndex + 1}, column '{column.PublicAlias}' is not a valid {column.DataType} value.",
+        };
 
     private static bool Equivalent(object? left, object? right) =>
         left is byte[] leftBytes && right is byte[] rightBytes

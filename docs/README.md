@@ -18,7 +18,7 @@
 - [Workflow operation tracing convention](operation-tracing.md): required lifecycle,
   structured fields, levels, and data-safety rules for every current and future
   executable operation.
-- [Architecture Decision Records](adr/README.md): accepted, proposed, and superseded decisions with rationale and consequences, including ADR-0010 through ADR-0012.
+- [Architecture Decision Records](adr/README.md): accepted, proposed, and superseded decisions with rationale and consequences, including current workflow execution, Email delivery, and publication decisions.
 
 ## Product planning
 

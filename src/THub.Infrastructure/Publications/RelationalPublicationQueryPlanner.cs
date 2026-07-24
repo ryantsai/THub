@@ -20,6 +20,10 @@ internal sealed record RelationalPublicationReadPlan(
     IReadOnlyList<SqlPublicationSortTerm> Sorts,
     int Take);
 
+internal sealed record RelationalPublicationCountPlan(
+    string CommandText,
+    IReadOnlyList<RelationalPublicationParameter> Parameters);
+
 internal sealed record RelationalPublicationPlanResult(
     SqlPublicationPlanStatus Status,
     RelationalPublicationReadPlan? Plan);
@@ -27,6 +31,53 @@ internal sealed record RelationalPublicationPlanResult(
 internal static class RelationalPublicationQueryPlanner
 {
     private const int AbsoluteMaximumCellBytes = 2 * 1_024 * 1_024;
+
+    public static RelationalPublicationCountPlan? BuildCount(
+        ConnectionKind kind,
+        PublicationVersion version,
+        PublicationSourceCountQuery query)
+    {
+        ArgumentNullException.ThrowIfNull(version);
+        ArgumentNullException.ThrowIfNull(query);
+        if (kind is not (ConnectionKind.MySql or ConnectionKind.PostgreSql or ConnectionKind.Oracle) ||
+            query.Filters.Count > 16)
+        {
+            return null;
+        }
+
+        var columns = version.Columns.ToDictionary(
+            column => column.PublicAlias,
+            StringComparer.OrdinalIgnoreCase);
+        var parameters = new List<RelationalPublicationParameter>();
+        var where = new List<string>();
+        for (var index = 0; index < query.Filters.Count; index++)
+        {
+            if (!TryBuildFilter(
+                    kind,
+                    query.Filters[index],
+                    index,
+                    columns,
+                    parameters,
+                    out var clause))
+            {
+                return null;
+            }
+
+            where.Add(clause);
+        }
+
+        var sql = new StringBuilder("SELECT COUNT(*) FROM ")
+            .Append(RelationalExecutionSupport.QualifiedName(
+                kind,
+                version.SourceSchema,
+                version.SourceObject));
+        if (where.Count > 0)
+        {
+            sql.Append(" WHERE ").AppendJoin(" AND ", where.Select(value => $"({value})"));
+        }
+
+        return new RelationalPublicationCountPlan(sql.ToString(), parameters);
+    }
 
     public static RelationalPublicationPlanResult BuildRows(
         ConnectionKind kind,

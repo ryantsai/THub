@@ -349,6 +349,8 @@ internal sealed class FakePublicationGrantStore : IPublicationGrantStore
 
 internal sealed class FakePublicationSourceDataReader : IPublicationSourceDataReader
 {
+    public PublicationSourceCountQuery? LastCountQuery { get; private set; }
+
     public PublicationSourceReadQuery? LastReadQuery { get; private set; }
 
     public PublicationForeignKeySourceQuery? LastLookupQuery { get; private set; }
@@ -358,11 +360,24 @@ internal sealed class FakePublicationSourceDataReader : IPublicationSourceDataRe
     public PublicationSourceReadResult<PublicationSourceRowPage> RowResult { get; set; } =
         new(PublicationSourceReadStatus.Success, new PublicationSourceRowPage([], null));
 
+    public PublicationSourceReadResult<PublicationSourceRowCount> CountResult { get; set; } =
+        new(PublicationSourceReadStatus.Success, new PublicationSourceRowCount(0));
+
     public PublicationSourceReadResult<PublicationSourceLookupPage> LookupResult { get; set; } =
         new(PublicationSourceReadStatus.Success, new PublicationSourceLookupPage([], null));
 
     public PublicationSourceReadResult<PublicationSourceForeignKeyResolution> ResolutionResult { get; set; } =
         new(PublicationSourceReadStatus.Success, new PublicationSourceForeignKeyResolution([]));
+
+    public Task<PublicationSourceReadResult<PublicationSourceRowCount>> CountRowsAsync(
+        PublicationVersion version,
+        PublicationSourceCountQuery query,
+        CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        LastCountQuery = query;
+        return Task.FromResult(CountResult);
+    }
 
     public Task<PublicationSourceReadResult<PublicationSourceRowPage>> ReadRowsAsync(
         PublicationVersion version,

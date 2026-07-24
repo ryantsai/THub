@@ -2,6 +2,7 @@ using System.Net.Sockets;
 using MailKit;
 using MailKit.Net.Smtp;
 using MailKit.Security;
+using Microsoft.Extensions.Logging;
 using MimeKit;
 using THub.Application.Alerts;
 using THub.Domain.Alerts;
@@ -11,7 +12,8 @@ namespace THub.Infrastructure.Alerts;
 
 public sealed class MailKitAlertSender(
     ISecretResolver secretResolver,
-    SmtpAlertSenderOptions options) : IAlertSender
+    SmtpAlertSenderOptions options,
+    ILogger<MailKitAlertSender>? logger = null) : IAlertSender
 {
     private readonly ISecretResolver _secretResolver =
         secretResolver ?? throw new ArgumentNullException(nameof(secretResolver));
@@ -162,7 +164,20 @@ public sealed class MailKitAlertSender(
         }
         catch (SmtpCommandException exception)
         {
-            return ClassifyCommandFailure(exception);
+            var result = ClassifyCommandFailure(
+                (int)exception.StatusCode,
+                exception.ErrorCode);
+            logger?.LogError(
+                "SMTP relay rejected Email delivery {EmailDeliveryId} for workflow run {WorkflowRunId} and node {NodeId} with status {SmtpStatusCode}, command error {SmtpErrorCode}, normalized error {ErrorCode}, category {ErrorCategory}, and retryable {IsRetryable}.",
+                delivery.Id,
+                delivery.WorkflowRunId,
+                delivery.WorkflowNodeId,
+                (int)exception.StatusCode,
+                exception.ErrorCode,
+                result.Error!.Code,
+                result.Error.Category,
+                result.Error.IsRetryable);
+            return result;
         }
         catch (Exception exception) when (
             exception is SmtpProtocolException or IOException or SocketException)
@@ -190,12 +205,25 @@ public sealed class MailKitAlertSender(
         var message = new MimeMessage
         {
             MessageId = delivery.StableMessageId,
-            Subject = delivery.Message.Subject,
-            Body = new TextPart("plain")
-            {
-                Text = delivery.Message.Body
-            }
+            Subject = delivery.Message.Subject
         };
+        var body = new BodyBuilder();
+        if (delivery.Message.IsBodyHtml)
+        {
+            body.HtmlBody = delivery.Message.Body;
+        }
+        else
+        {
+            body.TextBody = delivery.Message.Body;
+        }
+        if (delivery.Message.Attachment is { } attachment)
+        {
+            body.Attachments.Add(
+                attachment.FileName,
+                attachment.Content.ToArray(),
+                ContentType.Parse(attachment.MediaType));
+        }
+        message.Body = body.ToMessageBody();
         message.From.Add(MailboxAddress.Parse(profile.SenderAddress));
         foreach (var recipient in delivery.Message.Recipients)
         {
@@ -213,19 +241,29 @@ public sealed class MailKitAlertSender(
             _ => throw new ArgumentOutOfRangeException(nameof(security))
         };
 
-    private static AlertSendResult ClassifyCommandFailure(SmtpCommandException exception)
+    internal static AlertSendResult ClassifyCommandFailure(
+        int statusCode,
+        SmtpErrorCode errorCode)
     {
-        var statusCode = (int)exception.StatusCode;
         var isTransient = statusCode is >= 400 and < 500;
+        var isMessageTooLarge = statusCode == 552;
         return AlertSendResult.Failure(new ExecutionError(
-            isTransient ? "smtp.temporary_rejection" : "smtp.rejected",
-            exception.ErrorCode == SmtpErrorCode.UnexpectedStatusCode
-                ? ExecutionErrorCategory.Connectivity
-                : ExecutionErrorCategory.ExternalSideEffect,
-            isTransient
+            isMessageTooLarge
+                ? "smtp.message_too_large"
+                : isTransient
+                    ? "smtp.temporary_rejection"
+                    : "smtp.rejected",
+            isMessageTooLarge
+                ? ExecutionErrorCategory.ResourceLimit
+                : errorCode == SmtpErrorCode.UnexpectedStatusCode
+                    ? ExecutionErrorCategory.Connectivity
+                    : ExecutionErrorCategory.ExternalSideEffect,
+            isMessageTooLarge
+                ? "The SMTP relay rejected the message because it is too large."
+                : isTransient
                 ? "The SMTP relay temporarily rejected the message."
                 : "The SMTP relay permanently rejected the message.",
-            isTransient));
+            isTransient && !isMessageTooLarge));
     }
 
     private static AlertSendResult ConfigurationFailure(string code, string summary) =>

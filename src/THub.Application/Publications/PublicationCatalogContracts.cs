@@ -118,7 +118,10 @@ public sealed record PublicationColumnDto(
     int? KeyOrdinal,
     bool IsConcurrencyToken,
     bool IsGenerated,
-    PublicationForeignKeyDto? ForeignKey);
+    PublicationForeignKeyDto? ForeignKey,
+    int? MaximumLength = null,
+    byte? NumericPrecision = null,
+    byte? NumericScale = null);
 
 public sealed record PublicationForeignKeyDto(
     string ConstraintName,

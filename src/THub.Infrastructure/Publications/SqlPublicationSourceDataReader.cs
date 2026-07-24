@@ -20,6 +20,91 @@ public sealed class SqlPublicationSourceDataReader(
     IPublicationSourceSchemaInspector schemaInspector,
     ILogger<SqlPublicationSourceDataReader> logger) : IPublicationSourceDataReader
 {
+    public async Task<PublicationSourceReadResult<PublicationSourceRowCount>> CountRowsAsync(
+        PublicationVersion version,
+        PublicationSourceCountQuery query,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(version);
+        ArgumentNullException.ThrowIfNull(query);
+        try
+        {
+            var source = await LoadSourceAsync(version.ConnectionId, cancellationToken)
+                .ConfigureAwait(false);
+            var plan = SqlPublicationQueryPlanner.BuildCount(version, query);
+            if (source is null || plan is null)
+            {
+                return UnavailableCount();
+            }
+
+            var inspection = await schemaInspector.InspectObjectAsync(
+                    source.DataConnection,
+                    version.SourceSchema,
+                    version.SourceObject,
+                    cancellationToken)
+                .ConfigureAwait(false);
+            if (inspection.Status != PublicationSourceInspectionStatus.Success ||
+                inspection.Value is null ||
+                !string.Equals(
+                    inspection.Value.SchemaFingerprint,
+                    version.SchemaFingerprint,
+                    StringComparison.Ordinal))
+            {
+                return new(
+                    inspection.Status == PublicationSourceInspectionStatus.Unavailable
+                        ? PublicationSourceReadStatus.Unavailable
+                        : PublicationSourceReadStatus.SchemaChanged,
+                    null);
+            }
+
+            await using var connection = new SqlConnection(source.ConnectionString);
+            await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
+            var metadata = await LoadObjectMetadataAsync(
+                    connection,
+                    version.SourceSchema,
+                    version.SourceObject,
+                    source.CommandTimeoutSeconds,
+                    cancellationToken)
+                .ConfigureAwait(false);
+            if (!MatchesVersionMetadata(version, metadata))
+            {
+                return new(PublicationSourceReadStatus.SchemaChanged, null);
+            }
+
+            await using var command = connection.CreateCommand();
+            command.CommandText = plan.CommandText;
+            command.CommandType = CommandType.Text;
+            command.CommandTimeout = Math.Min(
+                source.CommandTimeoutSeconds,
+                version.Settings.CommandTimeoutSeconds);
+            foreach (var parameter in plan.Parameters)
+            {
+                command.Parameters.Add(parameter);
+            }
+
+            var scalar = await command.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false);
+            var totalCount = Convert.ToInt64(scalar, CultureInfo.InvariantCulture);
+            return totalCount < 0
+                ? UnavailableCount()
+                : new(
+                    PublicationSourceReadStatus.Success,
+                    new PublicationSourceRowCount(totalCount));
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception exception) when (IsExpectedSourceFailure(exception))
+        {
+            logger.LogWarning(
+                exception,
+                "Publication source count failed for version {PublicationVersionId} and connection {ConnectionId}.",
+                version.Id,
+                version.ConnectionId);
+            return UnavailableCount();
+        }
+    }
+
     public async Task<PublicationSourceReadResult<PublicationSourceRowPage>> ReadRowsAsync(
         PublicationVersion version,
         PublicationSourceReadQuery query,
@@ -56,22 +141,6 @@ public sealed class SqlPublicationSourceDataReader(
                     null);
             }
 
-            var planResult = SqlPublicationQueryPlanner.BuildRows(
-                version,
-                query,
-                source.Configuration.MaximumBatchRows);
-            if (planResult.Status == SqlPublicationPlanStatus.InvalidCursor)
-            {
-                return new PublicationSourceReadResult<PublicationSourceRowPage>(
-                    PublicationSourceReadStatus.InvalidCursor,
-                    null);
-            }
-
-            if (planResult.Plan is null)
-            {
-                return UnavailableRows();
-            }
-
             await using var connection = new SqlConnection(source.ConnectionString);
             await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
             var metadata = await LoadObjectMetadataAsync(
@@ -88,13 +157,58 @@ public sealed class SqlPublicationSourceDataReader(
                     null);
             }
 
-            return await ExecuteRowsAsync(
-                    connection,
+            var rows = new List<IReadOnlyDictionary<string, object?>>(query.Take);
+            var cursor = query.Cursor;
+            long responseBytes = 2;
+            do
+            {
+                var batchTake = Math.Min(
+                    source.Configuration.MaximumBatchRows,
+                    query.Take - rows.Count);
+                var planResult = SqlPublicationQueryPlanner.BuildRows(
                     version,
-                    planResult.Plan,
-                    source.CommandTimeoutSeconds,
-                    cancellationToken)
-                .ConfigureAwait(false);
+                    query with { Take = batchTake, Cursor = cursor },
+                    source.Configuration.MaximumBatchRows);
+                if (planResult.Status == SqlPublicationPlanStatus.InvalidCursor)
+                {
+                    return new(PublicationSourceReadStatus.InvalidCursor, null);
+                }
+
+                if (planResult.Plan is null)
+                {
+                    return UnavailableRows();
+                }
+
+                var batch = await ExecuteRowsAsync(
+                        connection,
+                        version,
+                        planResult.Plan,
+                        source.CommandTimeoutSeconds,
+                        cancellationToken)
+                    .ConfigureAwait(false);
+                if (batch.Status != PublicationSourceReadStatus.Success || batch.Value is null)
+                {
+                    return batch;
+                }
+
+                foreach (var row in batch.Value.Rows)
+                {
+                    responseBytes = checked(responseBytes + EstimateRowBytes(row));
+                    if (responseBytes > version.Settings.MaximumResponseBytes)
+                    {
+                        return UnavailableRows();
+                    }
+
+                    rows.Add(row);
+                }
+
+                cursor = batch.Value.NextCursor;
+            }
+            while (rows.Count < query.Take && cursor is not null);
+
+            return new(
+                PublicationSourceReadStatus.Success,
+                new PublicationSourceRowPage(rows, cursor));
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
@@ -656,6 +770,9 @@ public sealed class SqlPublicationSourceDataReader(
         or OverflowException;
 
     private static PublicationSourceReadResult<PublicationSourceRowPage> UnavailableRows() =>
+        new(PublicationSourceReadStatus.Unavailable, null);
+
+    private static PublicationSourceReadResult<PublicationSourceRowCount> UnavailableCount() =>
         new(PublicationSourceReadStatus.Unavailable, null);
 
     private static PublicationSourceReadResult<PublicationSourceLookupPage> UnavailableLookup() =>

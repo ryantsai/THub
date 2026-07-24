@@ -1,0 +1,270 @@
+@using System.Globalization
+@using Radzen.Blazor.Spreadsheet
+@using THub.Application.Publications
+@using THub.Domain.Publications
+@using THub.Web.Publications
+
+<div class="typed-cell-editor">
+    @if (Column is null)
+    {
+        <p class="typed-error" role="alert">@Localizer["The column metadata is unavailable."]</p>
+    }
+    else
+    {
+        <div class="typed-editor-heading">
+            <strong>@Column.PublicAlias</strong>
+            <span>@ConstraintSummary</span>
+        </div>
+
+        @if (Column.DataType == PublicationDataType.Boolean)
+        {
+            <select @bind="TextValue" aria-label='@Localizer["Boolean value"]'>
+                @if (Column.IsNullable)
+                {
+                    <option value="">@Localizer["Empty (null)"]</option>
+                }
+                else
+                {
+                    <option value="" disabled>@Localizer["Select a value…"]</option>
+                }
+                <option value="true">@Localizer["True"]</option>
+                <option value="false">@Localizer["False"]</option>
+            </select>
+        }
+        else
+        {
+            <input value="@TextValue"
+                   @oninput="TextChanged"
+                   maxlength="@InputMaximumLength"
+                   inputmode="@InputMode"
+                   spellcheck="false"
+                   aria-label='@Localizer["Cell value"]'
+                   placeholder="@InputPlaceholder" />
+
+            @if (IsTemporal)
+            {
+                <label class="picker-field">
+                    <span>@PickerLabel</span>
+                    <input type="@PickerType"
+                           value="@PickerValue"
+                           step="@PickerStep"
+                           @onchange="PickerChanged"
+                           aria-label="@PickerLabel" />
+                </label>
+                <small>@Localizer["Use the picker or enter any date/time text that can be parsed in your locale."]</small>
+            }
+        }
+
+        @if (ValidationError is not null)
+        {
+            <p class="typed-error" role="alert">@ValidationError</p>
+        }
+
+        <div class="typed-editor-actions">
+            <button class="primary" type="button" @onclick="CommitAsync">@Localizer["Apply"]</button>
+            @if (Column.IsNullable)
+            {
+                <button type="button" @onclick="ClearAsync">@Localizer["Clear"]</button>
+            }
+            <button type="button" @onclick="Context.Cancel">@Localizer["Cancel"]</button>
+        </div>
+    }
+</div>
+
+@code {
+    private string TextValue { get; set; } = string.Empty;
+    private string? ValidationError { get; set; }
+
+    [Parameter]
+    public SpreadsheetCellEditContext Context { get; set; } = null!;
+
+    [CascadingParameter]
+    public PublicationSpreadsheetContext? SpreadsheetContext { get; set; }
+
+    private PublicationColumnDto? Column =>
+        SpreadsheetContext?.GetColumn(Context.Cell.Address.Column);
+
+    private bool IsTemporal =>
+        Column?.DataType is PublicationDataType.Date or
+            PublicationDataType.DateTime or
+            PublicationDataType.DateTimeOffset or
+            PublicationDataType.Time;
+
+    private string PickerType => Column?.DataType switch
+    {
+        PublicationDataType.Date => "date",
+        PublicationDataType.Time => "time",
+        _ => "datetime-local",
+    };
+
+    private string PickerStep =>
+        Column?.DataType == PublicationDataType.Date ? "1" : "any";
+
+    private string PickerLabel => Column?.DataType switch
+    {
+        PublicationDataType.Date => Localizer["Choose date"],
+        PublicationDataType.Time => Localizer["Choose time"],
+        _ => Localizer["Choose date and time"],
+    };
+
+    private string InputMode => Column?.DataType switch
+    {
+        PublicationDataType.Byte or PublicationDataType.Int16 or
+            PublicationDataType.Int32 or PublicationDataType.Int64 => "numeric",
+        PublicationDataType.Decimal or PublicationDataType.Single or
+            PublicationDataType.Double => "decimal",
+        _ => "text",
+    };
+
+    private int? InputMaximumLength =>
+        Column?.DataType == PublicationDataType.String ? Column.MaximumLength : null;
+
+    private string InputPlaceholder => Column?.DataType switch
+    {
+        PublicationDataType.Date => Localizer["Date"],
+        PublicationDataType.DateTime => Localizer["Date and time"],
+        PublicationDataType.DateTimeOffset => Localizer["Date, time, and optional UTC offset"],
+        PublicationDataType.Time => Localizer["Time"],
+        PublicationDataType.Guid => "00000000-0000-0000-0000-000000000000",
+        PublicationDataType.Binary => Localizer["Base64 value"],
+        _ => Localizer["Value"],
+    };
+
+    private string ConstraintSummary
+    {
+        get
+        {
+            if (Column is null)
+            {
+                return string.Empty;
+            }
+
+            var parts = new List<string>
+            {
+                Localizer[Column.DataType.ToString()],
+                Column.IsNullable ? Localizer["Optional"] : Localizer["Required"],
+            };
+            if (Column.MaximumLength is int maximumLength)
+            {
+                parts.Add(Column.DataType == PublicationDataType.Binary
+                    ? Localizer["Maximum {0} bytes", maximumLength]
+                    : Localizer["Maximum {0} characters", maximumLength]);
+            }
+            if (Column.NumericPrecision is byte precision)
+            {
+                parts.Add(Localizer[
+                    "Precision {0}, scale {1}",
+                    precision,
+                    Column.NumericScale ?? 0]);
+            }
+            return string.Join(" · ", parts);
+        }
+    }
+
+    private string PickerValue
+    {
+        get
+        {
+            if (Column is null ||
+                !PublicationSpreadsheetChangeMapper.TryNormalizeCellValue(
+                    TextValue,
+                    Column,
+                    out var normalized,
+                    out _))
+            {
+                return string.Empty;
+            }
+
+            return normalized switch
+            {
+                DateOnly date => date.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
+                TimeOnly time => time.ToString("HH:mm:ss.fffffff", CultureInfo.InvariantCulture),
+                DateTime dateTime => dateTime.ToString("yyyy-MM-ddTHH:mm:ss.fffffff", CultureInfo.InvariantCulture),
+                DateTimeOffset offset => offset.ToString("yyyy-MM-ddTHH:mm:ss.fffffff", CultureInfo.InvariantCulture),
+                _ => string.Empty,
+            };
+        }
+    }
+
+    protected override void OnInitialized()
+    {
+        TextValue = FormatEditorValue(Context.Cell.Value, Column);
+    }
+
+    private void TextChanged(ChangeEventArgs args)
+    {
+        TextValue = Convert.ToString(args.Value, CultureInfo.CurrentCulture) ?? string.Empty;
+        ValidationError = null;
+    }
+
+    private void PickerChanged(ChangeEventArgs args)
+    {
+        TextValue = Convert.ToString(args.Value, CultureInfo.InvariantCulture) ?? string.Empty;
+        ValidationError = null;
+    }
+
+    private async Task CommitAsync()
+    {
+        if (Column is null)
+        {
+            return;
+        }
+
+        if (!PublicationSpreadsheetChangeMapper.TryNormalizeCellValue(
+                TextValue,
+                Column,
+                out var normalized,
+                out var failure))
+        {
+            ValidationError = FormatFailure(failure!);
+            return;
+        }
+
+        await Context.CommitAsync(
+            PublicationSpreadsheetChangeMapper.ToSpreadsheetValue(normalized, Column)!);
+    }
+
+    private async Task ClearAsync()
+    {
+        if (Column?.IsNullable == true)
+        {
+            await Context.CommitAsync(null!);
+        }
+    }
+
+    private string FormatFailure(PublicationCellValidationFailure failure) =>
+        failure.Code switch
+        {
+            PublicationCellValidationCode.Required =>
+                Localizer["A value is required for this column."],
+            PublicationCellValidationCode.MaximumLength =>
+                Localizer["Enter no more than {0} characters.", failure.Constraint ?? 0],
+            PublicationCellValidationCode.MaximumBinaryLength =>
+                Localizer["The decoded value must not exceed {0} bytes.", failure.Constraint ?? 0],
+            PublicationCellValidationCode.NumericPrecision =>
+                Localizer["The value exceeds the database precision of {0} digits.", failure.Constraint ?? 0],
+            PublicationCellValidationCode.NumericScale =>
+                Localizer["Enter no more than {0} decimal places.", failure.Constraint ?? 0],
+            _ => Localizer["Enter a valid {0} value.", Localizer[Column!.DataType.ToString()]],
+        };
+
+    private static string FormatEditorValue(object? value, PublicationColumnDto? column)
+    {
+        if (value is null || column is null)
+        {
+            return string.Empty;
+        }
+
+        return value switch
+        {
+            bool boolean => boolean ? "true" : "false",
+            DateTime dateTime when column.DataType == PublicationDataType.Date =>
+                dateTime.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
+            DateTime dateTime => dateTime.ToString("O", CultureInfo.InvariantCulture),
+            DateTimeOffset offset => offset.ToString("O", CultureInfo.InvariantCulture),
+            DateOnly date => date.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
+            TimeOnly time => time.ToString("HH:mm:ss.fffffff", CultureInfo.InvariantCulture),
+            _ => Convert.ToString(value, CultureInfo.InvariantCulture) ?? string.Empty,
+        };
+    }
+}

@@ -1,0 +1,69 @@
+.typed-cell-editor {
+    background: var(--surface, #fff);
+    border: 1px solid var(--border, #d8dee8);
+    border-radius: 0.55rem;
+    box-shadow: 0 0.7rem 2rem rgb(15 23 42 / 16%);
+    display: grid;
+    gap: 0.6rem;
+    min-width: 21rem;
+    padding: 0.75rem;
+}
+
+.typed-editor-heading {
+    align-items: baseline;
+    display: flex;
+    gap: 0.55rem;
+    justify-content: space-between;
+}
+
+.typed-editor-heading span,
+small {
+    color: var(--muted, #64748b);
+    font-size: 0.76rem;
+}
+
+input,
+select {
+    background: #fff;
+    border: 1px solid var(--border, #d8dee8);
+    border-radius: 0.35rem;
+    min-height: 2.25rem;
+    padding: 0.35rem 0.55rem;
+    width: 100%;
+}
+
+.picker-field {
+    display: grid;
+    gap: 0.25rem;
+}
+
+.picker-field span {
+    color: var(--muted, #64748b);
+    font-size: 0.76rem;
+}
+
+.typed-editor-actions {
+    display: flex;
+    gap: 0.4rem;
+    justify-content: flex-end;
+}
+
+button {
+    background: #fff;
+    border: 1px solid var(--border, #d8dee8);
+    border-radius: 0.35rem;
+    cursor: pointer;
+    padding: 0.35rem 0.65rem;
+}
+
+button.primary {
+    background: var(--accent, #2563eb);
+    border-color: var(--accent, #2563eb);
+    color: #fff;
+}
+
+.typed-error {
+    color: #b42318;
+    font-size: 0.8rem;
+    margin: 0;
+}
