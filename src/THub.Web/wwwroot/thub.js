@@ -16,6 +16,7 @@ window.thub = {
 window.thubLocalization = {
     catalog: null,
     observer: null,
+    overlaySelector: ".rz-dialog-wrapper, .rz-notification, .rz-popup, .rz-context-menu",
     translatableAttributes: ["aria-label", "title", "placeholder", "data-placeholder"],
 
     translateValue(value) {
@@ -57,27 +58,59 @@ window.thubLocalization = {
         }
     },
 
+    translateOverlayNode(node) {
+        if (node.nodeType === Node.TEXT_NODE) {
+            if (node.parentElement?.closest(this.overlaySelector)) {
+                this.translateNode(node);
+            }
+            return;
+        }
+
+        if (!(node instanceof Element)) {
+            return;
+        }
+
+        if (node.matches(this.overlaySelector)) {
+            this.translateNode(node);
+            return;
+        }
+
+        if (node.closest(this.overlaySelector)) {
+            this.translateNode(node);
+            return;
+        }
+
+        for (const overlay of node.querySelectorAll(this.overlaySelector)) {
+            this.translateNode(overlay);
+        }
+    },
+
     async start() {
         if (document.documentElement.lang.toLowerCase() !== "zh-tw") {
             return;
         }
 
-        const response = await fetch(
-            new URL("locales/zh-TW.json", document.baseURI),
-            { cache: "no-cache" });
-        if (!response.ok) {
+        try {
+            const response = await fetch(
+                new URL("locales/zh-TW.json", document.baseURI),
+                { cache: "no-cache" });
+            if (!response.ok) {
+                return;
+            }
+
+            this.catalog = await response.json();
+        } catch {
             return;
         }
 
-        this.catalog = await response.json();
-        this.translateNode(document.documentElement);
+        this.translateOverlayNode(document.documentElement);
         this.observer = new MutationObserver(mutations => {
             for (const mutation of mutations) {
                 for (const node of mutation.addedNodes) {
-                    this.translateNode(node);
+                    this.translateOverlayNode(node);
                 }
                 if (mutation.type === "characterData") {
-                    this.translateNode(mutation.target);
+                    this.translateOverlayNode(mutation.target);
                 }
             }
         });
