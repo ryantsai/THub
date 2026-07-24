@@ -92,7 +92,10 @@ public sealed class SqlAccessControlStore(
             .Distinct()
             .ToArray();
         var existingConnectionCount = await db.Connections
-            .CountAsync(connection => connectionIds.Contains(connection.Id), cancellationToken)
+            .CountAsync(
+                connection => connectionIds.Contains(connection.Id) &&
+                    connection.DeletedAtUtc == null,
+                cancellationToken)
             .ConfigureAwait(false);
         if (existingConnectionCount != connectionIds.Length)
         {

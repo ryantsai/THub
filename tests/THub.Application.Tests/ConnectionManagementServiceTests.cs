@@ -114,6 +114,31 @@ public sealed class ConnectionManagementServiceTests
             StringComparison.Ordinal);
     }
 
+    [Fact]
+    public async Task DeleteRemovesConnectionFromManagementLookups()
+    {
+        var store = new FakeStore();
+        var service = CreateService(store);
+        var created = await service.CreateAsync(
+            "Warehouse",
+            new SqlServerConnectionConfiguration("sql01", "Warehouse"),
+            "DOMAIN\\admin",
+            Now,
+            CancellationToken.None);
+        var connection = created.Connection!;
+
+        var result = await service.DeleteAsync(
+            connection.Id,
+            connection.UpdatedAtUtc,
+            Now.AddMinutes(1),
+            CancellationToken.None);
+
+        Assert.Equal(ConnectionSaveStatus.Saved, result.Status);
+        Assert.Null(await service.GetAsync(
+            connection.Id,
+            CancellationToken.None));
+    }
+
     private static ConnectionManagementService CreateService(FakeStore store) => new(
         store,
         new FakeProbe(),
@@ -184,6 +209,26 @@ public sealed class ConnectionManagementServiceTests
                     credentialWrite.Credential;
             }
 
+            return Task.FromResult(ConnectionSaveStatus.Saved);
+        }
+
+        public Task<ConnectionSaveStatus> DeleteAsync(
+            Guid id,
+            DateTimeOffset expectedUpdatedAtUtc,
+            DateTimeOffset deletedAtUtc,
+            CancellationToken cancellationToken)
+        {
+            if (!values.TryGetValue(id, out var connection))
+            {
+                return Task.FromResult(ConnectionSaveStatus.NotFound);
+            }
+            if (connection.UpdatedAtUtc != expectedUpdatedAtUtc.ToUniversalTime())
+            {
+                return Task.FromResult(ConnectionSaveStatus.Conflict);
+            }
+
+            connection.Delete(deletedAtUtc);
+            values.Remove(id);
             return Task.FromResult(ConnectionSaveStatus.Saved);
         }
     }

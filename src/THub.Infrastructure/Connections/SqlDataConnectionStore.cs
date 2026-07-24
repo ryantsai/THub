@@ -16,6 +16,7 @@ internal sealed class SqlDataConnectionStore(
         await using var db = await contextFactory.CreateDbContextAsync(cancellationToken);
         return await db.Connections
             .AsNoTracking()
+            .Where(connection => connection.DeletedAtUtc == null)
             .OrderBy(connection => connection.Name)
             .ToListAsync(cancellationToken);
     }
@@ -27,7 +28,10 @@ internal sealed class SqlDataConnectionStore(
         await using var db = await contextFactory.CreateDbContextAsync(cancellationToken);
         return await db.Connections
             .AsNoTracking()
-            .SingleOrDefaultAsync(connection => connection.Id == id, cancellationToken);
+            .SingleOrDefaultAsync(
+                connection => connection.Id == id &&
+                    connection.DeletedAtUtc == null,
+                cancellationToken);
     }
 
     public async Task<bool> CredentialExistsAsync(
@@ -89,7 +93,8 @@ internal sealed class SqlDataConnectionStore(
         ArgumentNullException.ThrowIfNull(connection);
         await using var db = await contextFactory.CreateDbContextAsync(cancellationToken);
         var current = await db.Connections.SingleOrDefaultAsync(
-            candidate => candidate.Id == connection.Id,
+            candidate => candidate.Id == connection.Id &&
+                candidate.DeletedAtUtc == null,
             cancellationToken);
         if (current is null)
         {
@@ -118,6 +123,38 @@ internal sealed class SqlDataConnectionStore(
         catch (DbUpdateException exception) when (IsUniqueConstraintViolation(exception))
         {
             return ConnectionSaveStatus.DuplicateName;
+        }
+    }
+
+    public async Task<ConnectionSaveStatus> DeleteAsync(
+        Guid id,
+        DateTimeOffset expectedUpdatedAtUtc,
+        DateTimeOffset deletedAtUtc,
+        CancellationToken cancellationToken)
+    {
+        await using var db = await contextFactory.CreateDbContextAsync(cancellationToken);
+        var current = await db.Connections.SingleOrDefaultAsync(
+            connection => connection.Id == id &&
+                connection.DeletedAtUtc == null,
+            cancellationToken);
+        if (current is null)
+        {
+            return ConnectionSaveStatus.NotFound;
+        }
+        if (current.UpdatedAtUtc != expectedUpdatedAtUtc.ToUniversalTime())
+        {
+            return ConnectionSaveStatus.Conflict;
+        }
+
+        current.Delete(deletedAtUtc);
+        try
+        {
+            await db.SaveChangesAsync(cancellationToken);
+            return ConnectionSaveStatus.Saved;
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            return ConnectionSaveStatus.Conflict;
         }
     }
 

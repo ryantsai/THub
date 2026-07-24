@@ -65,8 +65,11 @@ public sealed class THubDbContext(DbContextOptions<THubDbContext> options) : DbC
             entity.Property(x => x.Kind).HasConversion<string>().HasMaxLength(32);
             entity.Property(x => x.ConfigurationJson).HasColumnType("nvarchar(max)").IsRequired();
             entity.Property(x => x.CreatedBy).HasMaxLength(DataConnection.MaximumIdentityLength).IsRequired();
+            entity.Ignore(x => x.IsDeleted);
             entity.Property<byte[]>("RowVersion").IsRowVersion();
-            entity.HasIndex(x => x.Name).IsUnique();
+            entity.HasIndex(x => x.Name)
+                .IsUnique()
+                .HasFilter("[DeletedAtUtc] IS NULL");
             entity.HasIndex(x => new { x.Kind, x.IsEnabled });
         });
     }

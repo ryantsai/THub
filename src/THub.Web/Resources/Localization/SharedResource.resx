@@ -507,6 +507,9 @@
   <data name="Connection editor" xml:space="preserve">
     <value>Connection editor</value>
   </data>
+  <data name="Connection deleted. Workflows and datasets using it must be reconfigured." xml:space="preserve">
+    <value>Connection deleted. Workflows and datasets using it must be reconfigured.</value>
+  </data>
   <data name="Connection failed" xml:space="preserve">
     <value>Connection failed</value>
   </data>
@@ -674,6 +677,12 @@
   </data>
   <data name="Delete failed" xml:space="preserve">
     <value>Delete failed</value>
+  </data>
+  <data name="Delete connection" xml:space="preserve">
+    <value>Delete connection</value>
+  </data>
+  <data name="Delete '{0}'? Any workflows or datasets using this connection will stop working and must be reconfigured. Historical run and publication records will be preserved. This cannot be undone." xml:space="preserve">
+    <value>Delete '{0}'? Any workflows or datasets using this connection will stop working and must be reconfigured. Historical run and publication records will be preserved. This cannot be undone.</value>
   </data>
   <data name="Delete incoming keys" xml:space="preserve">
     <value>Delete incoming keys</value>
@@ -855,6 +864,9 @@
   <data name="Enter a filter value or select a null operator." xml:space="preserve">
     <value>Enter a filter value or select a null operator.</value>
   </data>
+  <data name="Enter a credential reference." xml:space="preserve">
+    <value>Enter a credential reference.</value>
+  </data>
   <data name="Enter both fields to create the encrypted credential." xml:space="preserve">
     <value>Enter both fields to create the encrypted credential.</value>
   </data>
@@ -999,9 +1011,6 @@ subsidiary.example.com</value>
   </data>
   <data name="FTP username" xml:space="preserve">
     <value>FTP username</value>
-  </data>
-  <data name="ftp_partner" xml:space="preserve">
-    <value>ftp_partner</value>
   </data>
   <data name="ftp.contoso.local" xml:space="preserve">
     <value>ftp.contoso.local</value>
@@ -2209,6 +2218,9 @@ subsidiary.example.com</value>
   <data name="The configured file size is outside the supported range." xml:space="preserve">
     <value>The configured file size is outside the supported range.</value>
   </data>
+  <data name="The connection could not be deleted." xml:space="preserve">
+    <value>The connection could not be deleted.</value>
+  </data>
   <data name="The connection could not be saved." xml:space="preserve">
     <value>The connection could not be saved.</value>
   </data>
@@ -2217,6 +2229,9 @@ subsidiary.example.com</value>
   </data>
   <data name="The connection state could not be changed." xml:space="preserve">
     <value>The connection state could not be changed.</value>
+  </data>
+  <data name="The connection was changed by another user. Reload before deleting." xml:space="preserve">
+    <value>The connection was changed by another user. Reload before deleting.</value>
   </data>
   <data name="The data window could not be loaded." xml:space="preserve">
     <value>The data window could not be loaded.</value>
@@ -2550,9 +2565,6 @@ subsidiary.example.com</value>
   </data>
   <data name="Warehouse" xml:space="preserve">
     <value>Warehouse</value>
-  </data>
-  <data name="warehouse_writer" xml:space="preserve">
-    <value>warehouse_writer</value>
   </data>
   <data name="What does this workflow do?" xml:space="preserve">
     <value>What does this workflow do?</value>

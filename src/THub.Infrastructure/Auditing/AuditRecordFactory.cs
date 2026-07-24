@@ -149,6 +149,14 @@ internal static class AuditRecordFactory
             return $"{resourceType}.{MachineName(status.CurrentValue.ToString()!)}";
         }
 
+        var deletedAt = entry.Properties.FirstOrDefault(property =>
+            property.IsModified &&
+            string.Equals(property.Metadata.Name, "DeletedAtUtc", StringComparison.Ordinal));
+        if (deletedAt?.CurrentValue is not null)
+        {
+            return $"{resourceType}.deleted";
+        }
+
         var enabled = entry.Properties.FirstOrDefault(property =>
             property.IsModified &&
             string.Equals(property.Metadata.Name, "IsEnabled", StringComparison.Ordinal));

@@ -108,9 +108,17 @@ Represents an approved connector configuration.
 | `Name` | Unique display name |
 | `Kind` | SQL Server, MySQL, PostgreSQL, Oracle, FTP, CSV file, or Excel file |
 | `ConfigurationJson` | Non-secret, connector-versioned configuration |
+| `DeletedAtUtc` | Soft-deletion timestamp; deleted connections are disabled and excluded from management and resolution while historical references remain intact |
 | `CreatedBy`, `CreatedAtUtc` | Audit metadata |
 
 Examples of safe configuration include database/server aliases, FTP host and transport mode, file bounds, sheet names, delimiters, an authentication kind, and a credential secret reference. SQL Server supports `Integrated` and `UserPassword`; MySQL, PostgreSQL, Oracle, and FTP use `UserPassword`. Raw passwords, tokens, or embedded connection strings containing credentials are not safe configuration.
+
+Deleting a connection is intentionally a soft delete. The connection is disabled and
+removed from normal lists and lookup paths, so workflows and governed datasets that
+still reference it stop resolving until they are reconfigured. The retained row
+preserves immutable publication-version foreign keys and historical audit/run context.
+Active connection names remain unique; a deleted connection does not prevent a new
+connection from reusing its former display name.
 
 ### `thub.EncryptedConnectionCredentials`
 

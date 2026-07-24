@@ -507,6 +507,9 @@
   <data name="Connection editor" xml:space="preserve">
     <value>連線編輯器</value>
   </data>
+  <data name="Connection deleted. Workflows and datasets using it must be reconfigured." xml:space="preserve">
+    <value>連線已刪除。使用此連線的工作流程與資料集必須重新設定。</value>
+  </data>
   <data name="Connection failed" xml:space="preserve">
     <value>連線失敗</value>
   </data>
@@ -674,6 +677,12 @@
   </data>
   <data name="Delete failed" xml:space="preserve">
     <value>刪除失敗</value>
+  </data>
+  <data name="Delete connection" xml:space="preserve">
+    <value>刪除連線</value>
+  </data>
+  <data name="Delete '{0}'? Any workflows or datasets using this connection will stop working and must be reconfigured. Historical run and publication records will be preserved. This cannot be undone." xml:space="preserve">
+    <value>要刪除「{0}」嗎？任何使用此連線的工作流程或資料集都將停止運作，且必須重新設定。歷史執行與發佈紀錄會保留。此操作無法復原。</value>
   </data>
   <data name="Delete incoming keys" xml:space="preserve">
     <value>刪除傳入的金鑰</value>
@@ -855,6 +864,9 @@
   <data name="Enter a filter value or select a null operator." xml:space="preserve">
     <value>輸入篩選條件值或選擇空運算符。</value>
   </data>
+  <data name="Enter a credential reference." xml:space="preserve">
+    <value>請輸入憑證參考。</value>
+  </data>
   <data name="Enter both fields to create the encrypted credential." xml:space="preserve">
     <value>輸入這兩個欄位以建立加密憑證。</value>
   </data>
@@ -999,9 +1011,6 @@
   </data>
   <data name="FTP username" xml:space="preserve">
     <value>FTP使用者名稱</value>
-  </data>
-  <data name="ftp_partner" xml:space="preserve">
-    <value>ftp_夥伴</value>
   </data>
   <data name="ftp.contoso.local" xml:space="preserve">
     <value>ftp.contoso.local</value>
@@ -2209,6 +2218,9 @@
   <data name="The configured file size is outside the supported range." xml:space="preserve">
     <value>設定的檔案大小超出了支援的範圍。</value>
   </data>
+  <data name="The connection could not be deleted." xml:space="preserve">
+    <value>無法刪除連線。</value>
+  </data>
   <data name="The connection could not be saved." xml:space="preserve">
     <value>無法儲存連線。</value>
   </data>
@@ -2217,6 +2229,9 @@
   </data>
   <data name="The connection state could not be changed." xml:space="preserve">
     <value>連線狀態無法變更。</value>
+  </data>
+  <data name="The connection was changed by another user. Reload before deleting." xml:space="preserve">
+    <value>其他使用者已變更此連線。請重新載入後再刪除。</value>
   </data>
   <data name="The data window could not be loaded." xml:space="preserve">
     <value>無法載入資料視窗。</value>
@@ -2550,9 +2565,6 @@
   </data>
   <data name="Warehouse" xml:space="preserve">
     <value>Warehouse</value>
-  </data>
-  <data name="warehouse_writer" xml:space="preserve">
-    <value>倉庫作家</value>
   </data>
   <data name="What does this workflow do?" xml:space="preserve">
     <value>這個工作流程有什麼作用？</value>

@@ -78,6 +78,14 @@ public interface IDataConnectionStore
             ? SaveAsync(connection, expectedUpdatedAtUtc, cancellationToken)
             : throw new NotSupportedException(
                 "This connection store does not support encrypted credential writes.");
+
+    Task<ConnectionSaveStatus> DeleteAsync(
+        Guid id,
+        DateTimeOffset expectedUpdatedAtUtc,
+        DateTimeOffset deletedAtUtc,
+        CancellationToken cancellationToken) =>
+        throw new NotSupportedException(
+            "This connection store does not support connection deletion.");
 }
 
 public sealed record ConnectionCredentialWrite
@@ -327,6 +335,33 @@ public sealed class ConnectionManagementService(
                 ? await ToDetailsAsync(connection, cancellationToken)
                 : null,
             status == ConnectionSaveStatus.Saved ? null : "connection.concurrency");
+    }
+
+    public async Task<ConnectionCommandResult> DeleteAsync(
+        Guid id,
+        DateTimeOffset expectedUpdatedAtUtc,
+        DateTimeOffset deletedAtUtc,
+        CancellationToken cancellationToken)
+    {
+        var status = await store.DeleteAsync(
+            id,
+            expectedUpdatedAtUtc,
+            deletedAtUtc,
+            cancellationToken);
+        return status switch
+        {
+            ConnectionSaveStatus.Saved => new ConnectionCommandResult(status, null),
+            ConnectionSaveStatus.NotFound => new ConnectionCommandResult(
+                status,
+                null,
+                "connection.not_found",
+                "The connection no longer exists."),
+            _ => new ConnectionCommandResult(
+                ConnectionSaveStatus.Conflict,
+                null,
+                "connection.concurrency",
+                "The connection was changed by another user. Reload before deleting.")
+        };
     }
 
     public async Task<ConnectionProbeResult> ProbeAsync(

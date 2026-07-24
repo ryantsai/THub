@@ -74,6 +74,10 @@ public sealed class DataConnection
 
     public bool IsEnabled { get; private set; } = true;
 
+    public DateTimeOffset? DeletedAtUtc { get; private set; }
+
+    public bool IsDeleted => DeletedAtUtc is not null;
+
     public string CreatedBy { get; private set; } = string.Empty;
 
     public DateTimeOffset CreatedAtUtc { get; private set; }
@@ -95,6 +99,26 @@ public sealed class DataConnection
     public void Enable(DateTimeOffset changedAtUtc) => SetEnabled(true, changedAtUtc);
 
     public void Disable(DateTimeOffset changedAtUtc) => SetEnabled(false, changedAtUtc);
+
+    public void Delete(DateTimeOffset changedAtUtc)
+    {
+        if (IsDeleted)
+        {
+            throw new InvalidOperationException("The connection is already deleted.");
+        }
+
+        var timestamp = RequireTimestamp(changedAtUtc, nameof(changedAtUtc));
+        if (timestamp < UpdatedAtUtc)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(changedAtUtc),
+                "Connection timestamps cannot move backwards.");
+        }
+
+        IsEnabled = false;
+        DeletedAtUtc = timestamp;
+        UpdatedAtUtc = timestamp;
+    }
 
     private void SetEnabled(bool isEnabled, DateTimeOffset changedAtUtc)
     {

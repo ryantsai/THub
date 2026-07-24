@@ -29,7 +29,7 @@
 .probe-result div { display: grid; gap: 3px; }
 .probe-result strong { font-size: 10px; }
 .probe-result small { font-size: 9px; opacity: .8; }
-.editor-actions { padding: 14px 19px; display: grid; grid-template-columns: auto auto 1fr auto auto; gap: 9px; border-top: 1px solid #e8eeec; }
+.editor-actions { padding: 14px 19px; display: grid; grid-template-columns: auto auto auto 1fr auto auto; gap: 9px; border-top: 1px solid #e8eeec; }
 
 @media(max-width:1000px) { .resource-grid { grid-template-columns: 1fr 1fr; } }
 @media(max-width:650px) {

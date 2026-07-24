@@ -30,6 +30,26 @@ public sealed class DataConnectionTests
         Assert.Equal(CreatedAt.AddMinutes(2), connection.UpdatedAtUtc);
     }
 
+    [Fact]
+    public void DeleteDisablesConnectionAndPreservesDeletionTimestamp()
+    {
+        var connection = new DataConnection(
+            "Warehouse",
+            ConnectionKind.SqlServer,
+            "{\"schemaVersion\":1,\"server\":\"sql01\"}",
+            "DOMAIN\\admin",
+            CreatedAt);
+
+        connection.Delete(CreatedAt.AddMinutes(1));
+
+        Assert.True(connection.IsDeleted);
+        Assert.False(connection.IsEnabled);
+        Assert.Equal(CreatedAt.AddMinutes(1), connection.DeletedAtUtc);
+        Assert.Equal(CreatedAt.AddMinutes(1), connection.UpdatedAtUtc);
+        Assert.Throws<InvalidOperationException>(
+            () => connection.Delete(CreatedAt.AddMinutes(2)));
+    }
+
     [Theory]
     [InlineData("{\"password\":\"do-not-store\"}")]
     [InlineData("{\"nested\":{\"apiKey\":\"do-not-store\"}}")]

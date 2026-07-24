@@ -405,6 +405,9 @@ namespace THub.Infrastructure.Persistence.Migrations
                         .HasMaxLength(256)
                         .HasColumnType("nvarchar(256)");
 
+                    b.Property<DateTimeOffset?>("DeletedAtUtc")
+                        .HasColumnType("datetimeoffset");
+
                     b.Property<bool>("IsEnabled")
                         .HasColumnType("bit");
 
@@ -429,7 +432,8 @@ namespace THub.Infrastructure.Persistence.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("Name")
-                        .IsUnique();
+                        .IsUnique()
+                        .HasFilter("[DeletedAtUtc] IS NULL");
 
                     b.HasIndex("Kind", "IsEnabled");
 

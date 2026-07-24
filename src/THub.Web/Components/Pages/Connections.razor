@@ -7,6 +7,7 @@
 @inject ConnectionManagementService ConnectionService
 @inject AuthenticationStateProvider AuthenticationStateProvider
 @inject NotificationService Notifications
+@inject DialogService Dialogs
 @inject TimeProvider TimeProvider
 @inject AccessControlEvaluator AccessControl
 
@@ -89,7 +90,7 @@ else
                         </label>
                         @if (Edit.AuthenticationKind == DatabaseAuthenticationKind.UserPassword)
                         {
-                            <label><span>@Localizer["Credential reference"]</span><input placeholder='@Localizer["warehouse_writer"]' maxlength="200" autocomplete="off" spellcheck="false" @bind="Edit.CredentialSecretReference" disabled="@Busy" /><small>@Localizer["Stable identifier used by workflows and connection metadata."]</small></label>
+                            <label><span>@Localizer["Credential reference"]</span><input placeholder="warehouse_writer" maxlength="200" autocomplete="off" spellcheck="false" @bind="Edit.CredentialSecretReference" disabled="@Busy" /><small>@Localizer["Stable identifier used by workflows and connection metadata."]</small></label>
                             <label><span>@Localizer["Database username"]</span><input maxlength="256" autocomplete="off" spellcheck="false" @bind="Edit.CredentialUserName" disabled="@Busy" /><small>@CredentialInputHint(Edit)</small></label>
                             <label><span>@Localizer["Database password"]</span><input type="password" maxlength="4096" autocomplete="new-password" @bind="Edit.CredentialPassword" disabled="@Busy" /></label>
                         }
@@ -114,7 +115,7 @@ else
                         {
                             <div class="transport-warning" role="alert"><RadzenIcon Icon="warning_amber" /><span>@Localizer["Plain FTP is unencrypted. The username, password, and file contents are exposed in transit."]</span></div>
                         }
-                        <label><span>@Localizer["Credential reference"]</span><input placeholder='@Localizer["ftp_partner"]' maxlength="200" autocomplete="off" spellcheck="false" @bind="Edit.CredentialSecretReference" disabled="@Busy" /></label>
+                        <label><span>@Localizer["Credential reference"]</span><input placeholder="ftp_partner" maxlength="200" autocomplete="off" spellcheck="false" @bind="Edit.CredentialSecretReference" disabled="@Busy" /></label>
                         <label><span>@Localizer["FTP username"]</span><input maxlength="256" autocomplete="off" spellcheck="false" @bind="Edit.CredentialUserName" disabled="@Busy" /><small>@CredentialInputHint(Edit)</small></label>
                         <label><span>@Localizer["FTP password"]</span><input type="password" maxlength="4096" autocomplete="new-password" @bind="Edit.CredentialPassword" disabled="@Busy" /></label>
                         <label class="check"><input type="checkbox" @bind="Edit.TrustServerCertificate" disabled="@(Busy || Edit.FtpEncryptionMode == FtpEncryptionMode.None)" /><span>@Localizer["Trust server certificate (development only)"]</span></label>
@@ -145,6 +146,7 @@ else
                     {
                         <RadzenButton Text='@Localizer["Test connection"]' Icon="network_check" ButtonStyle="ButtonStyle.Light" Click="@ProbeAsync" Disabled="@Busy" />
                         <RadzenButton Text="@(Edit.IsEnabled ? "Disable" : "Enable")" Icon="power_settings_new" ButtonStyle="@(Edit.IsEnabled ? ButtonStyle.Danger : ButtonStyle.Success)" Click="@ToggleAsync" Disabled="@Busy" />
+                        <RadzenButton Text='@Localizer["Delete connection"]' Icon="delete" ButtonStyle="ButtonStyle.Danger" Click="@DeleteAsync" Disabled="@Busy" />
                     }
                     <span></span>
                     <RadzenButton Text='@Localizer["Cancel"]' ButtonStyle="ButtonStyle.Light" Click="@CloseEditor" Disabled="@Busy" />
@@ -279,6 +281,13 @@ else
         ProbeResult = null;
         try
         {
+            if (Edit.UsesCredential &&
+                string.IsNullOrWhiteSpace(Edit.CredentialSecretReference))
+            {
+                FormError = Localizer["Enter a credential reference."];
+                return;
+            }
+
             var configuration = Edit.ToConfiguration();
             ConnectionCommandResult result;
             if (Edit.Id is { } id)
@@ -382,6 +391,60 @@ else
         }
     }
 
+    private async Task DeleteAsync()
+    {
+        if (Edit.Id is not { } id || !CanManage.Contains(id))
+        {
+            Notify(
+                NotificationSeverity.Error,
+                Localizer["You do not have permission to manage this connection."]);
+            return;
+        }
+
+        var confirmed = await Dialogs.Confirm(
+            Localizer[
+                "Delete '{0}'? Any workflows or datasets using this connection will stop working and must be reconfigured. Historical run and publication records will be preserved. This cannot be undone.",
+                Edit.Name],
+            Localizer["Delete connection"],
+            new ConfirmOptions
+            {
+                OkButtonText = Localizer["Delete"],
+                CancelButtonText = Localizer["Cancel"]
+            });
+        if (confirmed != true)
+        {
+            return;
+        }
+
+        Busy = true;
+        FormError = null;
+        ProbeResult = null;
+        try
+        {
+            var result = await ConnectionService.DeleteAsync(
+                id,
+                Edit.UpdatedAtUtc,
+                TimeProvider.GetUtcNow(),
+                cancellation.Token);
+            if (result.Status != ConnectionSaveStatus.Saved)
+            {
+                FormError = Localizer[
+                    result.Message ?? "The connection could not be deleted."];
+                return;
+            }
+
+            ShowEditor = false;
+            Notify(
+                NotificationSeverity.Success,
+                Localizer["Connection deleted. Workflows and datasets using it must be reconfigured."]);
+            await LoadAsync();
+        }
+        finally
+        {
+            Busy = false;
+        }
+    }
+
     private void CloseEditor()
     {
         ShowEditor = false;
@@ -462,6 +525,9 @@ else
         public string CredentialUserName { get; set; } = string.Empty;
         public string CredentialPassword { get; set; } = string.Empty;
         public bool HasStoredCredential { get; set; }
+        public bool UsesCredential => Kind == ConnectionKind.Ftp ||
+            IsDatabase(Kind) &&
+            AuthenticationKind == DatabaseAuthenticationKind.UserPassword;
         public bool Encrypt { get; set; } = true;
         public bool TrustServerCertificate { get; set; }
         public int ConnectTimeoutSeconds { get; set; } = 15;
@@ -537,10 +603,7 @@ else
 
         public ConnectionCredential? ToCredential()
         {
-            var usesCredential = Kind == ConnectionKind.Ftp ||
-                IsDatabase(Kind) &&
-                AuthenticationKind == DatabaseAuthenticationKind.UserPassword;
-            if (!usesCredential)
+            if (!UsesCredential)
             {
                 return null;
             }

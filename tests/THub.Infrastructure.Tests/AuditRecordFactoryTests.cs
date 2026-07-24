@@ -36,4 +36,31 @@ public sealed class AuditRecordFactoryTests
         Assert.Equal("DOMAIN\\operator", record.ActorIdentifier);
         Assert.DoesNotContain("sql01", record.ActorIdentifier);
     }
+
+    [Fact]
+    public void SoftDeletedConnectionProducesDeletedAuditAction()
+    {
+        var options = new DbContextOptionsBuilder<THubDbContext>()
+            .UseSqlServer("Server=(localdb)\\MSSQLLocalDB;Database=THub.Audit.Unit;Integrated Security=true")
+            .Options;
+        using var db = new THubDbContext(options);
+        var connection = new DataConnection(
+            "Warehouse",
+            ConnectionKind.SqlServer,
+            """{"schemaVersion":1,"server":"sql01"}""",
+            "DOMAIN\\owner",
+            new DateTimeOffset(2026, 7, 24, 1, 0, 0, TimeSpan.Zero));
+        db.Attach(connection);
+        connection.Delete(new DateTimeOffset(2026, 7, 24, 2, 0, 0, TimeSpan.Zero));
+
+        using var scope = AuditContext.Push(AuditActorKind.User, "DOMAIN\\operator");
+        var records = AuditRecordFactory.Create(
+            db.ChangeTracker,
+            new DateTimeOffset(2026, 7, 24, 2, 0, 0, TimeSpan.Zero));
+
+        var record = Assert.Single(records);
+        Assert.Equal("connection.deleted", record.Action);
+        Assert.Equal(connection.Id.ToString("D"), record.ResourceIdentifier);
+        Assert.Equal("DOMAIN\\operator", record.ActorIdentifier);
+    }
 }
