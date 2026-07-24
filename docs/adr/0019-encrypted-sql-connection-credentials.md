@@ -101,7 +101,7 @@ separate `ISecretResolver` policy from ADR-0012.
 
 - Add a bounded administrator operation for bulk re-encryption before deployments need
   to retire old key versions at scale.
-- Add retained credential create/replace audit events when PD-009 defines security-event
-  retention and classification.
+- ADR-0022 adds metadata-only credential create/replace audit records; PD-009 still defines
+  security-event retention and classification.
 - Revisit an HSM or vault-backed key provider if the deployment threat model no longer
   accepts environment-held master keys.

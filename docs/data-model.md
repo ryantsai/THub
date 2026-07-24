@@ -230,9 +230,11 @@ V1 has no `AlertDeliveryAttempts` history table. Each attempt updates the aggreg
 
 ### Audit and retention
 
-- A future `AuditEvents` stream would record actor or token identity, action, subject, correlation, timestamp, result, and bounded redacted details for privileged changes, token lifecycle, publication access, editor submission/approval/apply, and Email administration/delivery. It is not mapped today; publication/token/change-set rows retain their own actor, counter, status, and timestamp metadata instead.
+- `AuditRecords` is the append-only metadata stream from ADR-0022. It stores UTC occurrence time, user/system/API-token actor kind and bounded identifier, source host, stable action and outcome, resource type, and optional stable resource/correlation identifiers. It stores no arbitrary details or before/after values.
+- EF-backed control-plane changes append their records in the same transaction. Direct SQL paths append records for workflow-run claims, accepted publication-token uses, and publication change-set claim/apply outcomes. Pure lease renewals and aggregate node progress remain in their owning operational records rather than generating high-volume audit entries.
+- EF rejects audit update/delete tracking and `TR_AuditRecords_AppendOnly` rejects direct SQL updates/deletes. This is an application boundary, not protection from SQL database owners.
 
-PD-009 still blocks final retention periods and before/after value classification. No table may use the absence of a retention decision as permission to store credentials, bearer-token text, unrestricted row data, or full Email bodies.
+PD-009 still blocks final retention periods and before/after value classification, so no automatic audit purge is implemented. No table may use the absence of a retention decision as permission to store credentials, bearer-token text, unrestricted row data, or full Email bodies.
 
 ## EF Core conventions
 

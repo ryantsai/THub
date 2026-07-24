@@ -18,6 +18,7 @@ public static class Permissions
     public const string PublicationManage = Application.Security.SecurityPermissions.PublicationManage;
     public const string SecurityManage = Application.Security.SecurityPermissions.SecurityManage;
     public const string Administration = Application.Security.SecurityPermissions.Administration;
+    public const string AuditView = Application.Security.SecurityPermissions.AuditView;
 
     public static IReadOnlySet<string> All => Application.Security.SecurityPermissions.All;
 }

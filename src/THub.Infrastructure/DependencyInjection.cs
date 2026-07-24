@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using THub.Application.Actions;
+using THub.Application.Auditing;
 using THub.Application.Alerts;
 using THub.Application.Connections;
 using THub.Application.Execution;
@@ -11,6 +12,7 @@ using THub.Application.Security;
 using THub.Application.Workflows;
 using THub.Application.Workflows.Management;
 using THub.Infrastructure.Actions;
+using THub.Infrastructure.Auditing;
 using THub.Infrastructure.Alerts;
 using THub.Infrastructure.Connections;
 using THub.Infrastructure.Execution;
@@ -54,6 +56,7 @@ public static class DependencyInjection
         AddPublicationSourceInspection(services);
         services.AddScoped<IAccessControlStore, SqlAccessControlStore>();
         services.AddSingleton<ITrustedActionStore, SqlTrustedActionStore>();
+        services.AddScoped<IAuditRecordStore, SqlAuditRecordStore>();
         return services;
     }
 

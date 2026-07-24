@@ -82,6 +82,69 @@ namespace THub.Infrastructure.Persistence.Migrations
                     b.ToTable("TrustedActions", "thub");
                 });
 
+            modelBuilder.Entity("THub.Domain.Auditing.AuditRecord", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Action")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<string>("ActorIdentifier")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)");
+
+                    b.Property<string>("ActorKind")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("nvarchar(32)");
+
+                    b.Property<string>("CorrelationIdentifier")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<DateTimeOffset>("OccurredAtUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("Outcome")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("nvarchar(32)");
+
+                    b.Property<string>("ResourceIdentifier")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<string>("ResourceType")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<string>("Source")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Action", "OccurredAtUtc");
+
+                    b.HasIndex("ActorIdentifier", "OccurredAtUtc");
+
+                    b.HasIndex("OccurredAtUtc");
+
+                    b.HasIndex("ResourceType", "ResourceIdentifier", "OccurredAtUtc");
+
+                    b.ToTable("AuditRecords", "thub", t =>
+                        {
+                            t.HasTrigger("TR_AuditRecords_AppendOnly");
+                        });
+                });
+
             modelBuilder.Entity("THub.Domain.Alerts.AlertDelivery", b =>
                 {
                     b.Property<Guid>("Id")

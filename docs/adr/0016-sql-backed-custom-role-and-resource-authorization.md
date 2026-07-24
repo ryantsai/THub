@@ -66,6 +66,6 @@ SQL Server remains the only authoritative THub control-plane provider. Authoriza
 
 ## Follow-up
 
-- Add retained access-control change audit events when PD-009 defines retention and classification.
+- ADR-0022 adds metadata-only access-control change audit records; PD-009 still governs retention.
 - Consider a short-lived authorization cache only with immediate invalidation after role changes.
 - Add resource-name selectors to the role editor; the initial backend stores stable identifiers.

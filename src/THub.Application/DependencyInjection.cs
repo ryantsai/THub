@@ -1,5 +1,6 @@
 using Microsoft.Extensions.DependencyInjection;
 using THub.Application.Actions;
+using THub.Application.Auditing;
 using THub.Application.Alerts;
 using THub.Application.Connections;
 using THub.Application.Execution;
@@ -41,6 +42,7 @@ public static class DependencyInjection
         services.AddSingleton<TrustedActionDefinitionSerializer>();
         services.AddScoped<TrustedActionAdministrationService>();
         services.AddScoped<TrustedActionWorkflowAuthorization>();
+        services.AddScoped<AuditTrailService>();
         services.AddSingleton(TimeProvider.System);
         return services;
     }

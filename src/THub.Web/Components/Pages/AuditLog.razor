@@ -1,0 +1,215 @@
+@page "/audit"
+@attribute [Authorize(Policy = Permissions.AuditView)]
+@implements IDisposable
+@using THub.Application.Auditing
+@using THub.Domain.Auditing
+@inject AuditTrailService AuditTrail
+
+<PageTitle>Audit log · THub</PageTitle>
+
+<div class="page-heading">
+    <div>
+        <div class="eyebrow">Administration</div>
+        <h1>Audit log</h1>
+        <p>Trace persistent management, execution, delivery, and publication activity without exposing payloads or secrets.</p>
+    </div>
+    <div class="heading-actions audit-filters">
+        <RadzenTextBox @bind-Value="Search" Placeholder="Actor, action, or resource" @onkeydown="HandleSearchKeyAsync" />
+        <RadzenDropDown TValue="AuditOutcome?" Data="@OutcomeOptions" TextProperty="Label" ValueProperty="Value"
+                        @bind-Value="Outcome" Placeholder="All outcomes" AllowClear="true" />
+        <RadzenButton Text="Search" Icon="search" Click="@ApplyFiltersAsync" Disabled="@Busy" />
+        <RadzenButton Text="Refresh" Icon="refresh" ButtonStyle="ButtonStyle.Light" Click="@LoadAsync" Disabled="@Busy" />
+    </div>
+</div>
+
+<section class="panel">
+    <div class="panel-head">
+        <div><h2>Persistent events</h2><p>@Summary</p></div>
+        <span class="audit-safety">Metadata only</span>
+    </div>
+
+    @if (Busy && Items.Count == 0)
+    {
+        <div class="page-state"><RadzenProgressBar Mode="ProgressBarMode.Indeterminate" /><p>Loading audit events…</p></div>
+    }
+    else if (Error is not null)
+    {
+        <div class="page-state error"><RadzenIcon Icon="error_outline" /><p>@Error</p><button type="button" @onclick="LoadAsync">Try again</button></div>
+    }
+    else if (Items.Count == 0)
+    {
+        <div class="page-state"><RadzenIcon Icon="policy" /><h3>No matching audit events</h3><p>Adjust the filters or return after an audited action has completed.</p></div>
+    }
+    else
+    {
+        <div class="table-scroll">
+            <table class="activity-table audit-table">
+                <thead><tr><th>When</th><th>Actor</th><th>Action</th><th>Resource</th><th>Source</th><th>Outcome</th><th></th></tr></thead>
+                <tbody>
+                    @foreach (var item in Items)
+                    {
+                        <tr class="@(Selected?.Id == item.Id ? "selected" : null)">
+                            <td class="muted audit-time">@item.OccurredAtUtc.ToLocalTime().ToString("G")</td>
+                            <td><strong>@item.ActorIdentifier</strong><small>@item.ActorKind</small></td>
+                            <td><code>@item.Action</code></td>
+                            <td><strong>@item.ResourceType</strong><small>@ShortIdentifier(item.ResourceIdentifier)</small></td>
+                            <td class="muted">@item.Source</td>
+                            <td><span class="status-chip @OutcomeCss(item.Outcome)">@item.Outcome</span></td>
+                            <td><button class="audit-link" type="button" @onclick="() => SelectAsync(item.Id)">Details</button></td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+        <div class="audit-pager" aria-label="Audit pagination">
+            <span>Page @CurrentPage of @PageCount</span>
+            <div>
+                <button type="button" disabled="@(Busy || Offset == 0)" @onclick="PreviousAsync">Previous</button>
+                <button type="button" disabled="@(Busy || Offset + PageSize >= TotalCount)" @onclick="NextAsync">Next</button>
+            </div>
+        </div>
+    }
+</section>
+
+@if (Selected is not null)
+{
+    <section class="panel audit-detail" aria-label="Audit event details">
+        <div class="panel-head">
+            <div><h2>@Selected.Action</h2><p>@Selected.Id</p></div>
+            <span class="status-chip @OutcomeCss(Selected.Outcome)">@Selected.Outcome</span>
+        </div>
+        <div class="audit-detail-grid">
+            <dl><dt>Occurred</dt><dd>@Selected.OccurredAtUtc.ToLocalTime().ToString("O")</dd></dl>
+            <dl><dt>Actor</dt><dd>@Selected.ActorIdentifier <small>@Selected.ActorKind</small></dd></dl>
+            <dl><dt>Source host</dt><dd>@Selected.Source</dd></dl>
+            <dl><dt>Resource type</dt><dd>@Selected.ResourceType</dd></dl>
+            <dl><dt>Resource identifier</dt><dd>@(Selected.ResourceIdentifier ?? "—")</dd></dl>
+            <dl><dt>Correlation identifier</dt><dd>@(Selected.CorrelationIdentifier ?? "—")</dd></dl>
+        </div>
+        <p class="audit-boundary">
+            Audit records intentionally contain stable identifiers and outcomes only. Configuration, SQL, paths, headers, tokens, row values, and request or response bodies are not stored here.
+        </p>
+    </section>
+}
+
+@code {
+    private const int PageSize = 100;
+    private readonly CancellationTokenSource cancellation = new();
+    private IReadOnlyList<AuditRecordDto> Items { get; set; } = [];
+    private AuditRecordDto? Selected { get; set; }
+    private string? Search { get; set; }
+    private AuditOutcome? Outcome { get; set; }
+    private int Offset { get; set; }
+    private int TotalCount { get; set; }
+    private bool Busy { get; set; }
+    private string? Error { get; set; }
+
+    private static IReadOnlyList<OutcomeOption> OutcomeOptions { get; } = Enum
+        .GetValues<AuditOutcome>()
+        .Select(value => new OutcomeOption(value, value.ToString()))
+        .ToArray();
+
+    private int CurrentPage => TotalCount == 0 ? 1 : (Offset / PageSize) + 1;
+    private int PageCount => Math.Max(1, (int)Math.Ceiling(TotalCount / (double)PageSize));
+    private string Summary => $"{TotalCount:N0} matching events · newest first";
+
+    protected override Task OnInitializedAsync() => LoadAsync();
+
+    private async Task ApplyFiltersAsync()
+    {
+        Offset = 0;
+        Selected = null;
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        Busy = true;
+        Error = null;
+        try
+        {
+            var page = await AuditTrail.ListAsync(
+                new AuditRecordListRequest(Offset, PageSize, Search, Outcome),
+                cancellation.Token);
+            Items = page.Items;
+            TotalCount = page.TotalCount;
+            if (Selected is not null && Items.All(item => item.Id != Selected.Id))
+            {
+                Selected = null;
+            }
+        }
+        catch (OperationCanceledException) when (cancellation.IsCancellationRequested)
+        {
+        }
+        catch (Exception)
+        {
+            Error = "Audit records are temporarily unavailable.";
+        }
+        finally
+        {
+            Busy = false;
+        }
+    }
+
+    private async Task SelectAsync(Guid id)
+    {
+        try
+        {
+            Selected = await AuditTrail.FindAsync(id, cancellation.Token);
+        }
+        catch (OperationCanceledException) when (cancellation.IsCancellationRequested)
+        {
+        }
+        catch (Exception)
+        {
+            Error = "The audit event could not be loaded.";
+        }
+    }
+
+    private async Task PreviousAsync()
+    {
+        Offset = Math.Max(0, Offset - PageSize);
+        Selected = null;
+        await LoadAsync();
+    }
+
+    private async Task NextAsync()
+    {
+        if (Offset + PageSize >= TotalCount)
+        {
+            return;
+        }
+
+        Offset += PageSize;
+        Selected = null;
+        await LoadAsync();
+    }
+
+    private async Task HandleSearchKeyAsync(KeyboardEventArgs args)
+    {
+        if (string.Equals(args.Key, "Enter", StringComparison.Ordinal))
+        {
+            await ApplyFiltersAsync();
+        }
+    }
+
+    private static string ShortIdentifier(string? value) =>
+        string.IsNullOrWhiteSpace(value)
+            ? "No stable identifier"
+            : value.Length > 18 ? $"{value[..18]}…" : value;
+
+    private static string OutcomeCss(AuditOutcome outcome) => outcome switch
+    {
+        AuditOutcome.Failed => "failed",
+        AuditOutcome.Denied => "draft",
+        _ => string.Empty,
+    };
+
+    public void Dispose()
+    {
+        cancellation.Cancel();
+        cancellation.Dispose();
+    }
+
+    private sealed record OutcomeOption(AuditOutcome Value, string Label);
+}

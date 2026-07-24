@@ -36,6 +36,7 @@ Accepted ADRs are not immutable. Supersede them when evidence changes; do not si
 | [0019](0019-encrypted-sql-connection-credentials.md) | Accepted | AES-GCM encrypted SQL-backed connection credentials with external versioned keys |
 | [0020](0020-sql-backed-trusted-workflow-actions.md) | Accepted | SQL-backed, role-granted trusted webhooks and executables with optional encrypted Windows run-as credentials |
 | [0021](0021-provider-neutral-governed-publications.md) | Accepted | Provider-neutral governed publications, separate Worker apply connections, and Swagger consumer contracts |
+| [0022](0022-append-only-control-plane-audit.md) | Accepted | Append-only, metadata-only control-plane audit trail and authorized viewer |
 
 ## Creating an ADR
 

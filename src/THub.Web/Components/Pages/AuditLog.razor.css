@@ -1,0 +1,32 @@
+.audit-filters { flex-wrap: wrap; justify-content: flex-end; }
+.audit-filters .rz-textbox { min-width: 240px; height: 40px; }
+.audit-filters .rz-dropdown { min-width: 145px; height: 40px; }
+.audit-safety { padding: 5px 9px; border: 1px solid #cfe4dc; border-radius: 20px; color: #397564; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .5px; }
+.audit-table tr.selected td { background: #f2f8f6; }
+.audit-table td { vertical-align: top; }
+.audit-table td strong, .audit-table td small { display: block; }
+.audit-table td small { margin-top: 4px; color: #899693; font-size: 9px; }
+.audit-table code { color: #245e50; font: 600 10px/1.5 ui-monospace, monospace; white-space: nowrap; }
+.audit-time { white-space: nowrap; font-variant-numeric: tabular-nums; }
+.audit-link { padding: 0; border: 0; background: none; color: #17775f; font-size: 10px; font-weight: 700; cursor: pointer; }
+.audit-pager { min-height: 58px; padding: 0 18px; display: flex; align-items: center; justify-content: space-between; border-top: 1px solid #edf1f0; color: #74837f; font-size: 11px; }
+.audit-pager div { display: flex; gap: 8px; }
+.audit-pager button { padding: 7px 11px; border: 1px solid #d7e1de; border-radius: 6px; background: white; color: #17775f; font-size: 10px; font-weight: 700; cursor: pointer; }
+.audit-pager button:disabled { color: #a2adaa; cursor: not-allowed; }
+.audit-detail { margin-top: 18px; }
+.audit-detail-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1px; padding: 18px; background: #edf1f0; }
+.audit-detail-grid dl { min-width: 0; margin: 0; padding: 13px; background: white; }
+.audit-detail-grid dt { color: #83908d; font-size: 9px; text-transform: uppercase; letter-spacing: .7px; }
+.audit-detail-grid dd { margin: 5px 0 0; font-size: 11px; overflow-wrap: anywhere; }
+.audit-detail-grid small { color: #83908d; }
+.audit-boundary { margin: 0; padding: 0 18px 18px; color: #72817e; font-size: 11px; line-height: 1.6; }
+
+@media (max-width: 900px) {
+    .audit-detail-grid { grid-template-columns: 1fr 1fr; }
+}
+
+@media (max-width: 650px) {
+    .audit-filters { width: 100%; justify-content: stretch; }
+    .audit-filters .rz-textbox, .audit-filters .rz-dropdown { width: 100%; }
+    .audit-detail-grid { grid-template-columns: 1fr; }
+}

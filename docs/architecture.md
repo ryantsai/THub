@@ -18,10 +18,10 @@ Webhook calls and external executables run only through SQL-backed, role-granted
 
 | Area | Current implementation | Target direction |
 | --- | --- | --- |
-| Web | Global Interactive Server Blazor app, Radzen shell, Windows auth/RBAC, persisted workflow catalog/designer with live relational schema mapping, run controls/history, publication administration, and bounded staged Spreadsheet editor | Complete audit/retention and deeper live-run telemetry |
+| Web | Global Interactive Server Blazor app, Radzen shell, Windows auth/RBAC, persisted workflow catalog/designer with live relational schema mapping, run controls/history, publication administration, bounded staged Spreadsheet editor, and authorized audit viewer | Retention and deeper live-run telemetry |
 | Publications host | Separate managed-bearer ASP.NET Core host with bounded read-only `/schema` and `/rows` routes, Swagger/OpenAPI, atomic accepted-use metering, process-local admission, Problem Details, logging, and `/healthz` | Relational readiness/metrics and a gateway or distributed limiter before scale-out |
 | Worker | Windows Service host, persistent Quartz scheduling, atomic run claims/heartbeats/recovery, bounded graph execution, durable step attempts, Email-outbox dispatch, and claimed approved editor apply | Checkpoint/resume decisions, optional bounded spill, and expanded telemetry |
-| Database | `thub` control-plane schema including immutable workflow versions, leased runs/step attempts, Email, and publication versions/tokens/grants/change sets plus `quartz` operational scheduler schema | Expanded audit/retention |
+| Database | `thub` control-plane schema including immutable workflow versions, leased runs/step attempts, Email, publication versions/tokens/grants/change sets, and append-only audit records plus `quartz` operational scheduler schema | Retention and capacity automation |
 | Connectors | Bounded SQL Server/MySQL/PostgreSQL/Oracle sources and insert targets, local and FTP/FTPS delimited/Excel sources and create-new targets, transforms, and Email action | Live interoperability matrix, richer mapping, explicitly governed operations, and optional pushdown/spill |
 | Publications | Governed immutable REST versions, managed tokens/counters, provider-specific relational discovery/readers, Swagger/OpenAPI, role grants, Spreadsheet staging/review, and separate Worker-only provider-neutral apply connections | Authorized build plus live relational/browser coverage, production readiness, retention, and multi-host admission decision |
 | Email alerts | Durable workflow-event and canvas-action outbox delivery through governed SMTP profiles, with administrator management, a redacted delivery monitor, and MailKit sender | Approved production secret-provider integration and a reviewed dead-letter recovery operation |
@@ -233,7 +233,7 @@ ADR-0011 separates REST and editor responsibilities:
 - Provider-specific SQL Server, MySQL, PostgreSQL, and Oracle inspection discovers tables/views, supported typed columns, a stable non-null primary or unique key, generated/concurrency metadata, and foreign keys. Display/search candidates are suggestions only; management defaults every lookup to unapproved and persists it only after explicit administrator selection. The active version freezes that policy and its fingerprint. Loaded labels are batch-resolved with bounded parameterized queries, and the bounded searchable `RadzenDropDownDataGrid` editor commits single or atomic composite referenced keys. Staging rechecks tuple existence against the active schema before persisting a change set.
 - non-generated key values can be supplied for insert, but keys, generated columns, and concurrency tokens are never update targets. Source uniqueness/foreign-key violations and optimistic-concurrency misses become change-set conflicts.
 
-Change-set apply deliberately does not claim exactly-once cross-database effects. If source commit completion is ambiguous, the stale apply is failed for operator reconciliation instead of automatically replaying a potentially duplicated insert. A general audit stream and before/after retention classification remain open under PD-009.
+Change-set apply deliberately does not claim exactly-once cross-database effects. If source commit completion is ambiguous, the stale apply is failed for operator reconciliation instead of automatically replaying a potentially duplicated insert. Audit lifecycle metadata is persisted without row values; before/after classification and retention remain open under PD-009.
 
 ## 9. Security and trust boundaries
 
@@ -253,7 +253,7 @@ The publication API uses a different trust boundary: IIS permits anonymous trans
 
 Authorization is permission-based. Windows groups map to application roles, and roles grant named permissions. A fallback policy requires authentication. Server endpoints and privileged operations must enforce policies even when navigation is hidden with `AuthorizeView`.
 
-Current permissions cover workflow view/edit/execute, schedule management, connection management, publication management, and administration.
+Current permissions cover workflow view/edit/execute, schedule management, connection management, publication management, audit viewing, and administration.
 
 Workflow removal and package portability follow [ADR-0017](adr/0017-safe-workflow-lifecycle-and-package-portability.md).
 `workflow.delete` permits resource-authorized archive and the narrower permanent deletion
@@ -274,7 +274,7 @@ Publication-management permission does not itself grant access to editor data. E
 - Never interpolate user-provided SQL identifiers or fragments without validation/allow-listing.
 - Canonicalize and validate file paths against configured roots.
 - Protect publication routes with explicit authentication, approved object/column policy, bounds, and admission limits. Add a fixed row policy before publishing data that is not safe at the full approved row scope.
-- Treat token counters and change-set actor/status fields as operational metadata, not as a substitute for the still-pending append-only audit stream.
+- Treat token counters and change-set actor/status fields as operational metadata alongside, not as a substitute for, the append-only audit stream.
 - Store only a selector, display prefix, algorithm version, and one-way verifier for a managed publication token; return the full token once and never log it.
 - Store SMTP credential references rather than secret values and resolve them only inside the Worker dispatcher. The default resolver supports no referenced credential; production authenticated SMTP requires an organization-approved `ISecretResolver`.
 
@@ -297,10 +297,11 @@ Current tables in schema `thub`:
 | `PublicationAccessTokens` | Opaque-token selector/verifier, expiry/revocation, accepted count, and last-use metadata | unique binary-collated selector; rowversion concurrency |
 | `PublicationGrants` | Per-publication role capabilities | unique publication + role |
 | `PublicationChangeSets`, `PublicationChanges` | Staged insert/update/delete review and apply state plus bounded row JSON | status/submission indexes, rowversion, restricted publication/version relationships |
+| `AuditRecords` | Append-only actor/action/outcome/resource metadata for completed control-plane actions | occurred/action/actor/resource indexes; update/delete rejection trigger |
 
 Migrations live in `src/THub.Infrastructure/Persistence/Migrations`. Production deployment must apply reviewed migrations as a separate deployment step; web/worker startup should not silently mutate the schema.
 
-Reviewed mappings and migrations now include immutable workflow versions, run claims/cancellation, step attempts, Email delivery profiles/rules/outbox, and the governed publication tables listed above. Email templates are value objects serialized with their rules, and delivery attempt state is summarized on each delivery rather than stored in a separate attempt-history table. Expanded audit events and retention metadata remain future work.
+Reviewed mappings and migrations now include immutable workflow versions, run claims/cancellation, step attempts, Email delivery profiles/rules/outbox, governed publication tables, and append-only audit records. Email templates are value objects serialized with their rules, and delivery attempt state is summarized on each delivery rather than stored in a separate attempt-history table. Retention metadata and purge automation remain future work.
 
 ## 11. Availability, concurrency, and scale
 
@@ -324,6 +325,7 @@ Implemented:
 - a basic unauthenticated `/healthz` process health endpoint;
 - an authorized `/api/v1/runtime/status` endpoint;
 - a separate publication host with managed-bearer `/schema` and `/rows` routes, Serilog request output, Problem Details, bounded responses, and basic `/healthz` process liveness.
+- append-only metadata audit records plus an `audit.view`-protected searchable/paged management viewer.
 
 Required before production:
 
@@ -331,7 +333,7 @@ Required before production:
 - correlation IDs across workflow, run, and step records;
 - structured step/run logs with redaction;
 - duration, throughput, failure, retry, queue-depth, and schedule-lag metrics;
-- audit records for workflow publication, connection changes, role configuration, generated APIs, and editor writes;
+- a separate policy for failed/denied request security events that do not commit control-plane state;
 - publication token accepted-use, rejection, source-query, and schema-drift metrics without token or row payloads;
 - Email outbox depth, attempts, age, dead letters, and safe delivery-error categories;
 - retention policies for logs, runs, staging data, and exports.
@@ -371,7 +373,7 @@ Internet exposure, additional publication instances, alternate JWT/Entra authent
 2. Decide checkpoint/resume and bounded disk-spill semantics before supporting workflows larger than the current in-memory budgets.
 3. Integrate an organization-approved SMTP secret provider and add Email outbox monitoring and operator recovery surfaces.
 4. Add publication-host SQL readiness, centralized metrics, live SQL Server/browser coverage, and operator reconciliation for ambiguous editor applies.
-5. Resolve publication before/after classification and retention under PD-009; require a new ADR before internet exposure, alternate authentication, direct writes, or multi-host admission.
-6. Add complete audit/retention, readiness, and production monitoring; extend the implemented redacted workflow-package format only through explicit schema compatibility.
+5. Resolve audit/publication classification and retention under PD-009; require a new ADR before internet exposure, alternate authentication, direct writes, or multi-host admission.
+6. Add failed/denied request security-event policy, readiness, and production monitoring; extend the implemented redacted workflow-package format only through explicit schema compatibility.
 
 Architecture changes must be captured by a new or superseding ADR and reflected here.

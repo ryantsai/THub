@@ -93,15 +93,33 @@ public sealed class SqlPublicationChangeSetClaimStore(
         await db.Database.OpenConnectionAsync(cancellationToken).ConfigureAwait(false);
         var connection = (SqlConnection)db.Database.GetDbConnection();
         const string claimText = """
+            SET NOCOUNT ON;
+            SET XACT_ABORT ON;
             SET TRANSACTION ISOLATION LEVEL READ COMMITTED;
+            DECLARE @stale TABLE ([Id] uniqueidentifier NOT NULL, [PublicationId] uniqueidentifier NOT NULL);
+            DECLARE @claimed TABLE ([Id] uniqueidentifier NOT NULL, [PublicationId] uniqueidentifier NOT NULL);
+
+            BEGIN TRANSACTION;
 
             UPDATE [thub].[PublicationChangeSets]
             SET [Status] = N'Failed',
                 [CompletedAtUtc] = @nowUtc,
                 [OutcomeDetail] = N'Apply lease expired; reconcile the source before resubmitting.',
                 [UpdatedAtUtc] = @nowUtc
+            OUTPUT inserted.[Id], inserted.[PublicationId] INTO @stale
             WHERE [Status] = N'Applying'
               AND [UpdatedAtUtc] < @staleBeforeUtc;
+
+            INSERT INTO [thub].[AuditRecords]
+            (
+                [Id], [OccurredAtUtc], [ActorKind], [ActorIdentifier], [Source],
+                [Action], [Outcome], [ResourceType], [ResourceIdentifier], [CorrelationIdentifier]
+            )
+            SELECT
+                NEWID(), @nowUtc, N'System', @leaseOwner, N'thub.worker',
+                N'publication-change-set.lease-expired', N'Failed', N'publication-change-set',
+                CONVERT(nvarchar(36), stale.[Id]), CONVERT(nvarchar(36), stale.[PublicationId])
+            FROM @stale AS stale;
 
             ;WITH candidate AS
             (
@@ -122,9 +140,24 @@ public sealed class SqlPublicationChangeSetClaimStore(
                 change_set.[ApplyStartedBy] = @leaseOwner,
                 change_set.[ApplyStartedAtUtc] = @nowUtc,
                 change_set.[UpdatedAtUtc] = @nowUtc
-            OUTPUT inserted.[Id]
+            OUTPUT inserted.[Id], inserted.[PublicationId] INTO @claimed
             FROM [thub].[PublicationChangeSets] AS change_set
             INNER JOIN candidate ON candidate.[Id] = change_set.[Id];
+
+            INSERT INTO [thub].[AuditRecords]
+            (
+                [Id], [OccurredAtUtc], [ActorKind], [ActorIdentifier], [Source],
+                [Action], [Outcome], [ResourceType], [ResourceIdentifier], [CorrelationIdentifier]
+            )
+            SELECT
+                NEWID(), @nowUtc, N'System', @leaseOwner, N'thub.worker',
+                N'publication-change-set.claimed', N'Succeeded', N'publication-change-set',
+                CONVERT(nvarchar(36), claimed.[Id]), CONVERT(nvarchar(36), claimed.[PublicationId])
+            FROM @claimed AS claimed;
+
+            COMMIT TRANSACTION;
+
+            SELECT TOP (1) [Id] FROM @claimed;
             """;
         await using var command = connection.CreateCommand();
         command.CommandText = claimText;
@@ -206,14 +239,39 @@ public sealed class SqlPublicationChangeSetClaimStore(
             _ => throw new ArgumentOutOfRangeException(nameof(outcome)),
         };
         const string commandText = """
+            SET NOCOUNT ON;
+            SET XACT_ABORT ON;
+            DECLARE @completed TABLE ([PublicationId] uniqueidentifier NOT NULL);
+
+            BEGIN TRANSACTION;
+
             UPDATE [thub].[PublicationChangeSets]
             SET [Status] = @status,
                 [CompletedAtUtc] = @nowUtc,
                 [OutcomeDetail] = @detail,
                 [UpdatedAtUtc] = @nowUtc
+            OUTPUT inserted.[PublicationId] INTO @completed
             WHERE [Id] = @changeSetId
               AND [Status] = N'Applying'
               AND [ApplyStartedBy] = @leaseOwner;
+
+            INSERT INTO [thub].[AuditRecords]
+            (
+                [Id], [OccurredAtUtc], [ActorKind], [ActorIdentifier], [Source],
+                [Action], [Outcome], [ResourceType], [ResourceIdentifier], [CorrelationIdentifier]
+            )
+            SELECT
+                NEWID(), @nowUtc, N'System', @leaseOwner, N'thub.worker',
+                N'publication-change-set.' + LOWER(@status),
+                CASE WHEN @status = N'Applied' THEN N'Succeeded' ELSE N'Failed' END,
+                N'publication-change-set',
+                CONVERT(nvarchar(36), @changeSetId),
+                CONVERT(nvarchar(36), completed.[PublicationId])
+            FROM @completed AS completed;
+
+            COMMIT TRANSACTION;
+
+            SELECT COUNT(*) FROM @completed;
             """;
         await using var db = await contextFactory.CreateDbContextAsync(cancellationToken)
             .ConfigureAwait(false);
@@ -236,7 +294,9 @@ public sealed class SqlPublicationChangeSetClaimStore(
             Value = detail is null ? DBNull.Value : detail,
         });
 
-        return await command.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false) == 1;
+        return Convert.ToInt32(
+            await command.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false),
+            System.Globalization.CultureInfo.InvariantCulture) == 1;
     }
 
     private static void AddLeaseParameters(

@@ -64,5 +64,5 @@ applies; import never publishes or executes a workflow.
 
 ## Follow-up
 
-- Add retained deletion/archive/import/export audit events when PD-009 defines retention.
+- ADR-0022 adds metadata-only lifecycle audit records for persisted changes; PD-009 still governs retention.
 - Add explicit user-selected connection mapping if automatic mapping is insufficient.

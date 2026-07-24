@@ -25,6 +25,7 @@ public static class SecurityPermissions
     public const string PublicationApprove = "publication.approve";
     public const string SecurityManage = "security.manage";
     public const string Administration = "administration";
+    public const string AuditView = "audit.view";
 
     public static readonly IReadOnlySet<string> All = new HashSet<string>(
     [
@@ -49,6 +50,7 @@ public static class SecurityPermissions
         PublicationApprove,
         SecurityManage,
         Administration,
+        AuditView,
     ], StringComparer.Ordinal);
 
     public static readonly IReadOnlySet<string> GlobalAssignable = new HashSet<string>(

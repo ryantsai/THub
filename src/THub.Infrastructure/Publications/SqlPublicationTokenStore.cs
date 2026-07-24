@@ -128,9 +128,16 @@ public sealed class SqlPublicationTokenStore(
             var connection = (SqlConnection)db.Database.GetDbConnection();
 
             // Execute directly so the configured retrying EF execution strategy cannot replay a
-            // counter increment after an ambiguous network failure. One UPDATE performs every
-            // state check and both mutations atomically; an uncertain result fails closed.
+            // counter increment after an ambiguous network failure. One guarded transaction
+            // performs every state check, the counter update, and its audit insert atomically;
+            // an uncertain result fails closed.
             const string updateText = """
+                SET NOCOUNT ON;
+                SET XACT_ABORT ON;
+                DECLARE @affected int;
+
+                BEGIN TRANSACTION;
+
                 UPDATE token
                 SET token.[AcceptedRequestCount] = token.[AcceptedRequestCount] + CONVERT(bigint, 1),
                     token.[LastUsedAtUtc] = CASE
@@ -153,12 +160,49 @@ public sealed class SqlPublicationTokenStore(
                         AND publication.[State] = N'Active'
                         AND publication.[ActiveVersionId] = @publicationVersionId
                   );
+
+                SET @affected = @@ROWCOUNT;
+                IF @affected = 1
+                BEGIN
+                    INSERT INTO [thub].[AuditRecords]
+                    (
+                        [Id],
+                        [OccurredAtUtc],
+                        [ActorKind],
+                        [ActorIdentifier],
+                        [Source],
+                        [Action],
+                        [Outcome],
+                        [ResourceType],
+                        [ResourceIdentifier],
+                        [CorrelationIdentifier]
+                    )
+                    VALUES
+                    (
+                        NEWID(),
+                        @acceptedAtUtc,
+                        N'ApiToken',
+                        CONVERT(nvarchar(36), @tokenId),
+                        N'thub.publications',
+                        N'publication-api.request.accepted',
+                        N'Succeeded',
+                        N'publication',
+                        CONVERT(nvarchar(36), @publicationId),
+                        CONVERT(nvarchar(36), @publicationVersionId)
+                    );
+                END
+
+                COMMIT TRANSACTION;
+
+                SELECT @affected;
                 """;
             await using var update = connection.CreateCommand();
             update.CommandText = updateText;
             update.CommandTimeout = 30;
             AddMeterParameters(update, tokenId, publicationId, publicationVersionId, acceptedAt);
-            var affected = await update.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
+            var affected = Convert.ToInt32(
+                await update.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false),
+                System.Globalization.CultureInfo.InvariantCulture);
             if (affected == 1)
             {
                 return PublicationAcceptedUseStatus.Recorded;

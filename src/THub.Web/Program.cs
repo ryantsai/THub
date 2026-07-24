@@ -2,6 +2,8 @@ using Microsoft.AspNetCore.Authentication.Negotiate;
 using Radzen;
 using Serilog;
 using THub.Application;
+using THub.Application.Auditing;
+using THub.Domain.Auditing;
 using THub.Infrastructure;
 using THub.Web;
 using THub.Web.Components;
@@ -34,6 +36,7 @@ try
             .AddNegotiate();
     }
     builder.Services.AddTHubAuthorization(builder.Configuration);
+    builder.Services.AddScoped<IAuditViewerAuthorization, AuditViewerAuthorization>();
     builder.Services.AddRadzenComponents();
     builder.Services.AddWebApplication();
     builder.Services.AddWebInfrastructure(builder.Configuration);
@@ -52,6 +55,14 @@ try
     app.UseHttpsRedirection();
     app.UseSerilogRequestLogging();
     app.UseAuthentication();
+    app.Use(async (context, next) =>
+    {
+        var actor = context.User.Identity?.Name;
+        using var auditScope = AuditContext.Push(
+            string.IsNullOrWhiteSpace(actor) ? AuditActorKind.System : AuditActorKind.User,
+            string.IsNullOrWhiteSpace(actor) ? "thub.web" : actor);
+        await next(context);
+    });
     app.UseAuthorization();
     app.UseAntiforgery();
 

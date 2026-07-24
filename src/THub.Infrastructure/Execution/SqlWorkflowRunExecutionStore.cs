@@ -79,7 +79,35 @@ public sealed class SqlWorkflowRunExecutionStore(
                             AND ([LeaseExpiresAtUtc] IS NULL OR [LeaseExpiresAtUtc] <= @ClaimedAtUtc)));
 
                 IF @@ROWCOUNT = 1
+                BEGIN
                     SET @ClaimedRunId = @CandidateRunId;
+                    INSERT INTO [thub].[AuditRecords]
+                    (
+                        [Id],
+                        [OccurredAtUtc],
+                        [ActorKind],
+                        [ActorIdentifier],
+                        [Source],
+                        [Action],
+                        [Outcome],
+                        [ResourceType],
+                        [ResourceIdentifier],
+                        [CorrelationIdentifier]
+                    )
+                    VALUES
+                    (
+                        NEWID(),
+                        @ClaimedAtUtc,
+                        N'System',
+                        @LeaseOwner,
+                        N'thub.worker',
+                        N'workflow-run.claimed',
+                        N'Succeeded',
+                        N'workflow-run',
+                        CONVERT(nvarchar(36), @CandidateRunId),
+                        CONVERT(nvarchar(36), @CandidateWorkflowId)
+                    );
+                END
             END
         END
 

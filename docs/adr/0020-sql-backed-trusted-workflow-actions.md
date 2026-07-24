@@ -84,8 +84,8 @@ PD-009.
   filesystem/network ACLs.
 - THub does not provide an operating-system sandbox, CPU quota, or arbitrary output-file
   containment; administrators must use a restricted identity and ACLs.
-- Structured logs and definition metadata are not the final durable audit stream while
-  PD-009 remains unresolved.
+- ADR-0022 supplies the durable metadata-only definition/execution lifecycle stream;
+  PD-009 remains open for retention.
 
 ## Alternatives considered
 

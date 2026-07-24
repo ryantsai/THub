@@ -50,7 +50,7 @@ Rules:
 - Enforce permissions at HTTP/application boundaries even when navigation is hidden.
 - Never trust browser-side state or `AuthorizeView` as enforcement.
 - Avoid putting authorization decisions inside infrastructure adapters.
-- Record privileged changes in an audit stream when audit persistence is added.
+- Record completed privileged changes through the append-only audit stream. Require `audit.view` at both the page policy and application query boundary for its management viewer.
 - Resource-specific workflow and connection grants are checked at list, detail, and mutation boundaries. System Administrator bypass is explicit and server-side.
 
 Editor data access is resource-specific and its subjects are SQL-backed system or custom roles. Each editor publication independently grants View, Insert, Update, Delete, and Approve. `PublicationManage`, Developer membership, UI visibility, or possession of a REST bearer token grants none of those capabilities implicitly. Server-side authorization runs for editor load, lookup, submit, review, and change-set queries. Staging and review persist only after a serializable recheck of the exact grant fingerprint. Replacing grants transactionally rejects every pending or approved set before the new policy becomes current, so stale authorization cannot later reach the Worker; the Worker then accepts only an approved set whose publication/version/schema state remains current.
@@ -127,7 +127,7 @@ Never:
 - Apply command timeouts, cancellation, row/batch limits, and least-privilege database accounts.
 - Keep preview queries bounded.
 - Treat merge/upsert/delete/replace modes as separately authorized capabilities and add
-  durable audit records before claiming a complete privileged-operation audit trail.
+  durable audit records. Failed validation/authorization attempts without a committed state transition remain security telemetry rather than durable action records.
 
 Provider-specific database connectors use their own maintained provider, identifier quoting, and metadata instead of a generic string-selected provider. MySQL, PostgreSQL, and Oracle connections require referenced database credentials. TLS certificate validation may be bypassed only through an explicit administrator setting; encryption with normal certificate validation is preferred.
 
@@ -179,7 +179,7 @@ Executable nodes resolve one enabled SQL-backed trusted action. System Administr
 - Optional `DOMAIN\user`/UPN credentials use AES-GCM ciphertext in SQL and the external key ring. Passwords are replacement-only and are never logged or returned to the browser.
 - Cancellation, timeout, and output-limit failure terminate the process tree. Nonzero exit codes fail the node without automatic retry.
 - The Worker or run-as account still requires least-privilege Windows logon rights and filesystem/network ACLs. THub does not enforce a CPU/memory job-object sandbox or contain arbitrary output files.
-- Definition creator/updater metadata and invocation logs provide the current bounded audit surface; retained security-event history remains open under PD-009.
+- Definition changes and trusted-action invocation outcomes are covered by the bounded audit/run surfaces; retention remains open under PD-009.
 
 ## REST publications
 
@@ -206,7 +206,7 @@ Editors remain inside Windows-authenticated `THub.Web` and stage all writes in t
 - Editor sessions may change approved values but cannot change structure, formatting, formulas, images, charts, hyperlinks, imports/exports, validation rules, clipboard contents, or autofill. Undo/redo remains available, and staged values are normalized and revalidated server-side.
 - The default workbook window is 250 rows and the absolute maximum is 1,000. Server-side filtering and deterministic navigation remain authoritative.
 - On submit, server code accepts the current edit, compares the workbook with its protected loaded snapshot, and revalidates keys, types, nullability, lengths, writable columns, formula absence, row limits, and the current resource grant.
-- Insert, Update, Delete, and Approve are independent capabilities. Change sets persist submitter, reviewer, timestamps, before/after values, status, and bounded outcome details; the Blazor circuit reads through `ConnectionId`, while only the Worker apply path resolves `ApplyConnectionId`. A general append-only audit stream and retention/classification policy remain unresolved under PD-009.
+- Insert, Update, Delete, and Approve are independent capabilities. Change sets persist submitter, reviewer, timestamps, before/after values, status, and bounded outcome details; the Blazor circuit reads through `ConnectionId`, while only the Worker apply path resolves `ApplyConnectionId`. The append-only stream records lifecycle metadata without copying row values; retention/classification remains unresolved under PD-009.
 - The worker claims only approved change sets and applies every set in one source transaction with source `rowversion` or an explicitly allowed original-value comparison. A concurrency or source-constraint mismatch becomes a conflict rather than an overwrite. A stale ambiguous apply is failed for operator reconciliation rather than replayed automatically.
 - An editor source must be a table with a stable selected key; discovery prefers the primary key and otherwise can select a safe unfiltered unique index. Non-generated key values may be supplied on insert but keys are never mutable on update. Foreign-key metadata is discovered, but display/search suggestions default to unapproved and are frozen only after an administrator explicitly enables a lookup and selects its columns. Existing window labels are batch-resolved through bounded parameterized reads. A bounded searchable `RadzenDropDownDataGrid` cell editor commits the complete referenced key; composite components share read/write/nullability policy and update atomically. Submit rechecks every non-null staged tuple against the active version and source schema before persistence, while the source constraint remains the final apply-time authority.
 
@@ -230,7 +230,7 @@ Email profiles, rules, outbox persistence, terminal-event integration, the `Emai
 
 Structured logs may contain identities, workflow/run/step IDs, counts, timings, normalized error categories, and correlation IDs. They must not contain credentials, access tokens, unbounded row data, full connection strings, or raw sensitive payloads.
 
-Publication access logs may add publication/version/token IDs and accepted row counts, never bearer text or filter values. Email logs may add profile/delivery IDs, attempt numbers, and safe outcome categories, never SMTP credentials, recipients beyond approved operational policy, or full subjects/bodies. Editor change sets currently store bounded before/after values; their final classification and retention policy remains open in PD-009, and a separate append-only audit stream is not yet implemented.
+Publication access logs and audit records may add publication/version/token IDs and accepted-use outcomes, never bearer text or filter values. Email logs/audit records may add profile/delivery IDs, attempt numbers, and safe outcome categories, never SMTP credentials, recipients beyond approved operational policy, or full subjects/bodies. Editor change sets currently store bounded before/after values; their final classification and retention policy remains open in PD-009, while the audit stream deliberately does not copy those values.
 
 Serilog writes local rolling JSON files in addition to console output. Treat the log directory as operational data: grant write access only to the corresponding host identity, grant read access only to approved operators/collectors, monitor disk usage, and apply the documented retention policy. Do not grant workflow authors direct filesystem access to logs.
 

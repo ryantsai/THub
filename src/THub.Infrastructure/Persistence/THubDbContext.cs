@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using THub.Domain.Auditing;
 using THub.Domain.Actions;
 using THub.Domain.Alerts;
 using THub.Domain.Connections;
@@ -7,6 +8,7 @@ using THub.Domain.Runs;
 using THub.Domain.Security;
 using THub.Domain.Workflows;
 using THub.Infrastructure.Connections;
+using THub.Infrastructure.Auditing;
 
 namespace THub.Infrastructure.Persistence;
 
@@ -34,6 +36,21 @@ public sealed class THubDbContext(DbContextOptions<THubDbContext> options) : DbC
     public DbSet<AccessRoleAssignment> AccessRoleAssignments => Set<AccessRoleAssignment>();
     public DbSet<AccessResourceGrant> AccessResourceGrants => Set<AccessResourceGrant>();
     public DbSet<TrustedAction> TrustedActions => Set<TrustedAction>();
+    public DbSet<AuditRecord> AuditRecords => Set<AuditRecord>();
+
+    public override int SaveChanges(bool acceptAllChangesOnSuccess)
+    {
+        AppendAuditRecords();
+        return base.SaveChanges(acceptAllChangesOnSuccess);
+    }
+
+    public override Task<int> SaveChangesAsync(
+        bool acceptAllChangesOnSuccess,
+        CancellationToken cancellationToken = default)
+    {
+        AppendAuditRecords();
+        return base.SaveChangesAsync(acceptAllChangesOnSuccess, cancellationToken);
+    }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -52,5 +69,21 @@ public sealed class THubDbContext(DbContextOptions<THubDbContext> options) : DbC
             entity.HasIndex(x => x.Name).IsUnique();
             entity.HasIndex(x => new { x.Kind, x.IsEnabled });
         });
+    }
+
+    private void AppendAuditRecords()
+    {
+        ChangeTracker.DetectChanges();
+        if (ChangeTracker.Entries<AuditRecord>().Any(entry =>
+                entry.State is EntityState.Modified or EntityState.Deleted))
+        {
+            throw new InvalidOperationException("Audit records are append-only.");
+        }
+
+        var records = AuditRecordFactory.Create(ChangeTracker, DateTimeOffset.UtcNow);
+        if (records.Count > 0)
+        {
+            AuditRecords.AddRange(records);
+        }
     }
 }

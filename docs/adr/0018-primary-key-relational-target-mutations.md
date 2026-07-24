@@ -70,7 +70,7 @@ predicates are not implemented.
 - THub still cannot promise exactly-once effects after an ambiguous commit. Upsert and
   delete are replay-friendly for the same input, but database triggers and other side
   effects may not be.
-- Dedicated durable audit persistence for these privileged operations remains pending.
+- ADR-0022 provides durable metadata-only lifecycle records; run/step counters remain the bounded execution summary.
 
 ## Alternatives considered
 
@@ -89,6 +89,6 @@ predicates are not implemented.
 
 - Add live integration suites for supported SQL Server, MySQL, PostgreSQL, and Oracle
   versions, including concurrency, composite keys, cancellation, and rollback.
-- Add durable audit events for mutation configuration and execution summaries.
+- ADR-0022 records persisted configuration and execution lifecycle changes without row values.
 - Revisit bounded chunk transactions only with an explicit partial-commit and recovery
   contract.

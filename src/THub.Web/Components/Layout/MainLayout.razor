@@ -33,6 +33,9 @@
                 <span class="nav-section">Administration</span>
                 <NavLink href="/trusted-actions"><RadzenIcon Icon="verified_user" />Trusted actions</NavLink>
             </AuthorizeView>
+            <AuthorizeView Policy="@Permissions.AuditView">
+                <NavLink href="/audit"><RadzenIcon Icon="policy" />Audit log</NavLink>
+            </AuthorizeView>
         </nav>
 
         <div class="sidebar-foot">
