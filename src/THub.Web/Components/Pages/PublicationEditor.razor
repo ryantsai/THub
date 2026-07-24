@@ -79,7 +79,7 @@ else if (Publication is not null && Version is not null && Workbook is not null 
         <div class="toolbar-group">
             <button class="@(ChangePanelOpen ? "active" : null)" type="button" @onclick="() => ChangePanelOpen = !ChangePanelOpen"><RadzenIcon Icon="history" />@Localizer["Change history"]@if (ChangeSets.Count > 0){<span class="toolbar-count">@ChangeSets.Count</span>}</button>
             <details class="sheet-info">
-                <summary title='@Localizer["Table details"]' aria-label='@Localizer["Table details"]'><RadzenIcon Icon="info_outline" /></summary>
+                <summary title='@Localizer["Table details"]' aria-label='@Localizer["Table details"]'><RadzenIcon Icon="info" /></summary>
                 <div>
                     <span><small>@Localizer["Schema"]</small><strong>v@(Version.VersionNumber) · @Version.ConcurrencyMode</strong></span>
                     <span><small>@Localizer["Rows"]</small><strong>@Rows.Count</strong></span>
