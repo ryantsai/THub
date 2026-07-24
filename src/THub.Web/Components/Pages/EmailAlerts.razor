@@ -123,8 +123,7 @@ else if (SelectedTab == AlertTab.Profiles)
             <div class="editor-section divided">
                 <h3>@Localizer["Recipient and message bounds"]</h3>
                 <div class="policy-form bounds">
-                    <label class="wide"><span>@Localizer["Allowed recipient domains"] <b aria-hidden="true">*</b></span><textarea rows="3" maxlength="3900" placeholder='@Localizer["example.com
-subsidiary.example.com"]' @bind="ProfileEditor.AllowedDomainsText" disabled="@Busy"></textarea><small>@Localizer["One domain per line. Up to 20 domains; every recipient is checked before SMTP."]</small></label>
+                    <label class="wide"><span>@Localizer["Allowed recipient domains"] <b aria-hidden="true">*</b></span><textarea rows="3" maxlength="3900" placeholder='@Localizer["example.com\nsubsidiary.example.com"]' @bind="ProfileEditor.AllowedDomainsText" disabled="@Busy"></textarea><small>@Localizer["One domain per line. Up to 20 domains; every recipient is checked before SMTP."]</small></label>
                     <label><span>@Localizer["Maximum recipients"]</span><input type="number" min="1" max="100" @bind="ProfileEditor.MaximumRecipients" disabled="@Busy" /></label>
                     <label><span>@Localizer["Maximum subject characters"]</span><input type="number" min="1" max="998" @bind="ProfileEditor.MaximumSubjectLength" disabled="@Busy" /></label>
                     <label><span>@Localizer["Maximum body characters"]</span><input type="number" min="1" max="1000000" @bind="ProfileEditor.MaximumBodyLength" disabled="@Busy" /></label>
