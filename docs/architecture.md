@@ -268,7 +268,7 @@ Publication-management permission does not itself grant access to editor data. E
 ### Secrets and untrusted configuration
 
 - Persist secret references, not credentials, inside connection or node JSON.
-- Resolve database/FTP authentication through the provider-neutral Application contract from ADR-0019. Infrastructure stores referenced credential payloads as AES-256-GCM ciphertext in SQL, obtains versioned master keys from external configuration, and retains provider-specific connection-string construction.
+- Resolve database/FTP authentication through the provider-neutral Application contract from ADR-0023. Infrastructure stores referenced credential payloads as AES-256-GCM ciphertext in SQL, obtains one master key from external configuration, and retains provider-specific connection-string construction.
 - Decrypt connection credentials only immediately before an approved Web probe/schema
   inspection, Worker execution/editor apply, or Publications source read. Never return a
   stored value to the browser.

@@ -16,6 +16,25 @@ public sealed class AccessRoleConfiguration : IEntityTypeConfiguration<AccessRol
         builder.Property(role => role.CreatedBy).HasMaxLength(256).IsRequired();
         builder.HasIndex(role => role.Name).IsUnique();
         builder.HasIndex(role => role.SystemRole).IsUnique().HasFilter("[SystemRole] IS NOT NULL");
+        builder.HasData(
+            new
+            {
+                Id = SystemRoleIds.SystemAdministrator,
+                Name = "System Administrator",
+                Description = "Unrestricted platform and resource access.",
+                SystemRole = (SystemRoleKind?)SystemRoleKind.SystemAdministrator,
+                CreatedAtUtc = new DateTimeOffset(2026, 7, 23, 0, 0, 0, TimeSpan.Zero),
+                CreatedBy = "initial-schema",
+            },
+            new
+            {
+                Id = SystemRoleIds.Developer,
+                Name = "Developer",
+                Description = "Create, edit, publish, execute, and monitor workflows.",
+                SystemRole = (SystemRoleKind?)SystemRoleKind.Developer,
+                CreatedAtUtc = new DateTimeOffset(2026, 7, 23, 0, 0, 0, TimeSpan.Zero),
+                CreatedBy = "initial-schema",
+            });
     }
 }
 
@@ -33,7 +52,27 @@ public sealed class AccessRolePermissionConfiguration : IEntityTypeConfiguration
             .WithMany()
             .HasForeignKey(permission => permission.RoleId)
             .OnDelete(DeleteBehavior.Cascade);
+        builder.HasData(
+            DeveloperPermission(1, "workflow.view"),
+            DeveloperPermission(2, "workflow.create"),
+            DeveloperPermission(3, "workflow.edit"),
+            DeveloperPermission(4, "workflow.publish"),
+            DeveloperPermission(5, "workflow.execute"),
+            DeveloperPermission(6, "run.view"),
+            DeveloperPermission(7, "schedule.manage"),
+            DeveloperPermission(8, "connection.view"),
+            DeveloperPermission(9, "workflow.delete"),
+            DeveloperPermission(10, "workflow.target.upsert"),
+            DeveloperPermission(11, "workflow.target.delete"));
     }
+
+    private static object DeveloperPermission(int suffix, string permission) =>
+        new
+        {
+            Id = new Guid($"11000000-0000-0000-0000-{suffix:000000000000}"),
+            RoleId = SystemRoleIds.Developer,
+            Permission = permission,
+        };
 }
 
 public sealed class AccessRoleAssignmentConfiguration : IEntityTypeConfiguration<AccessRoleAssignment>

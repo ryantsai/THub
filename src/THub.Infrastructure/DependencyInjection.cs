@@ -197,7 +197,7 @@ public static class DependencyInjection
         IConfiguration configuration)
     {
         services.AddSingleton(
-            ConnectionCredentialKeyRing.FromConfiguration(configuration));
+            ConnectionCredentialEncryptionKey.FromConfiguration(configuration));
         services.AddSingleton<ConnectionCredentialProtector>();
         services.AddSingleton<
             IEncryptedConnectionCredentialReader,

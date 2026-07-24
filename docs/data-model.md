@@ -128,15 +128,14 @@ ciphertext. It is deliberately separate from `Connections.ConfigurationJson`.
 | Field | Meaning |
 | --- | --- |
 | `SecretReference` | Primary key matching the non-secret reference in connection metadata |
-| `KeyVersion` | External master-key version needed to decrypt this row |
 | `Nonce` | Fresh 12-byte AES-GCM nonce |
 | `Ciphertext` | Encrypted credential payload |
 | `AuthenticationTag` | 16-byte AES-GCM authentication tag |
 | `UpdatedAtUtc` | Last create/replace instant |
 
-The reference and payload schema version are authenticated as associated data. The
-database never stores a master key. A reference may intentionally be shared by multiple
-connections; replacing it changes the credential resolved by all of them.
+The reference is authenticated as associated data. The database never stores the master
+key. A reference may intentionally be shared by multiple connections; replacing it
+changes the credential resolved by all of them.
 
 ### `quartz.QRTZ_*`
 

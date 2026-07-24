@@ -52,8 +52,8 @@ alternate-credential process-start boundary and never returns or logs the passwo
 The deployment administrator owns the target account's local security rights,
 filesystem permissions, network access, and profile behavior.
 
-Trusted-action credentials reuse the AES-256-GCM envelope and external versioned
-master-key ring accepted by ADR-0019. The credential table and resolver remain
+Trusted-action credentials reuse the AES-256-GCM envelope and single external master
+key accepted by ADR-0023. The credential table and resolver remain
 provider-neutral despite their original connection-oriented name. Storage references
 use a reserved trusted-action prefix so an action credential cannot accidentally replace
 a connector credential with the same administrator-facing reference. Passwords are

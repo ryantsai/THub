@@ -28,9 +28,8 @@ Use provider-specific open-source or vendor-maintained .NET libraries:
 - the existing CsvHelper and ClosedXML parsers after an FTP download has passed configured size bounds.
 
 All four connection types use the provider-neutral `IConnectionCredentialResolver`.
-Connection metadata and workflow JSON store only a secret reference. ADR-0019 now
-defines the built-in encrypted SQL credential store and external versioned master-key
-ring.
+Connection metadata and workflow JSON store only a secret reference. ADR-0023 defines
+the built-in encrypted SQL credential store and its single external master key.
 
 Relational workflow nodes expose discovered table/view identifiers, bounded reads, and transactional parameterized inserts. They do not accept arbitrary SQL or implement update, merge, replace, or delete.
 

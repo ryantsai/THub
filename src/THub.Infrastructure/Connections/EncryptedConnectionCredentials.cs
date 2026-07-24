@@ -16,14 +16,12 @@ internal sealed class EncryptedConnectionCredential
 
     public EncryptedConnectionCredential(
         string secretReference,
-        int keyVersion,
         byte[] nonce,
         byte[] ciphertext,
         byte[] authenticationTag,
         DateTimeOffset updatedAtUtc)
     {
         SecretReference = secretReference;
-        KeyVersion = keyVersion;
         Nonce = nonce;
         Ciphertext = ciphertext;
         AuthenticationTag = authenticationTag;
@@ -31,8 +29,6 @@ internal sealed class EncryptedConnectionCredential
     }
 
     public string SecretReference { get; private set; } = string.Empty;
-
-    public int KeyVersion { get; private set; }
 
     public byte[] Nonce { get; private set; } = [];
 
@@ -55,7 +51,6 @@ internal sealed class EncryptedConnectionCredential
                 nameof(replacement));
         }
 
-        KeyVersion = replacement.KeyVersion;
         Nonce = replacement.Nonce;
         Ciphertext = replacement.Ciphertext;
         AuthenticationTag = replacement.AuthenticationTag;
@@ -63,106 +58,56 @@ internal sealed class EncryptedConnectionCredential
     }
 }
 
-internal sealed class ConnectionCredentialKeyRing
+internal sealed class ConnectionCredentialEncryptionKey
 {
     public const string SectionName = "CredentialEncryption";
 
-    private readonly IReadOnlyDictionary<int, byte[]> keys;
+    private readonly byte[]? key;
 
-    private ConnectionCredentialKeyRing(
-        int currentKeyVersion,
-        IReadOnlyDictionary<int, byte[]> keys)
+    private ConnectionCredentialEncryptionKey(byte[]? key)
     {
-        CurrentKeyVersion = currentKeyVersion;
-        this.keys = keys;
+        this.key = key;
     }
 
-    public int CurrentKeyVersion { get; }
-
-    public static ConnectionCredentialKeyRing FromConfiguration(
+    public static ConnectionCredentialEncryptionKey FromConfiguration(
         IConfiguration configuration)
     {
         ArgumentNullException.ThrowIfNull(configuration);
-        var section = configuration.GetSection(SectionName);
-        var currentVersionValue = section["CurrentKeyVersion"];
-        var keyEntries = section.GetSection("Keys").GetChildren().ToArray();
-
-        if (string.IsNullOrWhiteSpace(currentVersionValue) && keyEntries.Length == 0)
+        var configuredKey = configuration[$"{SectionName}:Key"];
+        if (string.IsNullOrWhiteSpace(configuredKey))
         {
-            return new ConnectionCredentialKeyRing(0, new Dictionary<int, byte[]>());
+            return new ConnectionCredentialEncryptionKey(null);
         }
 
-        if (!int.TryParse(
-                currentVersionValue,
-                System.Globalization.NumberStyles.None,
-                System.Globalization.CultureInfo.InvariantCulture,
-                out var currentVersion) ||
-            currentVersion < 1)
+        byte[] parsedKey;
+        try
+        {
+            parsedKey = Convert.FromBase64String(configuredKey);
+        }
+        catch (FormatException exception)
         {
             throw new InvalidOperationException(
-                "CredentialEncryption:CurrentKeyVersion must be a positive integer.");
+                "CredentialEncryption:Key must be Base64 encoded.",
+                exception);
         }
 
-        var parsedKeys = new Dictionary<int, byte[]>();
-        foreach (var entry in keyEntries)
+        if (parsedKey.Length != 32)
         {
-            if (!int.TryParse(
-                    entry.Key,
-                    System.Globalization.NumberStyles.None,
-                    System.Globalization.CultureInfo.InvariantCulture,
-                    out var version) ||
-                version < 1)
-            {
-                throw new InvalidOperationException(
-                    "CredentialEncryption key versions must be positive integers.");
-            }
-
-            byte[] key;
-            try
-            {
-                key = Convert.FromBase64String(entry.Value ?? string.Empty);
-            }
-            catch (FormatException exception)
-            {
-                throw new InvalidOperationException(
-                    $"CredentialEncryption:Keys:{version} must be Base64 encoded.",
-                    exception);
-            }
-
-            if (key.Length != 32)
-            {
-                CryptographicOperations.ZeroMemory(key);
-                throw new InvalidOperationException(
-                    $"CredentialEncryption:Keys:{version} must decode to exactly 32 bytes.");
-            }
-
-            parsedKeys.Add(version, key);
-        }
-
-        if (!parsedKeys.ContainsKey(currentVersion))
-        {
+            CryptographicOperations.ZeroMemory(parsedKey);
             throw new InvalidOperationException(
-                "CredentialEncryption:Keys must contain the configured current key version.");
+                "CredentialEncryption:Key must decode to exactly 32 bytes.");
         }
 
-        return new ConnectionCredentialKeyRing(currentVersion, parsedKeys);
+        return new ConnectionCredentialEncryptionKey(parsedKey);
     }
 
-    public byte[] GetCurrentKey() => GetKey(CurrentKeyVersion);
-
-    public byte[] GetKey(int version)
-    {
-        if (!keys.TryGetValue(version, out var key))
-        {
-            throw new ConnectionCredentialProtectionException(
-                $"Credential encryption key version {version} is unavailable.");
-        }
-
-        return key;
-    }
+    public byte[] GetKey() =>
+        key ?? throw new ConnectionCredentialProtectionException(
+            "Credential encryption key is unavailable.");
 }
 
-internal sealed class ConnectionCredentialProtector(ConnectionCredentialKeyRing keyRing)
+internal sealed class ConnectionCredentialProtector(
+    ConnectionCredentialEncryptionKey encryptionKey)
 {
     private const int NonceSize = 12;
     private const int AuthenticationTagSize = 16;
@@ -190,7 +135,7 @@ internal sealed class ConnectionCredentialProtector(ConnectionCredentialKeyRing 
         try
         {
             using var aes = new AesGcm(
-                keyRing.GetCurrentKey(),
+                encryptionKey.GetKey(),
                 AuthenticationTagSize);
             aes.Encrypt(nonce, plaintext, ciphertext, tag, associatedData);
         }
@@ -202,7 +147,6 @@ internal sealed class ConnectionCredentialProtector(ConnectionCredentialKeyRing 
 
         return new EncryptedConnectionCredential(
             write.SecretReference,
-            keyRing.CurrentKeyVersion,
             nonce,
             ciphertext,
             tag,
@@ -225,7 +169,7 @@ internal sealed class ConnectionCredentialProtector(ConnectionCredentialKeyRing 
         try
         {
             using var aes = new AesGcm(
-                keyRing.GetKey(encrypted.KeyVersion),
+                encryptionKey.GetKey(),
                 AuthenticationTagSize);
             aes.Decrypt(
                 encrypted.Nonce,
@@ -259,7 +203,7 @@ internal sealed class ConnectionCredentialProtector(ConnectionCredentialKeyRing 
 
     private static byte[] CreateAssociatedData(string secretReference) =>
         Encoding.UTF8.GetBytes(
-            $"THub.ConnectionCredential.v1:{secretReference}");
+            $"THub.ConnectionCredential:{secretReference}");
 
     private sealed record CredentialPayload(string UserName, string Password);
 }

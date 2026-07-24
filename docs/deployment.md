@@ -152,8 +152,7 @@ Publications host through environment configuration:
 ```powershell
 $credentialKeyBytes = [byte[]]::new(32)
 [System.Security.Cryptography.RandomNumberGenerator]::Fill($credentialKeyBytes)
-$env:CredentialEncryption__CurrentKeyVersion = '1'
-$env:CredentialEncryption__Keys__1 = [Convert]::ToBase64String($credentialKeyBytes)
+$env:CredentialEncryption__Key = [Convert]::ToBase64String($credentialKeyBytes)
 [System.Security.Cryptography.CryptographicOperations]::ZeroMemory($credentialKeyBytes)
 ```
 
@@ -165,15 +164,13 @@ deployment logs, or the THub database.
 The Web host needs the key to create/replace credentials and test/discover connections;
 the Worker needs it for workflow execution. Publications needs it whenever an active
 relational publication uses referenced authentication. Give each host only the table access,
-source-system grants, and key ring it requires. Missing references, missing key versions,
-invalid key lengths, and authentication failures fail closed. Existing installations
-must re-enter each externally provisioned credential in the connection editor after
-applying the migration.
+source-system grants, and master key it requires. Missing references, a missing key,
+an invalid key length, and authentication failures fail closed.
 
 Trusted webhook authentication and executable run-as accounts use the same encrypted
-credential table and `CredentialEncryption` key ring. The Web needs the current key to
-create or replace these credentials; the Worker needs every referenced key version to
-invoke them. For executable impersonation, provision the target Windows account's
+credential table and `CredentialEncryption` master key. The Web needs the key to create
+or replace these credentials; the Worker needs the same key to invoke them. For
+executable impersonation, provision the target Windows account's
 required local logon right and only the filesystem/network ACLs needed by that trusted
 definition. Keep the Worker non-interactive. THub clears the inherited child environment,
 does not invoke a shell, and never passes the credential through arguments or environment
@@ -184,12 +181,9 @@ resource ID to the intended custom role under `/settings`. System Administrator 
 implicit access to every trusted action. Disabling a trusted action blocks new Worker
 invocations, including invocations from already-published workflow versions.
 
-To rotate, add a new `CredentialEncryption__Keys__<version>` value to every authorized
-host while retaining old versions, change `CurrentKeyVersion`, and restart the hosts.
-New or replaced credentials use the current version. Replace every stored credential
-through the editor before removing an old key; automated bulk re-encryption is not yet
-implemented. Back up all still-required keys separately from SQL backups. Losing a key
-version makes its remaining rows unrecoverable.
+Back up the key separately from SQL backups. Losing or replacing it makes every stored
+credential unrecoverable; changing the key requires clearing and re-entering all stored
+credentials.
 
 FTP connections select plain FTP, explicit FTPS, or implicit FTPS. Plain FTP exposes credentials and data in transit and must be restricted to explicitly approved legacy endpoints on a controlled network. Prefer FTPS with certificate validation. Size Worker temporary storage for the configured maximum FTP file size and monitor `%TEMP%\THub` for remnants after abrupt process termination.
 

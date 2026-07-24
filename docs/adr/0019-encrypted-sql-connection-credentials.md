@@ -1,6 +1,6 @@
 # ADR-0019: Store connection credentials as encrypted SQL ciphertext
 
-- Status: Accepted
+- Status: Superseded by [ADR-0023](0023-single-credential-encryption-key.md)
 - Date: 2026-07-23
 - Deciders: Project maintainers
 - Supersedes: [ADR-0013](0013-provider-neutral-database-authentication.md)

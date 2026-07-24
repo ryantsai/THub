@@ -72,19 +72,18 @@ For UNC paths or Windows-integrated remote SQL connections, confirm SPNs, delega
 Connection configuration and workflow graphs contain a secret reference, never the secret value.
 
 Connection credentials follow
-[ADR-0019](adr/0019-encrypted-sql-connection-credentials.md) and
+[ADR-0023](adr/0023-single-credential-encryption-key.md) and
 [ADR-0014](adr/0014-expand-relational-and-ftp-connectors.md). Connection metadata stores
 an authentication kind and reference only. The referenced username/password is
 AES-256-GCM ciphertext in `thub.EncryptedConnectionCredentials`; a fresh nonce,
-authentication tag, key version, and reference-bound associated data protect every
-payload. The versioned master-key ring remains external configuration and must not be
-stored in SQL. Database and FTP adapters receive plaintext only while opening a
-connection.
+authentication tag, and reference-bound associated data protect every payload. The
+single master key remains external configuration and must not be stored in SQL.
+Database and FTP adapters receive plaintext only while opening a connection.
 
 The connection editor never reads an existing username or password back to Blazor. An
 authorized administrator either leaves the stored credential unchanged or supplies both
-fields to create/replace it. Missing key versions and failed authentication tags fail
-closed. Any host with both ciphertext-table access and the matching master key can
+fields to create/replace it. A missing key and failed authentication tags fail closed.
+Any host with both ciphertext-table access and the matching master key can
 decrypt credentials, so restrict SQL permissions, process environment access, service
 identities, and backups together.
 
@@ -176,7 +175,7 @@ Executable nodes resolve one enabled SQL-backed trusted action. System Administr
 - Arguments use `ProcessStartInfo.ArgumentList` and only typed run/node/attempt/input-count placeholders. THub never composes a shell command.
 - `cmd`, PowerShell, script hosts, indirect binary launchers, UNC/device paths, and executable/working-directory reparse points are rejected.
 - The child receives a cleared environment plus the administrator's fixed entries and `SystemRoot`; Worker master keys and other host environment secrets are not inherited.
-- Optional `DOMAIN\user`/UPN credentials use AES-GCM ciphertext in SQL and the external key ring. Passwords are replacement-only and are never logged or returned to the browser.
+- Optional `DOMAIN\user`/UPN credentials use AES-GCM ciphertext in SQL and the external master key. Passwords are replacement-only and are never logged or returned to the browser.
 - Cancellation, timeout, and output-limit failure terminate the process tree. Nonzero exit codes fail the node without automatic retry.
 - The Worker or run-as account still requires least-privilege Windows logon rights and filesystem/network ACLs. THub does not enforce a CPU/memory job-object sandbox or contain arbitrary output files.
 - Definition changes and trusted-action invocation outcomes are covered by the bounded audit/run surfaces; retention remains open under PD-009.
