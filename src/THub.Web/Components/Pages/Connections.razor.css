@@ -17,9 +17,9 @@
 .connection-editor { overflow: hidden; }
 .close-editor { width: 32px; height: 32px; border: 0; border-radius: 6px; background: #f1f4f3; color: #53635f; font-size: 20px; cursor: pointer; }
 .connection-form { padding: 19px; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 15px; }
-.connection-form label { display: grid; gap: 6px; color: #687773; font-size: 10px; font-weight: 700; }
+.connection-form label { display: grid; gap: 7px; color: #5f6f6a; font-size: 12px; font-weight: 700; }
 .connection-form label.wide { grid-column: 1 / -1; }
-.connection-form input:not([type="checkbox"]), .connection-form select { width: 100%; min-height: 38px; padding: 8px 10px; border: 1px solid #d7e1de; border-radius: 7px; background: #fff; color: #263532; font-size: 11px; }
+.connection-form input:not([type="checkbox"]), .connection-form select { width: 100%; min-height: 42px; padding: 9px 11px; border: 1px solid #d2ddda; border-radius: 7px; background: #fff; color: #263532; font-size: 13px; }
 .connection-form .check { grid-template-columns: auto 1fr; align-items: center; align-content: center; }
 .connection-form .check input { width: 15px; height: 15px; accent-color: #17775f; }
 .transport-warning { grid-column: 1 / -1; padding: 10px 12px; display: flex; gap: 8px; align-items: center; border-radius: 7px; background: #fff2e5; color: #9b5c24; font-size: 10px; }

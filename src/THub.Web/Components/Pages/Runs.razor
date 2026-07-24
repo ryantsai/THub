@@ -14,9 +14,9 @@
 
 <div class="page-heading">
     <div>
-        <div class="eyebrow">Operations</div>
+        <div class="eyebrow">Build and run</div>
         <h1>Run history</h1>
-        <p>Durable attempts, step progress, retries, cancellations, and normalized errors.</p>
+        <p>See what ran, whether it worked, and where to look when something needs attention.</p>
     </div>
     <div class="heading-actions">
         <RadzenDropDown TValue="WorkflowRunStatus?" Data="@StatusOptions" TextProperty="Label" ValueProperty="Value"
@@ -27,7 +27,7 @@
 
 <section class="panel">
     <div class="panel-head">
-        <div><h2>Latest executions</h2><p>@Summary</p></div>
+        <div><h2>Latest runs</h2><p>@Summary</p></div>
         @if (Items.Any(run => run.Status is WorkflowRunStatus.Queued or WorkflowRunStatus.Running))
         {
             <span class="status-chip running">Active work</span>
@@ -44,7 +44,7 @@
     }
     else if (Items.Count == 0)
     {
-        <div class="page-state"><RadzenIcon Icon="history" /><h3>No runs yet</h3><p>Publish a workflow and queue it from the designer to create a durable run.</p></div>
+        <div class="page-state"><RadzenIcon Icon="history" /><h3>No runs yet</h3><p>Publish a workflow, then choose Run now or add a schedule.</p></div>
     }
     else
     {

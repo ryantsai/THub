@@ -14,9 +14,9 @@
 
 <div class="page-heading">
     <div>
-        <div class="eyebrow">Data plane</div>
-        <h1>Connections</h1>
-        <p>Approved database, FTP/FTPS, and bounded local file connections.</p>
+        <div class="eyebrow">Build and run</div>
+        <h1>Data connections</h1>
+        <p>Tell THub where it may safely read or write data.</p>
     </div>
     <div class="heading-actions">
         <RadzenButton Text="New connection" Icon="add" ButtonStyle="ButtonStyle.Primary" Click="@NewConnection" Disabled="@(Busy || !CanCreate)" />
@@ -38,7 +38,7 @@ else
         <section class="resource-grid" aria-label="Configured connections">
             @if (Items.Count == 0)
             {
-                <div class="page-state empty-card"><RadzenIcon Icon="cable" /><h3>No connections yet</h3><p>Add an approved source before configuring workflow nodes or publications.</p></div>
+                <div class="page-state empty-card"><RadzenIcon Icon="cable" /><h3>No connections yet</h3><p>Add the first database, file folder, or FTP location you want to use in a workflow.</p></div>
             }
             @foreach (var item in Items)
             {
@@ -58,7 +58,7 @@ else
         @if (ShowEditor)
         {
             <section class="panel connection-editor" aria-label="Connection editor">
-                <div class="panel-head"><div><h2>@(Edit.Id is null ? "New connection" : "Edit connection")</h2><p>Credentials are encrypted before they are stored in the THub control plane.</p></div><button class="close-editor" type="button" title="Close" @onclick="CloseEditor">×</button></div>
+                <div class="panel-head"><div><h2>@(Edit.Id is null ? "New connection" : "Edit connection")</h2><p>Saved usernames and passwords are encrypted and are never shown again.</p></div><button class="close-editor" type="button" title="Close" @onclick="CloseEditor">×</button></div>
                 <div class="connection-form">
                     <label><span>Name</span><input maxlength="200" @bind="Edit.Name" disabled="@Busy" /></label>
                     <label><span>Connector</span>

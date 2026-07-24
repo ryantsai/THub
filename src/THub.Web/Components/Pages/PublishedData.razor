@@ -8,17 +8,17 @@
 @inject PublicationRoleResolver RoleResolver
 @inject AuthenticationStateProvider AuthenticationStateProvider
 
-<PageTitle>Published data · THub</PageTitle>
+<PageTitle>Data tables · THub</PageTitle>
 
 <div class="page-heading">
-    <div><div class="eyebrow">Governed data</div><h1>Published editors</h1><p>Resources shown here are filtered by your configured Windows-group roles and per-publication grants.</p></div>
+    <div><div class="eyebrow">Share and monitor</div><h1>Data tables</h1><p>Open the shared tables you can view or edit.</p></div>
     <RadzenButton Text="Refresh" Icon="refresh" ButtonStyle="ButtonStyle.Light" Click="@LoadAsync" Disabled="@Loading" />
 </div>
 
 <section class="panel">
     @if (Loading)
     {
-        <div class="page-state"><RadzenProgressBar Mode="ProgressBarMode.Indeterminate" /><p>Resolving your publication grants…</p></div>
+        <div class="page-state"><RadzenProgressBar Mode="ProgressBarMode.Indeterminate" /><p>Checking which tables you can access…</p></div>
     }
     else if (Error is not null)
     {
@@ -26,7 +26,7 @@
     }
     else if (Items.Count == 0)
     {
-        <div class="page-state"><RadzenIcon Icon="table_view" /><h2>No editors are assigned</h2><p>An administrator can grant View, Insert, Update, Delete, or Approve access to one of your assigned roles.</p></div>
+        <div class="page-state"><RadzenIcon Icon="table_view" /><h2>No data tables are assigned</h2><p>Ask an administrator to share a table with your role.</p></div>
     }
     else
     {

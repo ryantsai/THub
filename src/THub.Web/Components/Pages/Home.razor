@@ -17,13 +17,13 @@
 <div class="page-heading">
     <div>
         <div class="eyebrow">@TimeProvider.GetLocalNow().ToString("dddd · d MMMM")</div>
-        <h1>Data operations overview</h1>
-        <p>Current control-plane state from durable workflow and run records.</p>
+        <h1>Good @Greeting, @UserDisplayName.</h1>
+        <p>Move data between your systems, automate the work, and see what happened.</p>
     </div>
     <div class="heading-actions">
         <RadzenButton Text="View runs" Icon="history" ButtonStyle="ButtonStyle.Light" Click="@(() => Navigation.NavigateTo("/runs"))" />
         <AuthorizeView Policy="@Permissions.WorkflowEdit">
-            <RadzenButton Text="New workflow" Icon="add" ButtonStyle="ButtonStyle.Primary" Click="@(() => Navigation.NavigateTo("/designer"))" />
+            <RadzenButton Text="Create workflow" Icon="add" ButtonStyle="ButtonStyle.Primary" Click="@(() => Navigation.NavigateTo("/designer"))" />
         </AuthorizeView>
     </div>
 </div>
@@ -38,14 +38,46 @@ else if (Error is not null)
 }
 else
 {
-    <section class="metric-grid" aria-label="Workflow metrics">
+    <section class="getting-started" aria-labelledby="getting-started-title">
+        <div class="section-intro">
+            <div>
+                <span class="eyebrow">Start here</span>
+                <h2 id="getting-started-title">@JourneyTitle</h2>
+            </div>
+            <p>THub guides you from a data source to a result you can check.</p>
+        </div>
+        <ol class="journey">
+            <li>
+                <span class="journey-number">1</span>
+                <div><strong>Connect data</strong><small>Add the database or files you want to use.</small></div>
+                <AuthorizeView Policy="@Permissions.ConnectionManage"><a href="/connections">Add connection</a></AuthorizeView>
+            </li>
+            <li>
+                <span class="journey-number">2</span>
+                <div><strong>Build a workflow</strong><small>Choose the steps and what each one should do.</small></div>
+                <AuthorizeView Policy="@Permissions.WorkflowEdit"><a href="/designer">Create workflow</a></AuthorizeView>
+            </li>
+            <li>
+                <span class="journey-number">3</span>
+                <div><strong>Run it</strong><small>Publish when it is ready, then run it now or on a schedule.</small></div>
+                <a href="/workflows">Open workflows</a>
+            </li>
+            <li>
+                <span class="journey-number">4</span>
+                <div><strong>Check results</strong><small>Confirm success or see exactly where a run stopped.</small></div>
+                <a href="/runs">View runs</a>
+            </li>
+        </ol>
+    </section>
+
+    <section class="metric-grid summary-strip" aria-label="Workspace summary">
         <article class="metric-card">
-            <div class="metric-label"><span>Published workflows</span><span class="metric-icon"><RadzenIcon Icon="account_tree" /></span></div>
-            <div class="metric-value">@PublishedWorkflowCount</div><div class="metric-foot">@WorkflowCount total workflow records</div>
+            <div class="metric-label"><span>Ready workflows</span><span class="metric-icon"><RadzenIcon Icon="account_tree" /></span></div>
+            <div class="metric-value">@PublishedWorkflowCount</div><div class="metric-foot">@WorkflowCount total</div>
         </article>
         <article class="metric-card">
             <div class="metric-label"><span>Runs today</span><span class="metric-icon"><RadzenIcon Icon="play_circle" /></span></div>
-            <div class="metric-value">@RunsToday</div><div class="metric-foot"><strong>@SuccessRate</strong> succeeded in the loaded window</div>
+            <div class="metric-value">@RunsToday</div><div class="metric-foot"><strong>@SuccessRate</strong> successful</div>
         </article>
         <article class="metric-card">
             <div class="metric-label"><span>Active schedules</span><span class="metric-icon"><RadzenIcon Icon="event_repeat" /></span></div>
@@ -53,13 +85,13 @@ else
         </article>
         <article class="metric-card alert">
             <div class="metric-label"><span>Needs attention</span><span class="metric-icon"><RadzenIcon Icon="warning_amber" /></span></div>
-            <div class="metric-value">@AttentionCount</div><div class="metric-foot">@FailedRunCount recent failures · @PausedWorkflowCount paused</div>
+            <div class="metric-value">@AttentionCount</div><div class="metric-foot">@FailedRunCount failed · @PausedWorkflowCount paused</div>
         </article>
     </section>
 
     <div class="dashboard-grid">
         <section class="panel">
-            <div class="panel-head"><div><h2>Recent workflow runs</h2><p>Persisted execution activity</p></div><a href="/runs">View all runs →</a></div>
+            <div class="panel-head"><div><h2>Recent runs</h2><p>The latest workflow activity you can access</p></div><a href="/runs">View all runs →</a></div>
             @if (RecentRuns.Count == 0)
             {
                 <div class="page-state compact"><p>No runs have been queued.</p></div>
@@ -88,19 +120,19 @@ else
 
         <div class="dashboard-stack">
             <section class="panel">
-                <div class="panel-head"><div><h2>Control-plane health</h2><p>Observed while loading this page</p></div><span class="status-chip">Connected</span></div>
+                <div class="panel-head"><div><h2>System status</h2><p>Checked when this page loaded</p></div><span class="status-chip">Ready</span></div>
                 <div class="health-list">
-                    <div class="health-item"><span class="health-icon"><RadzenIcon Icon="storage" /></span><div><strong>Metadata store</strong><small>Workflow and run queries completed</small></div><span class="health-value">Ready</span></div>
-                    <div class="health-item"><span class="health-icon"><RadzenIcon Icon="memory" /></span><div><strong>Execution queue</strong><small>Durable queued and running records</small></div><span class="health-value">@ActiveRunCount active</span></div>
-                    <div class="health-item"><span class="health-icon"><RadzenIcon Icon="schedule" /></span><div><strong>Schedule state</strong><small>Published five-field cron schedules</small></div><span class="health-value">@ActiveScheduleCount active</span></div>
+                    <div class="health-item"><span class="health-icon"><RadzenIcon Icon="storage" /></span><div><strong>Workspace data</strong><small>Workflows and runs loaded normally</small></div><span class="health-value">Ready</span></div>
+                    <div class="health-item"><span class="health-icon"><RadzenIcon Icon="memory" /></span><div><strong>Runs in progress</strong><small>Queued or currently running</small></div><span class="health-value">@ActiveRunCount active</span></div>
+                    <div class="health-item"><span class="health-icon"><RadzenIcon Icon="schedule" /></span><div><strong>Schedules</strong><small>Workflows set to run automatically</small></div><span class="health-value">@ActiveScheduleCount active</span></div>
                 </div>
             </section>
             <section class="panel">
-                <div class="panel-head"><div><h2>Quick actions</h2><p>Common operations</p></div></div>
+                <div class="panel-head"><div><h2>Common tasks</h2><p>Go straight to the work you need</p></div></div>
                 <div class="quick-list">
                     <AuthorizeView Policy="@Permissions.ConnectionManage"><a href="/connections"><RadzenIcon Icon="add_circle_outline" /><span>Add a data connection</span><small>→</small></a></AuthorizeView>
-                    <AuthorizeView Policy="@Permissions.WorkflowEdit"><a href="/designer"><RadzenIcon Icon="schema" /><span>Design a workflow</span><small>→</small></a></AuthorizeView>
-                    <AuthorizeView Policy="@Permissions.ScheduleManage"><a href="/schedules"><RadzenIcon Icon="more_time" /><span>Manage schedules</span><small>→</small></a></AuthorizeView>
+                    <AuthorizeView Policy="@Permissions.WorkflowEdit"><a href="/designer"><RadzenIcon Icon="schema" /><span>Create a workflow</span><small>→</small></a></AuthorizeView>
+                    <AuthorizeView Policy="@Permissions.ScheduleManage"><a href="/schedules"><RadzenIcon Icon="more_time" /><span>Review automatic schedules</span><small>→</small></a></AuthorizeView>
                 </div>
             </section>
         </div>
@@ -114,6 +146,16 @@ else
     private int WorkflowCount { get; set; }
     private bool Loading { get; set; }
     private string? Error { get; set; }
+    private string UserDisplayName { get; set; } = "there";
+    private string JourneyTitle => WorkflowCount == 0
+        ? "Build your first automation in four steps"
+        : "Four steps from data to result";
+    private string Greeting => TimeProvider.GetLocalNow().Hour switch
+    {
+        < 12 => "morning",
+        < 18 => "afternoon",
+        _ => "evening"
+    };
 
     private int PublishedWorkflowCount => Workflows.Count(workflow => workflow.Status == WorkflowStatus.Published);
     private int PausedWorkflowCount => Workflows.Count(workflow => workflow.Status == WorkflowStatus.Paused);
@@ -164,6 +206,7 @@ else
             }
 
             var user = (await AuthenticationStateProvider.GetAuthenticationStateAsync()).User;
+            UserDisplayName = FriendlyName(user.Identity?.Name);
             var visibleWorkflowIds = new HashSet<Guid>();
             var visibleWorkflows = new List<WorkflowListItemDto>();
             foreach (var workflow in workflows.Value.Items)
@@ -219,6 +262,26 @@ else
         }
         var duration = (run.CompletedAtUtc ?? DateTimeOffset.UtcNow) - run.StartedAtUtc.Value;
         return duration.TotalHours >= 1 ? duration.ToString(@"hh\:mm\:ss") : duration.ToString(@"mm\:ss");
+    }
+
+    private static string FriendlyName(string? identityName)
+    {
+        if (string.IsNullOrWhiteSpace(identityName))
+        {
+            return "there";
+        }
+
+        var accountName = identityName.Contains('\\')
+            ? identityName[(identityName.LastIndexOf('\\') + 1)..]
+            : identityName;
+        var firstPart = accountName
+            .Replace('.', ' ')
+            .Replace('_', ' ')
+            .Split(' ', StringSplitOptions.RemoveEmptyEntries)
+            .FirstOrDefault();
+        return string.IsNullOrWhiteSpace(firstPart)
+            ? "there"
+            : char.ToUpperInvariant(firstPart[0]) + firstPart[1..].ToLowerInvariant();
     }
 
     public void Dispose()

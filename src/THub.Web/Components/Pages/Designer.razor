@@ -36,8 +36,8 @@
     </div>
     <div class="designer-actions">
         <span class="draft-state"><i></i>@StatusText</span>
-        <RadzenButton Text="Validate" Icon="fact_check" ButtonStyle="ButtonStyle.Light" Size="ButtonSize.Small" Click="@Validate" Disabled="@Busy" />
-        <RadzenButton Text="Save draft" Icon="save" ButtonStyle="ButtonStyle.Primary" Size="ButtonSize.Small" Click="@SaveDraftAsync" Disabled="@(Busy || !CanEdit)" />
+        <RadzenButton Text="Check workflow" Icon="fact_check" ButtonStyle="ButtonStyle.Light" Size="ButtonSize.Small" Click="@Validate" Disabled="@Busy" />
+        <RadzenButton Text="Save" Icon="save" ButtonStyle="ButtonStyle.Primary" Size="ButtonSize.Small" Click="@SaveDraftAsync" Disabled="@(Busy || !CanEdit)" />
         <RadzenButton Text="Publish" Icon="rocket_launch" ButtonStyle="ButtonStyle.Success" Size="ButtonSize.Small" Click="@PublishAsync" Disabled="@(Busy || !CanPublish)" />
     </div>
 </div>
@@ -54,8 +54,8 @@ else
 {
     <div class="designer-shell">
         <aside class="node-palette">
-            <div class="palette-head"><strong>Toolbox</strong><small>Click to add a step</small></div>
-            <div class="palette-search"><RadzenIcon Icon="search" /><input placeholder="Find a tool…" @bind="Search" /></div>
+            <div class="palette-head"><strong>Add a step</strong><small>Choose what should happen next</small></div>
+            <div class="palette-search"><RadzenIcon Icon="search" /><input aria-label="Find a step" placeholder="Find a step…" @bind="Search" /></div>
             @foreach (var group in FilteredGroups)
             {
                 <section class="palette-group">
@@ -100,17 +100,20 @@ else
 
             @if (Nodes.Count == 0)
             {
-                <div class="canvas-empty"><RadzenIcon Icon="account_tree" /><strong>Start with a source</strong><span>Add a database, local file, or FTP source from the toolbox.</span></div>
+                <div class="canvas-empty"><RadzenIcon Icon="account_tree" /><strong>Start with a source</strong><span>Add a database, local file, or FTP source from the left panel.</span></div>
             }
-            <div class="canvas-hint"><RadzenIcon Icon="lightbulb" /><span>Steps are persisted as versioned JSON. Publishing freezes an immutable graph for every run.</span></div>
+            <div class="canvas-hint"><RadzenIcon Icon="lightbulb" /><span>Tip: start with a source, add the steps in order, then use Check workflow before publishing.</span></div>
         </section>
 
         <aside class="properties-panel">
-            <div class="properties-head"><div><strong>Workflow</strong><small>@StatusText</small></div></div>
+            <div class="properties-head"><div><strong>Workflow settings</strong><small>@StatusText</small></div></div>
             <div class="properties-body workflow-properties">
-                <label>Description<textarea rows="2" @bind="Description" disabled="@Busy"></textarea></label>
-                <label>Five-field cron<input placeholder="Manual (leave empty)" @bind="CronExpression" disabled="@Busy" /></label>
-                <label>Time zone<input @bind="TimeZoneId" disabled="@Busy" /></label>
+                <label>What does this workflow do?<textarea rows="2" @bind="Description" disabled="@Busy"></textarea></label>
+                <details class="workflow-values">
+                    <summary><RadzenIcon Icon="schedule" /> Run automatically (optional)</summary>
+                    <label>Schedule<input placeholder="For example: 0 8 * * 1-5" @bind="CronExpression" disabled="@Busy" /><small>Uses a five-part cron schedule. Leave empty to run only when you choose Run now.</small></label>
+                    <label>Time zone<input @bind="TimeZoneId" disabled="@Busy" /></label>
+                </details>
                 <details class="workflow-values">
                     <summary><RadzenIcon Icon="data_object" /> Variables &amp; functions</summary>
                     <div class="built-in-values">
@@ -538,7 +541,7 @@ else
             new("CSV target", "Write beneath an approved root", WorkflowNodeKind.CsvTarget, "description", "green", true),
             new("Excel target", "Write an XLSX workbook", WorkflowNodeKind.ExcelTarget, "grid_on", "green", true)]),
         new("Actions", [
-            new("Email alert", "Queue a durable Email message", WorkflowNodeKind.EmailAlert, "mail", "rose", true),
+            new("Email alert", "Send an email when something happens", WorkflowNodeKind.EmailAlert, "mail", "rose", true),
             new("Webhook", "Call an authorized trusted destination", WorkflowNodeKind.Webhook, "webhook", "rose", TrustedActions.Any(action => action.Kind == TrustedActionKind.Webhook)),
             new("Executable", "Run an authorized trusted executable", WorkflowNodeKind.Executable, "terminal", "slate", TrustedActions.Any(action => action.Kind == TrustedActionKind.Executable))])
     ];
@@ -671,7 +674,7 @@ else
         }
         catch (Exception)
         {
-            LoadError = "The workflow could not be loaded from the control-plane database.";
+            LoadError = "THub could not load this workflow. Try again or return to the workflow list.";
         }
         finally
         {
@@ -1667,7 +1670,7 @@ else
 
             var wasNew = WorkflowId is null;
             ApplyDetails(result.Value!);
-            Notifications.Notify(NotificationSeverity.Success, "Draft saved", $"Revision {DraftRevision} is durable.");
+            Notifications.Notify(NotificationSeverity.Success, "Changes saved", $"Saved as revision {DraftRevision}.");
             if (wasNew)
             {
                 Navigation.NavigateTo($"/designer/{WorkflowId}", replace: true);

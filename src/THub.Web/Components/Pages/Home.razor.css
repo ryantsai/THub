@@ -1,0 +1,197 @@
+.getting-started {
+    margin-bottom: 22px;
+    padding: clamp(22px, 3vw, 32px);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    background: #fff;
+    box-shadow: var(--shadow);
+}
+
+.section-intro {
+    display: flex;
+    align-items: end;
+    justify-content: space-between;
+    gap: 24px;
+}
+
+.section-intro h2 {
+    margin: 6px 0 0;
+    font-size: 21px;
+}
+
+.section-intro > p {
+    max-width: 420px;
+    margin: 0;
+    color: var(--muted);
+    font-size: 13px;
+    line-height: 1.55;
+}
+
+.journey {
+    margin: 28px 0 0;
+    padding: 0;
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    list-style: none;
+}
+
+.journey li {
+    min-width: 0;
+    padding: 0 24px;
+    display: grid;
+    align-content: start;
+    gap: 12px;
+    border-left: 1px solid #e2e9e7;
+}
+
+.journey li:first-child {
+    padding-left: 0;
+    border-left: 0;
+}
+
+.journey-number {
+    width: 30px;
+    height: 30px;
+    display: grid;
+    place-items: center;
+    border-radius: 50%;
+    background: #dff3ec;
+    color: #176d57;
+    font-size: 12px;
+    font-weight: 800;
+}
+
+.journey li > div {
+    display: grid;
+    gap: 5px;
+}
+
+.journey strong {
+    font: 700 15px/1.25 Manrope, sans-serif;
+}
+
+.journey small {
+    min-height: 42px;
+    color: #71817d;
+    font-size: 12px;
+    line-height: 1.5;
+}
+
+.journey a {
+    width: fit-content;
+    color: var(--accent-deep);
+    font-size: 12px;
+    font-weight: 700;
+    text-decoration: none;
+}
+
+.journey a:hover {
+    text-decoration: underline;
+}
+
+.summary-strip {
+    gap: 0;
+    overflow: hidden;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    background: #fff;
+    box-shadow: var(--shadow);
+}
+
+.summary-strip .metric-card {
+    min-height: 126px;
+    border: 0;
+    border-left: 1px solid #e5ebe9;
+    border-radius: 0;
+    box-shadow: none;
+}
+
+.summary-strip .metric-card:first-child {
+    border-left: 0;
+}
+
+.summary-strip .metric-card::after {
+    display: none;
+}
+
+.summary-strip .metric-label {
+    font-size: 11px;
+}
+
+.summary-strip .metric-value {
+    font-size: 30px;
+}
+
+.summary-strip .metric-foot,
+.health-item strong,
+.health-value,
+.quick-list a {
+    font-size: 11px;
+}
+
+.health-item small {
+    font-size: 10px;
+}
+
+.quick-list a {
+    min-height: 44px;
+}
+
+@media (max-width: 1050px) {
+    .journey {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 24px 0;
+    }
+
+    .journey li:nth-child(3) {
+        padding-left: 0;
+        border-left: 0;
+    }
+
+    .summary-strip .metric-card:nth-child(3) {
+        border-left: 0;
+        border-top: 1px solid #e5ebe9;
+    }
+
+    .summary-strip .metric-card:nth-child(4) {
+        border-top: 1px solid #e5ebe9;
+    }
+}
+
+@media (max-width: 650px) {
+    .section-intro {
+        align-items: start;
+        flex-direction: column;
+        gap: 10px;
+    }
+
+    .journey {
+        grid-template-columns: 1fr;
+        gap: 0;
+    }
+
+    .journey li,
+    .journey li:nth-child(3) {
+        padding: 18px 0;
+        grid-template-columns: auto 1fr;
+        border-left: 0;
+        border-top: 1px solid #e5ebe9;
+    }
+
+    .journey li:first-child {
+        border-top: 0;
+    }
+
+    .journey li > a {
+        grid-column: 2;
+    }
+
+    .summary-strip .metric-card {
+        border-left: 0;
+        border-top: 1px solid #e5ebe9;
+    }
+
+    .summary-strip .metric-card:first-child {
+        border-top: 0;
+    }
+}

@@ -17,9 +17,9 @@
 
 <div class="page-heading">
     <div>
-        <div class="eyebrow">Workspace</div>
+        <div class="eyebrow">Build and run</div>
         <h1>Workflows</h1>
-        <p>Design, version, publish, and monitor durable data movement.</p>
+        <p>Build a repeatable series of steps that moves or changes your data.</p>
     </div>
     @if (CanCreate)
     {
@@ -50,7 +50,7 @@
     }
     else if (Items.Count == 0)
     {
-        <div class="page-state"><RadzenIcon Icon="account_tree" /><h3>No workflows yet</h3><p>Create a workflow, connect its steps, validate it, then publish an immutable version.</p></div>
+        <div class="page-state"><RadzenIcon Icon="account_tree" /><h3>No workflows yet</h3><p>Create a workflow, add its steps, check it for problems, then publish when it is ready to run.</p></div>
     }
     else
     {
@@ -191,7 +191,7 @@
         }
         catch (Exception)
         {
-            Error = "Workflows could not be loaded. Check the control-plane database and try again.";
+            Error = "THub could not load workflows. Try again in a moment.";
         }
         finally
         {
@@ -432,7 +432,7 @@
             Notifications.Notify(
                 NotificationSeverity.Error,
                 "Run could not be queued",
-                "The control plane is temporarily unavailable. No run was confirmed.");
+                "THub is temporarily unavailable. No run was started.");
         }
         finally
         {

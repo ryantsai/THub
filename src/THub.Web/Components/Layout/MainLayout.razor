@@ -9,27 +9,28 @@
         </a>
 
         <nav class="primary-nav" aria-label="Primary navigation">
-            <span class="nav-section">Workspace</span>
-            <NavLink href="/" Match="NavLinkMatch.All"><RadzenIcon Icon="space_dashboard" />Overview</NavLink>
+            <span class="nav-section">Build and run</span>
+            <NavLink href="/" Match="NavLinkMatch.All"><RadzenIcon Icon="home" />Home</NavLink>
             <NavLink href="/workflows"><RadzenIcon Icon="account_tree" />Workflows</NavLink>
-            <AuthorizeView Policy="@Permissions.WorkflowEdit">
-                <NavLink href="/designer"><RadzenIcon Icon="polyline" />Designer</NavLink>
+            <AuthorizeView Policy="@Permissions.ConnectionView">
+                <NavLink href="/connections"><RadzenIcon Icon="database" />Data connections</NavLink>
             </AuthorizeView>
             <NavLink href="/runs"><RadzenIcon Icon="play_circle" />Runs</NavLink>
-
-            <span class="nav-section">Data plane</span>
-            <AuthorizeView Policy="@Permissions.ConnectionView">
-                <NavLink href="/connections"><RadzenIcon Icon="database" />Connections</NavLink>
-            </AuthorizeView>
             <AuthorizeView Policy="@Permissions.ScheduleManage">
                 <NavLink href="/schedules"><RadzenIcon Icon="schedule" />Schedules</NavLink>
             </AuthorizeView>
-            <NavLink href="/published-data"><RadzenIcon Icon="table_view" />Published data</NavLink>
+
+            <span class="nav-section">Share and monitor</span>
+            <NavLink href="/published-data"><RadzenIcon Icon="table_view" />Data tables</NavLink>
             <AuthorizeView Policy="@Permissions.PublicationManage">
-                <NavLink href="/publications"><RadzenIcon Icon="api" />Publications</NavLink>
+                <NavLink href="/publications"><RadzenIcon Icon="api" />Data sharing</NavLink>
             </AuthorizeView>
             <AuthorizeView Policy="@Permissions.Administration">
-                <NavLink href="/alerts/email"><RadzenIcon Icon="notifications_active" />Email alerts</NavLink>
+                <NavLink href="/alerts/email"><RadzenIcon Icon="notifications_active" />Alerts</NavLink>
+            </AuthorizeView>
+
+            <AuthorizeView Policy="@Permissions.Administration">
+                <span class="nav-section">Administration</span>
                 <NavLink href="/trusted-actions"><RadzenIcon Icon="verified_user" />Trusted actions</NavLink>
             </AuthorizeView>
         </nav>
@@ -49,8 +50,7 @@
                     <Authorized Context="authentication">
                         <div class="identity">
                             <div class="avatar">@Initials(authentication.User.Identity?.Name)</div>
-                            <div><strong>@DisplayName(authentication.User.Identity?.Name)</strong><small>Windows account</small></div>
-                            <RadzenIcon Icon="expand_more" />
+                            <div><strong>@DisplayName(authentication.User.Identity?.Name)</strong><small>Signed in</small></div>
                         </div>
                     </Authorized>
                 </AuthorizeView>

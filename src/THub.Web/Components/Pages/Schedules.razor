@@ -12,7 +12,7 @@
 <PageTitle>Schedules · THub</PageTitle>
 
 <div class="page-heading">
-    <div><div class="eyebrow">Automation</div><h1>Schedules</h1><p>Five-field cron schedules use explicit Windows time zones and immutable published versions.</p></div>
+    <div><div class="eyebrow">Build and run</div><h1>Schedules</h1><p>See which workflows run automatically and when each one is due next.</p></div>
     <div class="heading-actions"><RadzenButton Text="Refresh" Icon="refresh" ButtonStyle="ButtonStyle.Light" Click="@LoadAsync" Disabled="@Busy" /></div>
 </div>
 
@@ -28,7 +28,7 @@
     }
     else if (ScheduledWorkflows.Count == 0)
     {
-        <div class="page-state"><RadzenIcon Icon="event_busy" /><h3>No schedules configured</h3><p>Add a cron expression and time zone in a workflow designer, then publish it.</p></div>
+        <div class="page-state"><RadzenIcon Icon="event_busy" /><h3>No schedules yet</h3><p>Open a workflow, add an optional schedule in its settings, then publish it.</p></div>
     }
     else
     {
@@ -66,7 +66,7 @@
     }
 </section>
 
-<div class="schedule-note"><RadzenIcon Icon="info" /><p>Quartz coordinates firing. THub persists the logical occurrence and queues an exact workflow version; the execution worker then claims it under a separate lease.</p></div>
+<div class="schedule-note"><RadzenIcon Icon="info" /><p>A schedule always runs the exact workflow version you published. Editing a draft will not change active runs until you publish again.</p></div>
 
 @code {
     private readonly CancellationTokenSource cancellation = new();

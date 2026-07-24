@@ -17,10 +17,10 @@
 @inject AccessControlAdministrationService AccessControl
 @inject IConfiguration Configuration
 
-<PageTitle>Publications · THub</PageTitle>
+<PageTitle>Data sharing · THub</PageTitle>
 
 <div class="page-heading">
-    <div><div class="eyebrow">Controlled access</div><h1>Data publications</h1><p>Versioned, bounded database surfaces for read-only REST clients and governed spreadsheet edits.</p></div>
+    <div><div class="eyebrow">Share and monitor</div><h1>Data sharing</h1><p>Safely share approved database data as an API or editable table.</p></div>
     <div class="heading-actions">
         <RadzenButton Text="New publication" Icon="add" ButtonStyle="ButtonStyle.Primary" Click="@StartCreate" Disabled="@Busy" />
         <RadzenButton Text="Refresh" Icon="refresh" ButtonStyle="ButtonStyle.Light" Click="@LoadAsync" Disabled="@Busy" />
