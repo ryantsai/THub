@@ -96,7 +96,7 @@
 .endpoint-list { padding: 16px; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
 .endpoint-list > div { min-width: 0; padding: 12px; display: grid; gap: 7px; border: 1px solid #dce6e3; border-radius: 8px; background: #fff; }
 .endpoint-list span { color: #52635e; font-size: 8px; font-weight: 800; letter-spacing: .4px; text-transform: uppercase; }
-.endpoint-list code { min-width: 0; overflow-wrap: anywhere; color: #155f4c; font-size: 9px; user-select: all; }
+.endpoint-list code { min-width: 0; overflow-wrap: anywhere; color: #155f4c; font-size: 9px; -webkit-user-select: all; user-select: all; }
 .endpoint-list small { color: #7a8985; font-size: 8px; line-height: 1.45; }
 .handoff-sequence { margin: 0; padding: 0 16px 16px; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; list-style: none; }
 .handoff-sequence li { display: flex; align-items: center; gap: 8px; color: #566762; font-size: 9px; }
@@ -105,11 +105,11 @@
 .editor-handoff h3 { margin: 4px 0; font-size: 14px; }
 .editor-handoff p { margin: 0; color: #c8d9d4; font-size: 9px; }
 .editor-handoff a { min-width: 220px; padding: 10px 12px; display: flex; align-items: center; justify-content: space-between; gap: 10px; border: 1px solid #4f776c; border-radius: 7px; background: #225346; color: #fff; text-decoration: none; }
-.editor-handoff code { color: #fff; font-size: 9px; user-select: all; }
+.editor-handoff code { color: #fff; font-size: 9px; -webkit-user-select: all; user-select: all; }
 .token-once { margin: 0 18px 15px; padding: 14px; display: grid; grid-template-columns: auto 1fr auto; gap: 10px; border: 1px solid #e3c977; border-radius: 8px; background: #fff9e8; color: #66511f; }
 .token-once div { min-width: 0; display: grid; gap: 6px; }
 .token-once strong, .token-once small { font-size: 9px; }
-.token-once code { padding: 8px; border-radius: 5px; background: white; overflow-wrap: anywhere; font-size: 10px; user-select: all; }
+.token-once code { padding: 8px; border-radius: 5px; background: white; overflow-wrap: anywhere; font-size: 10px; -webkit-user-select: all; user-select: all; }
 .token-once button { border: 0; background: none; color: #7f6522; font-size: 9px; font-weight: 700; cursor: pointer; }
 .grant-table { width: calc(100% - 36px); margin: 0 18px 18px; border-collapse: collapse; border: 1px solid #e1e7e5; }
 .grant-table th, .grant-table td { padding: 10px 14px; border-top: 1px solid #edf1f0; font-size: 9px; text-align: center; }

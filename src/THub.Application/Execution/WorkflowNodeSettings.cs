@@ -914,9 +914,9 @@ public sealed class WorkflowNodeSettingsValidator
         var extension = Path.GetExtension(validationPath);
         if (Path.IsPathRooted(validationPath)
             || validationPath.Contains(':')
-            || template[..Math.Max(
+            || template[..(Math.Max(
                     template.LastIndexOf(Path.DirectorySeparatorChar),
-                    template.LastIndexOf(Path.AltDirectorySeparatorChar)) + 1]
+                    template.LastIndexOf(Path.AltDirectorySeparatorChar)) + 1)]
                 .Contains('{')
             || validationPath
                 .Split(
