@@ -164,10 +164,14 @@ dotnet tool run dotnet-ef migrations add MeaningfulName `
 
 ### REST/editor publications
 
-- ADR-0007 is Proposed. Do not implement a generic arbitrary-table/SQL CRUD API.
-- Default any future REST publication to read-only.
-- Require explicit object/column/operation/auth policies, bounds, rate limits, and audit.
-- Do not implement write-capable editors until direct-vs-staged writes and consumer authentication are decided.
+- Follow ADR-0011 and ADR-0021. Do not implement a generic arbitrary-table/SQL CRUD API.
+- Keep REST publications read-only and isolated behind managed opaque bearer tokens.
+- Require explicit provider/object/column/operation/auth policies, stable keys, bounds,
+  rate limits, schema drift checks, and safe telemetry.
+- Keep editor writes role-granted, staged, reviewed, and Worker-applied with optimistic
+  concurrency. The Blazor host must never receive source-write authority.
+- SQL Server, MySQL, PostgreSQL, and Oracle adapters remain provider-specific even
+  though the management and consumer experience is unified.
 
 ## UI expectations
 

@@ -5,7 +5,7 @@ using THub.Infrastructure.Publications;
 
 namespace THub.Infrastructure.Tests;
 
-public sealed class SqlPublicationChangeSetProcessorTests
+public sealed class PublicationChangeSetProcessorTests
 {
     [Fact]
     public void BuildInsert_IncludesNonGeneratedNaturalKey()
@@ -16,7 +16,7 @@ public sealed class SqlPublicationChangeSetProcessorTests
             StringComparer.OrdinalIgnoreCase);
         using var command = new SqlCommand();
 
-        var sql = SqlPublicationChangeSetProcessor.BuildInsert(
+        var sql = PublicationChangeSetProcessor.BuildInsert(
             command,
             version,
             columns,
@@ -37,7 +37,7 @@ public sealed class SqlPublicationChangeSetProcessorTests
         using var command = new SqlCommand();
 
         var exception = Assert.Throws<InvalidOperationException>(() =>
-            SqlPublicationChangeSetProcessor.BuildUpdate(
+            PublicationChangeSetProcessor.BuildUpdate(
                 command,
                 version,
                 columns,
@@ -58,7 +58,7 @@ public sealed class SqlPublicationChangeSetProcessorTests
             StringComparer.OrdinalIgnoreCase);
         using var command = new SqlCommand();
 
-        var sql = SqlPublicationChangeSetProcessor.BuildUpdate(
+        var sql = PublicationChangeSetProcessor.BuildUpdate(
             command,
             version,
             columns,
@@ -118,7 +118,8 @@ public sealed class SqlPublicationChangeSetProcessorTests
                     maximumLength: 200),
             ],
             "CONTOSO\\publisher",
-            new DateTimeOffset(2026, 7, 23, 8, 0, 0, TimeSpan.Zero));
+            new DateTimeOffset(2026, 7, 23, 8, 0, 0, TimeSpan.Zero),
+            Guid.NewGuid());
     }
 
     private static IReadOnlyDictionary<string, JsonElement> ParseObject(string json)

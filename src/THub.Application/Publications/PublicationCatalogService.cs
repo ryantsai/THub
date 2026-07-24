@@ -4,12 +4,15 @@ namespace THub.Application.Publications;
 
 public sealed class PublicationCatalogService(
     IPublicationCatalogStore store,
+    IPublicationConnectionPolicy connectionPolicy,
     TimeProvider timeProvider)
 {
     private readonly IPublicationCatalogStore _store =
         store ?? throw new ArgumentNullException(nameof(store));
     private readonly TimeProvider _timeProvider =
         timeProvider ?? throw new ArgumentNullException(nameof(timeProvider));
+    private readonly IPublicationConnectionPolicy _connectionPolicy =
+        connectionPolicy ?? throw new ArgumentNullException(nameof(connectionPolicy));
 
     public async Task<PublicationResult<IReadOnlyList<PublicationSummaryDto>>> ListAsync(
         PublicationCatalogQuery query,
@@ -61,6 +64,35 @@ public sealed class PublicationCatalogService(
         }
 
         var versions = await _store.ListVersionsAsync(publicationId, cancellationToken).ConfigureAwait(false);
+        return PublicationResult<PublicationDetailDto>.Success(
+            PublicationDtoMapper.ToDetail(publication, versions));
+    }
+
+    public async Task<PublicationResult<PublicationDetailDto>> GetBySlugAsync(
+        string slug,
+        CancellationToken cancellationToken)
+    {
+        string normalizedSlug;
+        try
+        {
+            normalizedSlug = Publication.NormalizeSlug(slug);
+        }
+        catch (ArgumentException exception)
+        {
+            return PublicationResultFactory.FromDomainException<PublicationDetailDto>(exception);
+        }
+
+        var publication = await _store.FindBySlugAsync(normalizedSlug, cancellationToken)
+            .ConfigureAwait(false);
+        if (publication is null)
+        {
+            return PublicationResultFactory.NotFound<PublicationDetailDto>(
+                "publication.not_found",
+                "The publication was not found.");
+        }
+
+        var versions = await _store.ListVersionsAsync(publication.Id, cancellationToken)
+            .ConfigureAwait(false);
         return PublicationResult<PublicationDetailDto>.Success(
             PublicationDtoMapper.ToDetail(publication, versions));
     }
@@ -204,6 +236,22 @@ public sealed class PublicationCatalogService(
                 "REST publications are read-only and cannot expose writable columns.");
         }
 
+        var requiresApplyConnection =
+            command.ConcurrencyMode != PublicationConcurrencyMode.ReadOnly ||
+            command.Columns.Any(column => column.IsWritable);
+        var connectionPolicy = await _connectionPolicy.ValidateAsync(
+                command.ConnectionId,
+                command.ApplyConnectionId,
+                requiresApplyConnection,
+                cancellationToken)
+            .ConfigureAwait(false);
+        if (!connectionPolicy.IsValid)
+        {
+            return PublicationResultFactory.Validation<PublicationVersionDto>(
+                connectionPolicy.ErrorCode!,
+                connectionPolicy.Message!);
+        }
+
         try
         {
             var versionId = Guid.NewGuid();
@@ -224,7 +272,8 @@ public sealed class PublicationCatalogService(
                 command.Settings,
                 columns,
                 command.Actor,
-                _timeProvider.GetUtcNow());
+                _timeProvider.GetUtcNow(),
+                command.ApplyConnectionId);
             var writeStatus = await _store.AddVersionAsync(version, cancellationToken)
                 .ConfigureAwait(false);
             return writeStatus switch
@@ -283,6 +332,20 @@ public sealed class PublicationCatalogService(
             return PublicationResultFactory.Validation<PublicationDetailDto>(
                 "publication.rest_read_only",
                 "REST publications can activate only read-only versions.");
+        }
+
+        var connectionPolicy = await _connectionPolicy.ValidateAsync(
+                version.ConnectionId,
+                version.ApplyConnectionId,
+                version.ConcurrencyMode != PublicationConcurrencyMode.ReadOnly ||
+                version.Columns.Any(column => column.IsWritable),
+                cancellationToken)
+            .ConfigureAwait(false);
+        if (!connectionPolicy.IsValid)
+        {
+            return PublicationResultFactory.Validation<PublicationDetailDto>(
+                connectionPolicy.ErrorCode!,
+                connectionPolicy.Message!);
         }
 
         try

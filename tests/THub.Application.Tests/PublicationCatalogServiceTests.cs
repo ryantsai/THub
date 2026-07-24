@@ -12,7 +12,10 @@ public sealed class PublicationCatalogServiceTests
         {
             AddPublicationStatus = PublicationCatalogWriteStatus.DuplicateSlug,
         };
-        var service = new PublicationCatalogService(store, new FixedTimeProvider(PublicationTestData.Now));
+        var service = new PublicationCatalogService(
+            store,
+            new FakePublicationConnectionPolicy(),
+            new FixedTimeProvider(PublicationTestData.Now));
 
         var result = await service.CreateAsync(
             new CreatePublicationCommand("Orders API", "Orders", PublicationKind.RestApi, "CONTOSO\\author"),
@@ -35,11 +38,15 @@ public sealed class PublicationCatalogServiceTests
             PublicationTestData.Now);
         var store = new FakePublicationCatalogStore();
         store.Publications.Add(publication);
-        var service = new PublicationCatalogService(store, new FixedTimeProvider(PublicationTestData.Now));
+        var service = new PublicationCatalogService(
+            store,
+            new FakePublicationConnectionPolicy(),
+            new FixedTimeProvider(PublicationTestData.Now));
 
         var result = await service.CreateVersionAsync(
             new CreatePublicationVersionCommand(
                 publication.Id,
+                Guid.NewGuid(),
                 Guid.NewGuid(),
                 "dbo",
                 "Orders",
@@ -98,6 +105,7 @@ public sealed class PublicationCatalogServiceTests
         store.Versions.Add(version);
         var service = new PublicationCatalogService(
             store,
+            new FakePublicationConnectionPolicy(),
             new FixedTimeProvider(PublicationTestData.Now.AddMinutes(1)));
 
         var result = await service.ActivateAsync(
@@ -109,5 +117,46 @@ public sealed class PublicationCatalogServiceTests
         Assert.True(result.IsSuccess);
         Assert.Equal(PublicationState.Active, result.Value!.State);
         Assert.Equal(version.Id, result.Value.ActiveVersionId);
+    }
+
+    [Fact]
+    public async Task ActivateAsync_RejectsVersionWhenApplyConnectionPolicyFails()
+    {
+        var publication = new Publication(
+            Guid.NewGuid(),
+            "orders-editor",
+            "Orders",
+            PublicationKind.Editor,
+            "CONTOSO\\author",
+            PublicationTestData.Now);
+        var version = PublicationTestData.CreateVersion(
+            publication.Id,
+            writable: true,
+            withForeignKey: false);
+        var store = new FakePublicationCatalogStore();
+        store.Publications.Add(publication);
+        store.Versions.Add(version);
+        var policy = new FakePublicationConnectionPolicy
+        {
+            Result = PublicationConnectionPolicyResult.Failure(
+                "publication.connection_target_mismatch",
+                "Read and apply connections must target the same database endpoint."),
+        };
+        var service = new PublicationCatalogService(
+            store,
+            policy,
+            new FixedTimeProvider(PublicationTestData.Now.AddMinutes(1)));
+
+        var result = await service.ActivateAsync(
+            publication.Id,
+            version.Id,
+            "CONTOSO\\publisher",
+            CancellationToken.None);
+
+        Assert.False(result.IsSuccess);
+        Assert.Equal(
+            "publication.connection_target_mismatch",
+            result.Problem!.Code);
+        Assert.Null(publication.ActiveVersionId);
     }
 }

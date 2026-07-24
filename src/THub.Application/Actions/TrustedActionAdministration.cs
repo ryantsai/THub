@@ -345,9 +345,9 @@ public sealed class TrustedActionAdministrationService(
 
         return new ConnectionCredentialWrite(
             TrustedActionCredentialReferences.ToStorageReference(
-                command.CredentialReference),
+                command.CredentialReference!),
             new ConnectionCredential(
-                command.CredentialUserName.Trim(),
+                command.CredentialUserName!.Trim(),
                 command.CredentialPassword!),
             changedAtUtc);
     }

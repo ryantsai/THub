@@ -105,6 +105,12 @@ public sealed class SqlPublicationGrantManagementStoreIntegrationTests
             "{}",
             "integration-test",
             Now);
+        var applyConnection = new DataConnection(
+            "Grant revocation integration apply",
+            ConnectionKind.SqlServer,
+            "{}",
+            "integration-test",
+            Now);
         var publication = new Publication(
             Guid.NewGuid(),
             "grant-revocation-editor",
@@ -119,7 +125,7 @@ public sealed class SqlPublicationGrantManagementStoreIntegrationTests
             null,
             Now,
             "integration-test");
-        db.AddRange(connection, publication, role);
+        db.AddRange(connection, applyConnection, publication, role);
         await db.SaveChangesAsync();
 
         var versionId = Guid.NewGuid();
@@ -166,7 +172,8 @@ public sealed class SqlPublicationGrantManagementStoreIntegrationTests
                     maximumLength: 200),
             ],
             "integration-test",
-            Now);
+            Now,
+            applyConnection.Id);
         db.PublicationVersions.Add(version);
         await db.SaveChangesAsync();
         publication.ActivateVersion(version, "integration-test", Now.AddMinutes(1));

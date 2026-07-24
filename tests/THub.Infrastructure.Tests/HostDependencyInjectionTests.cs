@@ -25,6 +25,7 @@ public sealed class HostDependencyInjectionTests
         AssertRegistered<PublicationTokenService>(services);
         AssertRegistered<PublicationDataService>(services);
         AssertRegistered<IPublicationCatalogStore>(services);
+        AssertRegistered<IPublicationConnectionPolicy>(services);
         AssertRegistered<IPublicationTokenStore>(services);
         AssertRegistered<IPublicationSourceDataReader>(services);
         AssertRegistered<IPublicationSourceSchemaInspector>(services);
@@ -95,9 +96,10 @@ public sealed class HostDependencyInjectionTests
         AssertRegistered<AlertDeliveryDispatcher>(services);
         AssertRegistered<IPublicationChangeSetClaimStore>(services);
         AssertRegistered<IPublicationChangeSetProcessor>(services);
+        AssertRegistered<IDataConnectionStore>(services);
+        AssertRegistered<IPublicationConnectionPolicy>(services);
 
         AssertNotRegistered<ConnectionManagementService>(services);
-        AssertNotRegistered<IDataConnectionStore>(services);
         AssertNotRegistered<IDataConnectionProbe>(services);
         AssertNotRegistered<WorkflowCatalogService>(services);
         AssertNotRegistered<WorkflowRunService>(services);

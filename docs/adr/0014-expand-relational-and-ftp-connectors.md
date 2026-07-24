@@ -8,6 +8,8 @@
   [ADR-0018](0018-primary-key-relational-target-mutations.md)
 - Credential-storage decision amended by:
   [ADR-0019](0019-encrypted-sql-connection-credentials.md)
+- Publication-provider restriction superseded by:
+  [ADR-0021](0021-provider-neutral-governed-publications.md)
 
 ## Context
 
@@ -41,7 +43,9 @@ FTP connections explicitly select plain FTP, explicit FTPS, or implicit FTPS. Pl
 - stage data in a unique worker temporary directory and remove it on completion on a best-effort basis;
 - do not create arbitrary remote directories or provide a watcher.
 
-SQL Server remains the authoritative THub control plane. Governed publications and Spreadsheet editors remain SQL Server-only; adding publication support for another provider requires separate validation and authorization work.
+SQL Server remains the authoritative THub control plane. This ADR originally kept
+governed publications and Spreadsheet editors SQL Server-only; ADR-0021 supersedes that
+restriction and defines publication support for all four relational providers.
 
 ## Consequences
 

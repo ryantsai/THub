@@ -78,6 +78,7 @@ public sealed class PublicationVersionConfiguration : IEntityTypeConfiguration<P
         builder.HasIndex(version => new { version.PublicationId, version.VersionNumber })
             .IsUnique();
         builder.HasIndex(version => version.ConnectionId);
+        builder.HasIndex(version => version.ApplyConnectionId);
         builder.HasIndex(version => new
         {
             version.ConnectionId,
@@ -92,6 +93,10 @@ public sealed class PublicationVersionConfiguration : IEntityTypeConfiguration<P
         builder.HasOne<DataConnection>()
             .WithMany()
             .HasForeignKey(version => version.ConnectionId)
+            .OnDelete(DeleteBehavior.Restrict);
+        builder.HasOne<DataConnection>()
+            .WithMany()
+            .HasForeignKey(version => version.ApplyConnectionId)
             .OnDelete(DeleteBehavior.Restrict);
     }
 }

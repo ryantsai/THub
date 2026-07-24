@@ -2,13 +2,13 @@
 
 THub is an intranet-first data workflow orchestration and visual-design platform inspired by SSIS, n8n, DolphinScheduler, Kestra, and Azure Data Factory. Its workflow connector boundary includes SQL Server, MySQL, PostgreSQL, Oracle Database, local CSV/Excel files, and FTP/FTPS CSV, tab-delimited, and Excel files.
 
-> **Repository status:** functional v1 foundation. The persisted designer/catalog, schema-versioned graph validation, immutable checksummed workflow versions, manual and scheduled run queues, SQL-leased Worker execution, durable step attempts, bounded relational/local-file/FTP nodes, select/filter/join transforms, Email alerts, SQL-backed trusted webhook/executable actions, and governed SQL Server publications are implemented. Publication canvas nodes remain intentionally non-operational; production readiness still requires deployment-specific identities, secrets, live connector verification, plus readiness/metrics, audit, and retention work.
+> **Repository status:** functional v1 foundation. The persisted designer/catalog, schema-versioned graph validation, immutable checksummed workflow versions, manual and scheduled run queues, SQL-leased Worker execution, durable step attempts, bounded relational/local-file/FTP nodes, select/filter/join transforms, Email alerts, SQL-backed trusted webhook/executable actions, and governed relational publication implementation are present. Writable publications now model separate read and Worker apply connections across SQL Server, MySQL, PostgreSQL, and Oracle. The solution build, automated suite, apply migration, Swagger UI, and responsive publication builder have been validated; live-provider integration remains required before production enablement. Publication canvas nodes remain intentionally non-operational. Production readiness also requires deployment-specific identities, secrets, readiness/metrics, audit, and retention work.
 
 ## Architecture at a glance
 
 ```text
 Windows user -------> THub.Web ----------------------------------> SQL Server control plane
-Internal API client -> THub.Publications ------------------------> SQL Server + approved source tables
+Internal API client -> THub.Publications ------------------------> SQL Server control plane + approved relational sources
 THub.Worker (Quartz + leased execution/background work) --------> SQL Server + approved sources/targets
 ```
 
@@ -37,8 +37,8 @@ Quartz owns schedule timing, persistence, misfire handling, and scheduler cluste
 | Email alerts/actions | Implemented | Administrator-managed profiles/rules, terminal-event and `EmailAlert` action enqueueing, deduplicated SQL outbox, leased Worker dispatch, bounded retries/dead letters, and MailKit SMTP delivery; credential-backed SMTP requires an approved `ISecretResolver` deployment integration |
 | Webhook/executable execution | Implemented with trusted-action policies | System Administrators approve fixed definitions and encrypted credentials; per-resource role grants control publication; Worker execution revalidates enabled policy, network/path, timeout, output, and identity boundaries |
 | Publication canvas nodes | Gated and separated | `PublishRestApi` and `PublishDataEditor` cannot run in a workflow; create the implemented governed resources under Publications instead |
-| Isolated REST publication host | Implemented | Separate read-only `/schema` and `/rows` routes use managed bearer tokens, atomic accepted-use metering, typed filters/sorts, keyset cursors, schema checks, response/time limits, and process-local admission |
-| Role-governed Spreadsheet editor | Implemented | Independent View/Insert/Update/Delete/Approve grants, bounded windows, foreign-key lookup cells, typed staging/review, and worker-applied optimistic-concurrency change sets |
+| Isolated REST publication host | Implemented; live-provider validation pending | Separate read-only `/schema` and `/rows` routes use managed bearer tokens, atomic accepted-use metering, typed filters/sorts, keyset cursors, schema checks, response/time limits, and process-local admission; `/swagger` and `/openapi/v1.json` describe the consumer contract |
+| Role-governed Spreadsheet editor | Provider-neutral staged apply implemented; live-provider validation pending | Stable `/data/{slug}` routes, independent View/Insert/Update/Delete/Approve grants, bounded windows, foreign-key lookup cells, typed staging/review, and separate read/Worker apply connections |
 
 ## Technology
 
@@ -130,12 +130,20 @@ The dependency direction is `Web/Publications/Worker -> Infrastructure/Applicati
    Create and activate a REST publication under `/publications`, create a named expiring token, and copy its plaintext value from the one-time response. The separate host exposes:
 
    ```text
+   GET /swagger
+   GET /openapi/v1.json
    GET /api/v1/publications/{slug}/schema
    GET /api/v1/publications/{slug}/rows?pageSize=100&filter=status:eq:Ready&sort=-createdAt
    Authorization: Bearer thub_<selector>.<secret>
    ```
 
-   The rows route accepts only `pageSize`, a server-issued `cursor`, up to 16 repeated `filter` values, and up to 8 repeated `sort` values. Filter syntax is `alias:operator:value`; `isNull` and `isNotNull` omit the value. Publication-version settings and the SQL connection's batch limit bound every request.
+   Swagger describes the generic protected API without disclosing publication-specific
+   columns. Authorize with the one-time bearer token, then call the authenticated
+   `/schema` route for the active column contract. The rows route accepts only
+   `pageSize`, a server-issued `cursor`, up to 16 repeated `filter` values, and up to 8
+   repeated `sort` values. Filter syntax is `alias:operator:value`; `isNull` and
+   `isNotNull` omit the value. Publication-version settings and the selected database
+   connection's batch limit bound every request.
 
 Base settings intentionally contain no database connection string. Every non-Development Web, Worker, and Publications environment must provide `ConnectionStrings:THub` through approved deployment configuration. Use separate least-privilege host identities: Publications needs control-plane token/metering access and approved source-read access, while Worker alone receives approved editor source-write access. Development settings are excluded from publish output.
 

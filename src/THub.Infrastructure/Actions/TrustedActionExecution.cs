@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Runtime.Versioning;
 using System.Globalization;
 using System.Net;
 using System.Net.Http.Headers;
@@ -547,6 +548,7 @@ public sealed class ExecutableNodeExecutor(
         }
     }
 
+    [SupportedOSPlatform("windows")]
     private static void ApplyWindowsCredential(
         ProcessStartInfo startInfo,
         ConnectionCredential credential)

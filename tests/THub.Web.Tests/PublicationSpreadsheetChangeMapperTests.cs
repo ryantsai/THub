@@ -132,6 +132,7 @@ public sealed class PublicationSpreadsheetChangeMapperTests
         Guid.NewGuid(),
         1,
         Guid.NewGuid(),
+        Guid.NewGuid(),
         "dbo",
         "Items",
         PublicationSourceObjectKind.Table,

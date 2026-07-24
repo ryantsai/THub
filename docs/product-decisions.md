@@ -18,6 +18,7 @@ These choices materially affect security, deployment, execution semantics, or pe
 | PD-006 | Runs use immutable versions and SQL leases. Occurrences queue with one active run per workflow by default; cancellation is durable; only transient retry-safe operations receive bounded automatic retry; recovery remains at-least-once. | [ADR-0010](adr/0010-durable-leased-workflow-execution.md) |
 | PD-008 | Database and FTP credentials retain provider-neutral references while their values are stored as AES-GCM ciphertext in SQL; a versioned 256-bit master-key ring remains external configuration. | [ADR-0019](adr/0019-encrypted-sql-connection-credentials.md) |
 | PD-002 | SQL-backed roles support Windows user/group assignments, global permissions, per-workflow/per-connection grants, and custom-role editor publication grants. | [ADR-0016](adr/0016-sql-backed-custom-role-and-resource-authorization.md) |
+| PD-010 | Writable editor versions use a separate Worker apply connection. It must target the same provider/database as the read connection and use a distinct stored credential reference when applicable. | [ADR-0021](adr/0021-provider-neutral-governed-publications.md) |
 
 ## Resolution process
 

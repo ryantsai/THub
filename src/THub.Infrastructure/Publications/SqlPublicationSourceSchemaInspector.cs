@@ -295,6 +295,26 @@ public sealed class SqlPublicationSourceSchemaInspector(
                         AND selected_index.[has_filter] = 0
                         AND selected_index.[is_disabled] = 0
                         AND selected_index.[is_hypothetical] = 0
+                        AND
+                        (
+                            SELECT COUNT(*)
+                            FROM sys.index_columns AS selected_key_column
+                            WHERE selected_key_column.[object_id] = selected_index.[object_id]
+                              AND selected_key_column.[index_id] = selected_index.[index_id]
+                              AND selected_key_column.[key_ordinal] > 0
+                        ) <= 16
+                        AND NOT EXISTS
+                        (
+                            SELECT 1
+                            FROM sys.index_columns AS nullable_key_column
+                            INNER JOIN sys.columns AS nullable_column
+                                ON nullable_column.[object_id] = nullable_key_column.[object_id]
+                               AND nullable_column.[column_id] = nullable_key_column.[column_id]
+                            WHERE nullable_key_column.[object_id] = selected_index.[object_id]
+                              AND nullable_key_column.[index_id] = selected_index.[index_id]
+                              AND nullable_key_column.[key_ordinal] > 0
+                              AND nullable_column.[is_nullable] = 1
+                        )
                       ORDER BY selected_index.[is_primary_key] DESC, selected_index.[index_id]
                   )
             ) AS key_column

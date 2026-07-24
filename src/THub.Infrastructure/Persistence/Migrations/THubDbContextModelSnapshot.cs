@@ -747,6 +747,9 @@ namespace THub.Infrastructure.Persistence.Migrations
                     b.Property<Guid>("ConnectionId")
                         .HasColumnType("uniqueidentifier");
 
+                    b.Property<Guid?>("ApplyConnectionId")
+                        .HasColumnType("uniqueidentifier");
+
                     b.Property<DateTimeOffset>("CreatedAtUtc")
                         .HasColumnType("datetimeoffset");
 
@@ -782,6 +785,8 @@ namespace THub.Infrastructure.Persistence.Migrations
                         .HasColumnType("int");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("ApplyConnectionId");
 
                     b.HasIndex("ConnectionId");
 
@@ -1397,6 +1402,11 @@ namespace THub.Infrastructure.Persistence.Migrations
 
             modelBuilder.Entity("THub.Domain.Publications.PublicationVersion", b =>
                 {
+                    b.HasOne("THub.Domain.Connections.DataConnection", null)
+                        .WithMany()
+                        .HasForeignKey("ApplyConnectionId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
                     b.HasOne("THub.Domain.Connections.DataConnection", null)
                         .WithMany()
                         .HasForeignKey("ConnectionId")

@@ -12,7 +12,7 @@ Optional Developer users/groups use `DeveloperUsers` or `DeveloperGroups`. Boots
 
 ## Recommended topology
 
-The accepted initial production topology is Windows Server with separate IIS applications/hostnames for `THub.Web` and one `THub.Publications` instance, one `THub.Worker` Windows Service, and an existing SQL Server instance. The publication host is functional, but production use still requires a real internal hostname/certificate, firewall policy, separate least-privilege identities, reviewed migrations, source-object grants, and live SQL Server verification.
+The accepted initial production topology is Windows Server with separate IIS applications/hostnames for `THub.Web` and one `THub.Publications` instance, one `THub.Worker` Windows Service, and an existing SQL Server control-plane instance. The publication host is functional, but production use still requires a real internal hostname/certificate, firewall policy, separate least-privilege identities, reviewed migrations, source-object grants, and live verification for every enabled relational provider.
 
 ```text
 Corporate browser -- HTTPS + Windows Authentication --> IIS / THub.Web --------+
@@ -23,7 +23,7 @@ THub.Worker Windows Service ----------------------------------------------------
       |                                      |
       +---- approved SQL Server/file roots   +---- approved SMTP relay
 
-THub.Publications --------------------- approved read-only SQL result objects
+THub.Publications --------------------- approved read-only relational objects
 ```
 
 Web, publication, and worker processes may initially share a Windows machine, but they are independently deployable and require separate least-privilege identities. The publication API remains one process instance until rate limiting is made distributed or moved to a gateway.
@@ -62,7 +62,7 @@ Publish the executable `THub.Publications` host separately:
 dotnet publish src/THub.Publications -c Release -r win-x64 --self-contained false -o artifacts/publications
 ```
 
-The host exposes authenticated read-only `GET /api/v1/publications/{slug}/schema` and `/rows` routes plus anonymous process liveness at `/healthz`. Both data routes resolve the active immutable version, authenticate exactly one managed bearer value, apply process-local admission, and atomically meter the accepted use. The schema route returns approved public metadata; the rows route executes a bounded parameterized query against the approved SQL object. Unknown/malformed/expired/revoked/wrong-publication credentials share a generic challenge; a metering or schema-drift failure serves no data.
+The host exposes authenticated read-only `GET /api/v1/publications/{slug}/schema` and `/rows` routes, generic consumer documentation at `/swagger` and `/openapi/v1.json`, and anonymous process liveness at `/healthz`. Both data routes resolve the active immutable version, authenticate exactly one managed bearer value, apply process-local admission, and atomically meter the accepted use. The schema route returns approved public metadata; the rows route executes a bounded provider-specific parameterized query against the approved SQL Server, MySQL, PostgreSQL, or Oracle object. Unknown/malformed/expired/revoked/wrong-publication credentials share a generic challenge; a metering or schema-drift failure serves no data. Swagger authorization is session-only and the generic document does not enumerate protected publication columns.
 
 Required [ADR-0011](adr/0011-isolated-governed-data-publications.md) deployment controls:
 
@@ -75,6 +75,7 @@ Required [ADR-0011](adr/0011-isolated-governed-data-publications.md) deployment 
 - The current immutable version allow-lists objects and columns but has no fixed row-level authorization predicate. Expose only source objects whose entire approved row scope is safe for every token on that publication.
 - Run one publication instance. Admission state is process-local and partitioned by token plus active version; it does not aggregate every token for a publication. Scale-out or aggregate publication-wide admission requires a gateway or distributed limiter.
 - Override `AllowedHosts` from the checked-in `localhost` value, supply the real THub connection through deployment configuration, persist any required Data Protection keys, and route logs/metrics to approved storage.
+- Set the Web host's `PublicationApi:PublicBaseUrl` to the publication site's externally reachable HTTPS origin so its consumer handoff links point to the deployed Swagger and API routes.
 - Treat the full bearer token as a one-time response secret. Never place it in configuration, logs, command lines, URLs, or deployment artifacts.
 
 ## Worker deployment
@@ -104,7 +105,7 @@ The installer creates an automatic service but deliberately does not start it. B
 
 The Worker hosts leased workflow execution, leased Email-outbox dispatch, and approved editor-change application in addition to Quartz scheduling. For workflows it atomically claims queued or expired-lease runs, heartbeats ownership, verifies the exact immutable graph checksum, executes bounded nodes, and persists lease-checked step/terminal state. Grant its service identity only the configured source/target SQL rights and approved file roots; SQL targets support insert and file targets support create-new, so do not grant broader mutation rights merely because the account is a Worker. Recovery restarts an abandoned graph and external effects remain at-least-once.
 
-The editor processor claims an approved change set, revalidates its immutable version and current source-schema fingerprint, and applies the bounded set in one source transaction using `rowversion` or original-value predicates. Grant the Worker source-write access only to approved editor tables. A stale ambiguous apply is marked failed for operator reconciliation rather than replayed automatically; do not promise exactly-once cross-database effects. Email delivery revalidates profile policy, uses bounded SMTP timeouts, and records lease-checked durable outcomes. Grant the Worker access only to the configured relay and source/target resources; authenticated SMTP must remain unavailable until an approved secret-resolution integration is deployed.
+The editor processor claims an approved change set, revalidates its immutable version and current source-schema fingerprint through its separate apply connection, and applies the bounded set in one source transaction using `rowversion` or original-value predicates. Provision distinct read and Worker apply connections to the same provider/database; referenced username/password connections must use different encrypted credential references. Grant the apply identity source-write access only to approved editor tables, and do not reuse it for Web or publication-host reads. A stale ambiguous apply is marked failed for operator reconciliation rather than replayed automatically; do not promise exactly-once cross-database effects. Email delivery revalidates profile policy, uses bounded SMTP timeouts, and records lease-checked durable outcomes. Grant the Worker access only to the configured relay and source/target resources; authenticated SMTP must remain unavailable until an approved secret-resolution integration is deployed.
 
 ## Database deployment
 
@@ -124,6 +125,13 @@ Back up the THub database before migrations that transform or delete data. Revie
 The Quartz tables are vendor-defined but are installed through the THub migration chain. The worker validates the expected Quartz schema at startup and fails rather than creating or changing tables. Review the official SQL Server schema changes and create a forward THub migration before upgrading Quartz across a version that changes its persistence schema.
 
 Reviewed migrations create immutable workflow versions, run claim/cancellation fields, durable step attempts, Email delivery profiles/rules/outbox, and publication definitions, immutable versions/columns/foreign keys, role grants, bearer metadata/counters, and change sets/changes, including their indexes, foreign keys, and optimistic concurrency tokens. Apply the complete migration chain before starting Web, Worker, or Publications; do not enable execution, Email, or publication traffic against a partially upgraded database. Other persistence details are documented in [the data model](data-model.md).
+
+The apply-connection migration intentionally leaves existing version
+`ApplyConnectionId` values null because a least-privilege write credential cannot be
+inferred safely. Existing read-only versions continue to work. Before re-enabling
+writes for an older editor publication, create and activate a new version that selects
+the reviewed Worker apply connection; the Worker fails closed for older writable
+versions without one.
 
 ## Configuration
 
@@ -155,8 +163,8 @@ host. Do not copy the generated example output into source control, shell histor
 deployment logs, or the THub database.
 
 The Web host needs the key to create/replace credentials and test/discover connections;
-the Worker needs it for workflow execution. Publications needs it only when an active
-SQL publication uses referenced authentication. Give each host only the table access,
+the Worker needs it for workflow execution. Publications needs it whenever an active
+relational publication uses referenced authentication. Give each host only the table access,
 source-system grants, and key ring it requires. Missing references, missing key versions,
 invalid key lengths, and authentication failures fail closed. Existing installations
 must re-enter each externally provisioned credential in the connection editor after
@@ -245,14 +253,14 @@ Publication limits are immutable version metadata, not `PublicationApi` host set
 
 | Version setting | Management default | Hard range | Enforcement |
 | --- | ---: | ---: | --- |
-| Default / maximum REST page size | 100 / 500 | 1–1,000 rows | Requested size is capped by the active version and the SQL connection batch limit |
+| Default / maximum REST page size | 100 / 500 | 1–1,000 rows | Requested size is capped by the active version and the database connection batch limit |
 | Requests / rate window | 600 / 60 seconds | 1–100,000 / 1–3,600 seconds | Process-local fixed window per token plus active version |
 | Maximum concurrent requests | 10 | 1–100 | Process-local per token plus active version |
 | Spreadsheet editor window | 250 | 1–1,000 rows | Loaded as one deterministic keyset window |
-| Request / SQL command timeout | 30 / 30 seconds | 1–300 seconds | Linked request cancellation and the lower applicable SQL connection/version command bound |
+| Request / database command timeout | 30 / 30 seconds | 1–300 seconds | Linked request cancellation and the lower applicable database connection/version command bound |
 | Maximum JSON response | 10 MiB | 1 KiB–100 MiB | Estimated during source materialization and enforced again during serialization |
 
-SQL connection metadata adds a `MaximumBatchRows` bound (default 1,000; range 1–10,000), so increasing a publication limit cannot bypass the connector limit. The REST query accepts at most 16 filters, 8 requested sorts, a 4,096-character server-issued schema/query-bound cursor, and 4,096 characters per filter value. Foreign-key lookups accept at most 100 rows and 256 search characters. Source discovery returns at most 200 objects, 1,024 columns, and 128 foreign-key mappings.
+Relational connection metadata adds a `MaximumBatchRows` bound (default 1,000; range 1–10,000), so increasing a publication limit cannot bypass the connector limit. The REST query accepts at most 16 filters, 8 requested sorts, a 4,096-character server-issued schema/query-bound cursor, and 4,096 characters per filter value. Foreign-key lookups accept at most 100 rows and 256 search characters. Source discovery returns at most 200 objects, 1,024 columns, and 128 foreign-key mappings.
 
 Email delivery profiles are administrator-managed control-plane metadata rather than raw host configuration. Configure profiles and workflow terminal-event rules at `/alerts/email`; each profile contains non-secret relay/sender/TLS/recipient policy and an optional credential secret reference. The Worker resolves that reference only at send time. The checked-in `UnavailableSmtpSecretResolver` always returns no credential, so referenced profiles fail closed. It permits only profiles intentionally configured for an approved anonymous relay. Production authenticated SMTP requires replacing the `ISecretResolver` registration with an organization-approved implementation; do not put SMTP user names or passwords in `appsettings`, the database, or the secret-reference field.
 
@@ -277,7 +285,7 @@ Worker startup validates individual ranges, retry-delay ordering, and that the d
 | --- | ---: | ---: | --- |
 | `PublicationApply:PollIntervalMilliseconds` | 2,000 | 100–60,000 ms | Delay after no work, a lost lease, or an unexpected processor failure; completed/conflicted/failed sets are followed immediately by another claim |
 
-Each process creates a stable-for-process worker ID. The processor uses a ten-minute apply lease, renews it before mutation and every 25 changes, and also honors the SQL connection's `MaximumBatchRows`. Those lease/heartbeat values are current implementation constants rather than deployment settings. Role grants are checked when users load, stage, and review; revoking a role does not cancel a change set that was already approved, so operators must explicitly resolve approved work when access policy changes.
+Each process creates a stable-for-process worker ID. The processor uses a ten-minute apply lease, renews it before mutation and every 25 changes, and also honors the relational connection's `MaximumBatchRows`. Those lease/heartbeat values are current implementation constants rather than deployment settings. Role grants are checked when users load, stage, and review; revoking a role does not cancel a change set that was already approved, so operators must explicitly resolve approved work when access policy changes.
 
 ### Worker scheduler settings
 

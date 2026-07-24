@@ -76,9 +76,46 @@ public sealed class PublicationSourceInspectionServiceTests
         Assert.Equal(0, inspector.Calls);
     }
 
-    private static DataConnection CreateConnection() => new(
+    [Theory]
+    [InlineData(ConnectionKind.SqlServer)]
+    [InlineData(ConnectionKind.MySql)]
+    [InlineData(ConnectionKind.PostgreSql)]
+    [InlineData(ConnectionKind.Oracle)]
+    public async Task InspectObjectAsync_AcceptsEveryRelationalConnectionKind(
+        ConnectionKind kind)
+    {
+        var connection = CreateConnection(kind);
+        var expected = new PublicationSourceObjectInspectionDto(
+            connection.Id,
+            "app",
+            "Orders",
+            PublicationSourceObjectKind.Table,
+            "fingerprint",
+            [new PublicationSourceColumnDto(
+                0, "OrderId", "integer", PublicationDataType.Int32, true, false, false, false, true, 0, null, null, null)],
+            []);
+        var inspector = new Inspector
+        {
+            Inspection = new(PublicationSourceInspectionStatus.Success, expected)
+        };
+        var service = new PublicationSourceInspectionService(
+            new ConnectionStore(connection),
+            inspector);
+
+        var result = await service.InspectObjectAsync(
+            connection.Id,
+            "app",
+            "Orders",
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(1, inspector.Calls);
+    }
+
+    private static DataConnection CreateConnection(
+        ConnectionKind kind = ConnectionKind.SqlServer) => new(
         "Operations SQL",
-        ConnectionKind.SqlServer,
+        kind,
         "{}",
         "CONTOSO\\admin",
         new DateTimeOffset(2026, 7, 23, 8, 0, 0, TimeSpan.Zero));

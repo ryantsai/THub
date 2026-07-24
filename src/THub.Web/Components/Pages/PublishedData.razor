@@ -22,7 +22,7 @@
     }
     else if (Error is not null)
     {
-        <div class="page-state error"><RadzenIcon Icon="error_outline" /><p>@Error</p><button type="button" @onclick="LoadAsync">Try again</button></div>
+        <div class="page-state error" role="alert"><RadzenIcon Icon="error_outline" /><p>@Error</p><button type="button" @onclick="LoadAsync">Try again</button></div>
     }
     else if (Items.Count == 0)
     {
@@ -36,7 +36,7 @@
                 <article>
                     <div class="published-editor-icon"><RadzenIcon Icon="table_view" /></div>
                     <div><h2>@item.Name</h2><p><code>@item.Slug</code> · active governed spreadsheet</p></div>
-                    <a href="@($"/editor/{item.Id}")">Open editor <RadzenIcon Icon="arrow_forward" /></a>
+                    <a href="@($"/data/{item.Slug}")">Open editor <RadzenIcon Icon="arrow_forward" /></a>
                 </article>
             }
         </div>

@@ -23,7 +23,18 @@
 .section-heading h3 { margin: 0; font-size: 13px; }
 .section-heading p { margin: 3px 0 0; color: #879490; font-size: 9px; }
 .version-wizard { margin: 0 18px 18px; border: 1px solid #dfe7e5; border-radius: 9px; background: #fafcfb; overflow: hidden; }
+.builder-steps { margin: 0; padding: 14px 18px; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; border-bottom: 1px solid #e1e8e6; background: #f4f8f7; list-style: none; }
+.builder-steps li { min-width: 0; padding: 9px 10px; display: flex; align-items: center; gap: 9px; border: 1px solid transparent; border-radius: 7px; color: #72817d; }
+.builder-steps li > span { width: 25px; height: 25px; flex: 0 0 25px; display: grid; place-items: center; border: 1px solid #cad6d3; border-radius: 50%; background: #fff; font-size: 9px; font-weight: 800; }
+.builder-steps li div { min-width: 0; display: grid; gap: 2px; }
+.builder-steps strong { color: #40514c; font-size: 9px; }
+.builder-steps small { overflow: hidden; color: #7d8b87; font-size: 8px; text-overflow: ellipsis; white-space: nowrap; }
+.builder-steps li.complete > span { border-color: #24836a; background: #24836a; color: #fff; }
+.builder-steps li.current { border-color: #b9d8cf; background: #fff; }
+.builder-steps li.current > span { border-color: #24836a; color: #176c56; box-shadow: 0 0 0 3px #dff1eb; }
 .source-select { grid-template-columns: minmax(220px, 1fr) auto minmax(250px, 1fr) auto; align-items: end; }
+.apply-connection { grid-template-columns: minmax(280px, 620px); padding-block: 10px; }
+.apply-connection small { color: #697874; font-size: 10px; font-weight: 500; line-height: 1.45; }
 .field-button { padding-bottom: 1px; }
 .inspection-summary, .form-warning { margin: 0 18px 12px; padding: 10px 12px; display: flex; gap: 8px; align-items: center; border-radius: 7px; background: #eaf6f1; color: #286d59; font-size: 9px; }
 .form-warning { background: #fff2e5; color: #9b5c24; }
@@ -53,6 +64,27 @@
 .search-column-choices label { display: inline-flex; align-items: center; gap: 5px; }
 .settings-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); padding-top: 3px; }
 .token-form { grid-template-columns: minmax(200px, 1fr) minmax(220px, 1fr) auto; align-items: end; border-top: 1px solid #edf1f0; border-bottom: 1px solid #edf1f0; }
+.consumer-handoff { margin: 18px; border: 1px solid #ccdcd7; border-radius: 10px; background: #f7faf9; overflow: hidden; }
+.consumer-handoff-head { padding: 18px; display: flex; align-items: start; justify-content: space-between; gap: 24px; border-bottom: 1px solid #dce7e4; background: #173d35; color: #fff; }
+.consumer-handoff-head h3 { margin: 4px 0 5px; font-size: 16px; }
+.consumer-handoff-head p { margin: 0; max-width: 720px; color: #c8d9d4; font-size: 9px; line-height: 1.5; }
+.handoff-kicker { color: #81d8bf; font-size: 8px; font-weight: 800; letter-spacing: .8px; text-transform: uppercase; }
+.swagger-link { min-height: 38px; padding: 8px 12px; display: inline-flex; align-items: center; gap: 7px; border: 1px solid #4f776c; border-radius: 7px; background: #225346; color: #fff; font-size: 9px; font-weight: 800; text-decoration: none; white-space: nowrap; transition: background-color 180ms ease, border-color 180ms ease; }
+.swagger-link:hover, .swagger-link:focus-visible { border-color: #8cd8c1; background: #2c6858; }
+.handoff-warning { margin: 14px 16px 0; padding: 10px 12px; display: flex; align-items: center; gap: 8px; border-radius: 7px; background: #fff2dd; color: #7b561c; font-size: 9px; }
+.endpoint-list { padding: 16px; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+.endpoint-list > div { min-width: 0; padding: 12px; display: grid; gap: 7px; border: 1px solid #dce6e3; border-radius: 8px; background: #fff; }
+.endpoint-list span { color: #52635e; font-size: 8px; font-weight: 800; letter-spacing: .4px; text-transform: uppercase; }
+.endpoint-list code { min-width: 0; overflow-wrap: anywhere; color: #155f4c; font-size: 9px; user-select: all; }
+.endpoint-list small { color: #7a8985; font-size: 8px; line-height: 1.45; }
+.handoff-sequence { margin: 0; padding: 0 16px 16px; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; list-style: none; }
+.handoff-sequence li { display: flex; align-items: center; gap: 8px; color: #566762; font-size: 9px; }
+.handoff-sequence li > span { width: 22px; height: 22px; flex: 0 0 22px; display: grid; place-items: center; border-radius: 50%; background: #dff1eb; color: #176c56; font-size: 8px; font-weight: 800; }
+.editor-handoff { margin: 18px; padding: 16px 18px; display: flex; align-items: center; justify-content: space-between; gap: 20px; border: 1px solid #cadbd6; border-radius: 9px; background: #173d35; color: #fff; }
+.editor-handoff h3 { margin: 4px 0; font-size: 14px; }
+.editor-handoff p { margin: 0; color: #c8d9d4; font-size: 9px; }
+.editor-handoff a { min-width: 220px; padding: 10px 12px; display: flex; align-items: center; justify-content: space-between; gap: 10px; border: 1px solid #4f776c; border-radius: 7px; background: #225346; color: #fff; text-decoration: none; }
+.editor-handoff code { color: #fff; font-size: 9px; user-select: all; }
 .token-once { margin: 0 18px 15px; padding: 14px; display: grid; grid-template-columns: auto 1fr auto; gap: 10px; border: 1px solid #e3c977; border-radius: 8px; background: #fff9e8; color: #66511f; }
 .token-once div { min-width: 0; display: grid; gap: 6px; }
 .token-once strong, .token-once small { font-size: 9px; }
@@ -67,9 +99,17 @@
     .inline-form.three, .settings-grid { grid-template-columns: repeat(2, 1fr); }
     .source-select { grid-template-columns: 1fr auto; }
     .publication-facts { grid-template-columns: repeat(2, 1fr); }
+    .builder-steps, .endpoint-list, .handoff-sequence { grid-template-columns: repeat(2, 1fr); }
 }
 @media (max-width: 650px) {
     .inline-form, .inline-form.three, .settings-grid, .source-select, .token-form { grid-template-columns: 1fr; }
     .foreign-key-controls { grid-template-columns: 1fr; }
     .publication-facts { grid-template-columns: 1fr; }
+    .builder-steps, .endpoint-list, .handoff-sequence { grid-template-columns: 1fr; }
+    .consumer-handoff-head, .editor-handoff { align-items: stretch; flex-direction: column; }
+    .editor-handoff a { min-width: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .swagger-link { transition: none; }
 }

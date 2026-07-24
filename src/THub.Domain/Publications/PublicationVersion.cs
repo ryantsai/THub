@@ -23,7 +23,8 @@ public sealed class PublicationVersion
         PublicationVersionSettings settings,
         IEnumerable<PublicationColumn> columns,
         string createdBy,
-        DateTimeOffset createdAtUtc)
+        DateTimeOffset createdAtUtc,
+        Guid? applyConnectionId = null)
     {
         Id = PublicationGuard.RequireId(id, nameof(id));
         PublicationId = PublicationGuard.RequireId(publicationId, nameof(publicationId));
@@ -34,6 +35,28 @@ public sealed class PublicationVersion
 
         VersionNumber = versionNumber;
         ConnectionId = PublicationGuard.RequireId(connectionId, nameof(connectionId));
+        if (concurrencyMode == PublicationConcurrencyMode.ReadOnly)
+        {
+            if (applyConnectionId is not null)
+            {
+                throw new ArgumentException(
+                    "Read-only publication versions cannot declare an apply connection.",
+                    nameof(applyConnectionId));
+            }
+        }
+        else
+        {
+            ApplyConnectionId = PublicationGuard.RequireId(
+                applyConnectionId ?? Guid.Empty,
+                nameof(applyConnectionId));
+            if (ApplyConnectionId == ConnectionId)
+            {
+                throw new ArgumentException(
+                    "Writable publication versions require a separate apply connection.",
+                    nameof(applyConnectionId));
+            }
+        }
+
         SourceSchema = PublicationGuard.Require(sourceSchema, nameof(sourceSchema), 128);
         SourceObject = PublicationGuard.Require(sourceObject, nameof(sourceObject), 128);
         SourceObjectKind = PublicationGuard.RequireDefined(sourceObjectKind, nameof(sourceObjectKind));
@@ -55,6 +78,8 @@ public sealed class PublicationVersion
     public int VersionNumber { get; private set; }
 
     public Guid ConnectionId { get; private set; }
+
+    public Guid? ApplyConnectionId { get; private set; }
 
     public string SourceSchema { get; private set; } = string.Empty;
 

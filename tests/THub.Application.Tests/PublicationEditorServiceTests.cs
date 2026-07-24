@@ -352,7 +352,8 @@ public sealed class PublicationEditorServiceTests
             new PublicationVersionSettings(),
             columns,
             "CONTOSO\\author",
-            PublicationTestData.Now);
+            PublicationTestData.Now,
+            Guid.NewGuid());
         publication.ActivateVersion(version, "CONTOSO\\author", PublicationTestData.Now);
         return (publication, version);
     }

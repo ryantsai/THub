@@ -44,13 +44,14 @@ public static class DependencyInjection
         services.AddSingleton<IEmailAlertDeliveryQueryStore, SqlEmailAlertDeliveryQueryStore>();
         services.AddSingleton<IWorkflowTerminalAlertStore, SqlWorkflowTerminalAlertStore>();
         services.AddScoped<IPublicationCatalogStore, SqlPublicationCatalogStore>();
+        services.AddScoped<IPublicationConnectionPolicy, PublicationConnectionPolicy>();
         services.AddScoped<IPublicationTokenStore, SqlPublicationTokenStore>();
         services.AddScoped<IPublicationGrantStore, SqlPublicationGrantStore>();
         services.AddScoped<IPublicationGrantManagementStore, SqlPublicationGrantManagementStore>();
         services.AddScoped<IPublicationChangeSetStore, SqlPublicationChangeSetStore>();
         services.AddScoped<IPublicationChangeSetQueryStore, SqlPublicationChangeSetQueryStore>();
-        services.AddScoped<IPublicationSourceDataReader, SqlPublicationSourceDataReader>();
-        services.AddScoped<IPublicationSourceSchemaInspector, SqlPublicationSourceSchemaInspector>();
+        AddPublicationSourceReading(services);
+        AddPublicationSourceInspection(services);
         services.AddScoped<IAccessControlStore, SqlAccessControlStore>();
         services.AddSingleton<ITrustedActionStore, SqlTrustedActionStore>();
         return services;
@@ -110,9 +111,11 @@ public static class DependencyInjection
             });
         services.AddScoped<IWorkflowNodeExecutor, WebhookNodeExecutor>();
         services.AddScoped<IWorkflowNodeExecutor, ExecutableNodeExecutor>();
+        services.AddSingleton<IDataConnectionStore, SqlDataConnectionStore>();
+        services.AddScoped<IPublicationConnectionPolicy, PublicationConnectionPolicy>();
         services.AddScoped<IPublicationChangeSetClaimStore, SqlPublicationChangeSetClaimStore>();
-        services.AddScoped<IPublicationChangeSetProcessor, SqlPublicationChangeSetProcessor>();
-        services.AddScoped<IPublicationSourceSchemaInspector, SqlPublicationSourceSchemaInspector>();
+        services.AddScoped<IPublicationChangeSetProcessor, PublicationChangeSetProcessor>();
+        AddPublicationSourceInspection(services);
         return services;
     }
 
@@ -125,10 +128,26 @@ public static class DependencyInjection
         AddDatabaseAuthentication(services, configuration);
 
         services.AddScoped<IPublicationCatalogStore, SqlPublicationCatalogStore>();
+        services.AddScoped<IPublicationConnectionPolicy, PublicationConnectionPolicy>();
         services.AddScoped<IPublicationTokenStore, SqlPublicationTokenStore>();
-        services.AddScoped<IPublicationSourceDataReader, SqlPublicationSourceDataReader>();
-        services.AddScoped<IPublicationSourceSchemaInspector, SqlPublicationSourceSchemaInspector>();
+        services.AddSingleton<IDataConnectionStore, SqlDataConnectionStore>();
+        AddPublicationSourceReading(services);
+        AddPublicationSourceInspection(services);
         return services;
+    }
+
+    private static void AddPublicationSourceInspection(IServiceCollection services)
+    {
+        services.AddScoped<SqlPublicationSourceSchemaInspector>();
+        services.AddScoped<RelationalPublicationSourceSchemaInspector>();
+        services.AddScoped<IPublicationSourceSchemaInspector, PublicationSourceSchemaInspector>();
+    }
+
+    private static void AddPublicationSourceReading(IServiceCollection services)
+    {
+        services.AddScoped<SqlPublicationSourceDataReader>();
+        services.AddScoped<RelationalPublicationSourceDataReader>();
+        services.AddScoped<IPublicationSourceDataReader, PublicationSourceDataReader>();
     }
 
     private static void AddControlPlanePersistence(

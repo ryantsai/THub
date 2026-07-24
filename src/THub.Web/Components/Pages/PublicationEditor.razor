@@ -1,4 +1,5 @@
 @page "/editor/{PublicationId:guid}"
+@page "/data/{Slug}"
 @attribute [Authorize]
 @implements IDisposable
 @using System.Globalization
@@ -37,7 +38,7 @@
 }
 else if (Error is not null)
 {
-    <section class="panel page-state error"><RadzenIcon Icon="lock" /><h2>Publication unavailable</h2><p>@Error</p><button type="button" @onclick="RefreshAsync">Try again</button></section>
+    <section class="panel page-state error" role="alert"><RadzenIcon Icon="lock" /><h2>Publication unavailable</h2><p>@Error</p><button type="button" @onclick="RefreshAsync">Try again</button></section>
 }
 else if (Publication is not null && Version is not null && Workbook is not null && SpreadsheetContext is not null)
 {
@@ -264,6 +265,9 @@ else if (Publication is not null && Version is not null && Workbook is not null 
     [Parameter]
     public Guid PublicationId { get; set; }
 
+    [Parameter]
+    public string? Slug { get; set; }
+
     private PublicationDetailDto? Publication { get; set; }
     private PublicationVersionDto? Version { get; set; }
     private PublicationSpreadsheetContext? SpreadsheetContext { get; set; }
@@ -315,6 +319,19 @@ else if (Publication is not null && Version is not null && Workbook is not null 
 
     protected override async Task OnParametersSetAsync()
     {
+        if (!string.IsNullOrWhiteSpace(Slug))
+        {
+            var publication = await Catalog.GetBySlugAsync(Slug, cancellation.Token);
+            if (!publication.IsSuccess || publication.Value is null)
+            {
+                Error = publication.Problem?.Message ?? "The publication was not found.";
+                Loading = false;
+                return;
+            }
+
+            PublicationId = publication.Value.Id;
+        }
+
         await LoadAsync();
     }
 

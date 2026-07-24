@@ -108,7 +108,7 @@ public sealed class PublicationSourceInspectionService(
                 $"Connection, search, and take from 1 to {MaximumObjectsPerRequest} must be bounded.");
         }
 
-        var connection = await RequireSqlConnectionAsync(connectionId, cancellationToken)
+        var connection = await RequireRelationalConnectionAsync(connectionId, cancellationToken)
             .ConfigureAwait(false);
         if (!connection.IsSuccess)
         {
@@ -139,7 +139,7 @@ public sealed class PublicationSourceInspectionService(
                 "Connection, schema, and object identifiers are required and bounded.");
         }
 
-        var connection = await RequireSqlConnectionAsync(connectionId, cancellationToken)
+        var connection = await RequireRelationalConnectionAsync(connectionId, cancellationToken)
             .ConfigureAwait(false);
         if (!connection.IsSuccess)
         {
@@ -155,7 +155,7 @@ public sealed class PublicationSourceInspectionService(
         return Map(inspected);
     }
 
-    private async Task<PublicationResult<DataConnection>> RequireSqlConnectionAsync(
+    private async Task<PublicationResult<DataConnection>> RequireRelationalConnectionAsync(
         Guid connectionId,
         CancellationToken cancellationToken)
     {
@@ -168,11 +168,16 @@ public sealed class PublicationSourceInspectionService(
                 "The source connection was not found.");
         }
 
-        if (!connection.IsEnabled || connection.Kind != ConnectionKind.SqlServer)
+        if (!connection.IsEnabled ||
+            connection.Kind is not (
+                ConnectionKind.SqlServer or
+                ConnectionKind.MySql or
+                ConnectionKind.PostgreSql or
+                ConnectionKind.Oracle))
         {
             return PublicationResultFactory.Conflict<DataConnection>(
                 "publication.source_connection_unavailable",
-                "Source inspection requires an enabled SQL Server connection.");
+                "Source inspection requires an enabled SQL Server, MySQL, PostgreSQL, or Oracle connection.");
         }
 
         return PublicationResult<DataConnection>.Success(connection);

@@ -1,10 +1,14 @@
 using System.Data;
+using System.Data.Common;
 using System.Globalization;
 using System.Text;
 using System.Text.Json;
 using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
+using MySqlConnector;
+using Npgsql;
+using Oracle.ManagedDataAccess.Client;
 using THub.Application.Connections;
 using THub.Application.Publications;
 using THub.Domain.Connections;
@@ -14,14 +18,16 @@ using THub.Infrastructure.Persistence;
 
 namespace THub.Infrastructure.Publications;
 
-public sealed class SqlPublicationChangeSetProcessor(
+public sealed class PublicationChangeSetProcessor(
     IDbContextFactory<THubDbContext> contextFactory,
     IPublicationChangeSetClaimStore claimStore,
     IPublicationSourceSchemaInspector schemaInspector,
+    IPublicationConnectionPolicy connectionPolicy,
     ConnectionConfigurationSerializer configurationSerializer,
     SqlServerConnectionStringFactory connectionStringFactory,
+    RelationalConnectionFactory relationalConnectionFactory,
     TimeProvider timeProvider,
-    ILogger<SqlPublicationChangeSetProcessor> logger) : IPublicationChangeSetProcessor
+    ILogger<PublicationChangeSetProcessor> logger) : IPublicationChangeSetProcessor
 {
     private static readonly TimeSpan LeaseDuration = TimeSpan.FromMinutes(10);
     private const int LeaseRenewalChangeInterval = 25;
@@ -61,7 +67,7 @@ public sealed class SqlPublicationChangeSetProcessor(
                     cancellationToken).ConfigureAwait(false);
             }
 
-            if (claim.ChangeSet.Changes.Count > context.Configuration.MaximumBatchRows)
+            if (claim.ChangeSet.Changes.Count > GetMaximumBatchRows(context.Configuration))
             {
                 return await CompleteAsync(
                     claim,
@@ -156,6 +162,18 @@ public sealed class SqlPublicationChangeSetProcessor(
                 PublicationChangeSetProcessStatus.Conflict,
                 cancellationToken).ConfigureAwait(false);
         }
+        catch (MySqlException exception) when (exception.Number is 1062 or 1451 or 1452)
+        {
+            return await CompleteConstraintConflictAsync(claim, cancellationToken).ConfigureAwait(false);
+        }
+        catch (PostgresException exception) when (exception.SqlState is "23503" or "23505")
+        {
+            return await CompleteConstraintConflictAsync(claim, cancellationToken).ConfigureAwait(false);
+        }
+        catch (OracleException exception) when (exception.Number is 1 or 2291 or 2292)
+        {
+            return await CompleteConstraintConflictAsync(claim, cancellationToken).ConfigureAwait(false);
+        }
         catch (Exception exception) when (IsExpectedApplyFailure(exception))
         {
             logger.LogWarning(
@@ -205,19 +223,37 @@ public sealed class SqlPublicationChangeSetProcessor(
             return null;
         }
 
+        var connectionPolicyResult = await connectionPolicy.ValidateAsync(
+                version.ConnectionId,
+                version.ApplyConnectionId,
+                requiresApplyConnection: true,
+                cancellationToken)
+            .ConfigureAwait(false);
+        if (!connectionPolicyResult.IsValid || version.ApplyConnectionId is null)
+        {
+            logger.LogWarning(
+                "Editor apply rejected by connection policy for publication version {PublicationVersionId}: {ErrorCode}.",
+                version.Id,
+                connectionPolicyResult.ErrorCode);
+            return null;
+        }
+
         var connection = await db.Connections
             .AsNoTracking()
-            .SingleOrDefaultAsync(candidate => candidate.Id == version.ConnectionId, cancellationToken)
+            .SingleOrDefaultAsync(
+                candidate => candidate.Id == version.ApplyConnectionId.Value,
+                cancellationToken)
             .ConfigureAwait(false);
-        if (connection is null || !connection.IsEnabled || connection.Kind != ConnectionKind.SqlServer)
+        if (connection is null || !connection.IsEnabled)
         {
             return null;
         }
 
-        var configuration = configurationSerializer.Deserialize(connection) as SqlServerConnectionConfiguration;
-        return configuration is null
-            ? null
-            : new PublicationApplyContext(version, connection, configuration, changeSet);
+        var configuration = configurationSerializer.Deserialize(connection);
+        return configuration is SqlServerConnectionConfiguration or
+            RelationalDatabaseConnectionConfiguration
+            ? new PublicationApplyContext(version, connection, configuration, changeSet)
+            : null;
     }
 
     private async Task ApplyChangesAsync(
@@ -225,8 +261,31 @@ public sealed class SqlPublicationChangeSetProcessor(
         PublicationChangeSetClaim claim,
         CancellationToken cancellationToken)
     {
+        if (context.Configuration is SqlServerConnectionConfiguration sqlServer)
+        {
+            await ApplySqlServerChangesAsync(context, sqlServer, claim, cancellationToken)
+                .ConfigureAwait(false);
+            return;
+        }
+
+        if (context.Configuration is RelationalDatabaseConnectionConfiguration relational)
+        {
+            await ApplyRelationalChangesAsync(context, relational, claim, cancellationToken)
+                .ConfigureAwait(false);
+            return;
+        }
+
+        throw new InvalidOperationException("The publication connection kind is unsupported.");
+    }
+
+    private async Task ApplySqlServerChangesAsync(
+        PublicationApplyContext context,
+        SqlServerConnectionConfiguration configuration,
+        PublicationChangeSetClaim claim,
+        CancellationToken cancellationToken)
+    {
         var connectionString = (await connectionStringFactory.CreateAsync(
-            context.Configuration,
+            configuration,
             "THub governed publication editor",
             ApplicationIntent.ReadWrite,
             enlist: true,
@@ -257,7 +316,7 @@ public sealed class SqlPublicationChangeSetProcessor(
                         transaction,
                         context.Version,
                         context.ChangeSet.Changes[index],
-                        context.Configuration.CommandTimeoutSeconds,
+                        configuration.CommandTimeoutSeconds,
                         cancellationToken)
                     .ConfigureAwait(false);
             }
@@ -287,6 +346,108 @@ public sealed class SqlPublicationChangeSetProcessor(
             }
 
             throw;
+        }
+    }
+
+    private async Task ApplyRelationalChangesAsync(
+        PublicationApplyContext context,
+        RelationalDatabaseConnectionConfiguration configuration,
+        PublicationChangeSetClaim claim,
+        CancellationToken cancellationToken)
+    {
+        await using var connection = await relationalConnectionFactory.CreateAsync(
+                configuration,
+                cancellationToken)
+            .ConfigureAwait(false);
+        await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
+        await using var transaction = await connection
+            .BeginTransactionAsync(IsolationLevel.ReadCommitted, cancellationToken)
+            .ConfigureAwait(false);
+        try
+        {
+            for (var index = 0; index < context.ChangeSet.Changes.Count; index++)
+            {
+                if (index > 0 && index % LeaseRenewalChangeInterval == 0 &&
+                    !await claimStore.RenewAsync(
+                        claim.ChangeSet.Id,
+                        claim.LeaseOwner,
+                        timeProvider.GetUtcNow(),
+                        cancellationToken).ConfigureAwait(false))
+                {
+                    throw new PublicationApplyConflictException(
+                        "lease_lost",
+                        "The apply lease was lost before the source transaction committed.");
+                }
+
+                await ApplyRelationalChangeAsync(
+                        connection,
+                        transaction,
+                        configuration,
+                        context.Version,
+                        context.ChangeSet.Changes[index],
+                        cancellationToken)
+                    .ConfigureAwait(false);
+            }
+
+            if (!await claimStore.RenewAsync(
+                    claim.ChangeSet.Id,
+                    claim.LeaseOwner,
+                    timeProvider.GetUtcNow(),
+                    cancellationToken).ConfigureAwait(false))
+            {
+                throw new PublicationApplyConflictException(
+                    "lease_lost",
+                    "The apply lease was lost before the source transaction committed.");
+            }
+
+            await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
+        }
+        catch
+        {
+            try
+            {
+                await transaction.RollbackAsync(CancellationToken.None).ConfigureAwait(false);
+            }
+            catch (Exception rollbackException) when (
+                rollbackException is DbException or InvalidOperationException)
+            {
+                // Preserve the original apply error. Disposal closes an unusable connection.
+            }
+
+            throw;
+        }
+    }
+
+    private static async Task ApplyRelationalChangeAsync(
+        DbConnection connection,
+        DbTransaction transaction,
+        RelationalDatabaseConnectionConfiguration configuration,
+        PublicationVersion version,
+        PublicationChange change,
+        CancellationToken cancellationToken)
+    {
+        await using var command = connection.CreateCommand();
+        command.Transaction = transaction;
+        command.CommandType = CommandType.Text;
+        command.CommandTimeout = Math.Min(
+            configuration.CommandTimeoutSeconds,
+            version.Settings.CommandTimeoutSeconds);
+        if (command is OracleCommand oracle)
+        {
+            oracle.BindByName = true;
+        }
+
+        command.CommandText = RelationalPublicationMutationBuilder.Build(
+            command,
+            configuration.Kind,
+            version,
+            change);
+        var affected = await command.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
+        if (affected != 1)
+        {
+            throw new PublicationApplyConflictException(
+                "row_concurrency",
+                "The source row changed or no longer exists.");
         }
     }
 
@@ -581,10 +742,27 @@ public sealed class SqlPublicationChangeSetProcessor(
                 "The apply outcome could not be committed because the lease was lost.");
     }
 
+    private Task<PublicationChangeSetProcessResult> CompleteConstraintConflictAsync(
+        PublicationChangeSetClaim claim,
+        CancellationToken cancellationToken) =>
+        CompleteAsync(
+            claim,
+            PublicationChangeSetApplyOutcome.Conflict,
+            "A unique or foreign-key constraint rejected the staged values.",
+            PublicationChangeSetProcessStatus.Conflict,
+            cancellationToken);
+
+    private static int GetMaximumBatchRows(ConnectionConfiguration configuration) => configuration switch
+    {
+        SqlServerConnectionConfiguration sqlServer => sqlServer.MaximumBatchRows,
+        RelationalDatabaseConnectionConfiguration relational => relational.MaximumBatchRows,
+        _ => throw new InvalidOperationException("The publication connection kind is unsupported.")
+    };
+
     private static string QualifiedName(PublicationVersion version) =>
         $"{SqlPublicationQueryPlanner.QuoteIdentifier(version.SourceSchema)}.{SqlPublicationQueryPlanner.QuoteIdentifier(version.SourceObject)}";
 
-    private static bool IsExpectedApplyFailure(Exception exception) => exception is SqlException
+    private static bool IsExpectedApplyFailure(Exception exception) => exception is DbException
         or TimeoutException
         or InvalidOperationException
         or ArgumentException
@@ -596,7 +774,7 @@ public sealed class SqlPublicationChangeSetProcessor(
     private sealed record PublicationApplyContext(
         PublicationVersion Version,
         DataConnection Connection,
-        SqlServerConnectionConfiguration Configuration,
+        ConnectionConfiguration Configuration,
         PublicationChangeSet ChangeSet);
 
     private sealed class PublicationApplyConflictException(

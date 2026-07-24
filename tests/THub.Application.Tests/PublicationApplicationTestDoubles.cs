@@ -114,13 +114,30 @@ internal static class PublicationTestData
             new PublicationVersionSettings(defaultPageSize: 25, maximumPageSize: 100, editorWindowSize: 50),
             columns,
             "CONTOSO\\author",
-            Now);
+            Now,
+            writable ? Guid.NewGuid() : null);
     }
 }
 
 internal sealed class FixedTimeProvider(DateTimeOffset now) : TimeProvider
 {
     public override DateTimeOffset GetUtcNow() => now;
+}
+
+internal sealed class FakePublicationConnectionPolicy : IPublicationConnectionPolicy
+{
+    public PublicationConnectionPolicyResult Result { get; set; } =
+        PublicationConnectionPolicyResult.Success;
+
+    public Task<PublicationConnectionPolicyResult> ValidateAsync(
+        Guid readConnectionId,
+        Guid? applyConnectionId,
+        bool requiresApplyConnection,
+        CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        return Task.FromResult(Result);
+    }
 }
 
 internal sealed class FakePublicationCatalogStore : IPublicationCatalogStore

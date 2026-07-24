@@ -92,6 +92,49 @@ public sealed class PublicationVersionTests
     }
 
     [Fact]
+    public void WritableVersionRequiresDistinctApplyConnection()
+    {
+        var versionId = Guid.NewGuid();
+        var connectionId = Guid.NewGuid();
+        var columns = new[]
+        {
+            CreateKeyColumn(versionId),
+            CreateReadableColumn(versionId, 1, "Name", "name", isWritable: true),
+        };
+
+        Assert.Throws<ArgumentException>(() => new PublicationVersion(
+            versionId,
+            Guid.NewGuid(),
+            1,
+            connectionId,
+            "dbo",
+            "PublishedResult",
+            PublicationSourceObjectKind.Table,
+            "sha256:0123456789abcdef",
+            PublicationConcurrencyMode.OriginalValues,
+            new PublicationVersionSettings(),
+            columns,
+            "DOMAIN\\designer",
+            CreatedAt));
+
+        Assert.Throws<ArgumentException>(() => new PublicationVersion(
+            versionId,
+            Guid.NewGuid(),
+            1,
+            connectionId,
+            "dbo",
+            "PublishedResult",
+            PublicationSourceObjectKind.Table,
+            "sha256:0123456789abcdef",
+            PublicationConcurrencyMode.OriginalValues,
+            new PublicationVersionSettings(),
+            columns,
+            "DOMAIN\\designer",
+            CreatedAt,
+            connectionId));
+    }
+
+    [Fact]
     public void CompositeForeignKeyMustBePublishedAsOneLogicalLookup()
     {
         var versionId = Guid.NewGuid();
@@ -223,7 +266,10 @@ public sealed class PublicationVersionTests
             new PublicationVersionSettings(),
             columns,
             "DOMAIN\\designer",
-            CreatedAt);
+            CreatedAt,
+            concurrencyMode == PublicationConcurrencyMode.ReadOnly
+                ? null
+                : Guid.NewGuid());
 
     private static PublicationColumn CreateKeyColumn(Guid versionId) =>
         new(

@@ -21,9 +21,16 @@ public static class PublicationApiEndpoints
     {
         endpoints.MapGet("/api/v1/publications/{slug}/rows", GetRowsAsync)
             .WithName("GetPublishedRows")
-            .Produces(StatusCodes.Status200OK)
+            .WithTags("Published data")
+            .WithSummary("Read a page of published rows")
+            .WithDescription(
+                "Returns the readable columns from the active immutable publication version. " +
+                "Filters and sorts accept only aliases approved by the publication owner.")
+            .Produces<PublicationRowsResponse>(StatusCodes.Status200OK)
             .ProducesProblem(StatusCodes.Status400BadRequest)
             .ProducesProblem(StatusCodes.Status401Unauthorized)
+            .ProducesProblem(StatusCodes.Status403Forbidden)
+            .ProducesProblem(StatusCodes.Status404NotFound)
             .ProducesProblem(StatusCodes.Status413PayloadTooLarge)
             .ProducesProblem(StatusCodes.Status409Conflict)
             .ProducesProblem(StatusCodes.Status429TooManyRequests)
@@ -32,10 +39,18 @@ public static class PublicationApiEndpoints
 
         endpoints.MapGet("/api/v1/publications/{slug}/schema", GetSchemaAsync)
             .WithName("GetPublicationSchema")
-            .Produces(StatusCodes.Status200OK)
+            .WithTags("Published data")
+            .WithSummary("Get the active publication contract")
+            .WithDescription(
+                "Returns the public aliases, types, filter/sort capabilities, and paging bounds " +
+                "for the active immutable publication version.")
+            .Produces<PublicationSchemaResponse>(StatusCodes.Status200OK)
             .ProducesProblem(StatusCodes.Status400BadRequest)
             .ProducesProblem(StatusCodes.Status401Unauthorized)
+            .ProducesProblem(StatusCodes.Status403Forbidden)
+            .ProducesProblem(StatusCodes.Status404NotFound)
             .ProducesProblem(StatusCodes.Status413PayloadTooLarge)
+            .ProducesProblem(StatusCodes.Status409Conflict)
             .ProducesProblem(StatusCodes.Status429TooManyRequests)
             .ProducesProblem(StatusCodes.Status503ServiceUnavailable)
             .ProducesProblem(StatusCodes.Status504GatewayTimeout);
@@ -86,12 +101,10 @@ public static class PublicationApiEndpoints
                 return;
             }
 
-            var payload = new
-            {
-                data = result.Value!.Rows.Select(row => row.Values),
-                nextCursor = result.Value.NextCursor,
-                version = access.Validated.PublicationVersionId
-            };
+            var payload = new PublicationRowsResponse(
+                result.Value!.Rows.Select(row => row.Values).ToArray(),
+                result.Value.NextCursor,
+                access.Validated.PublicationVersionId);
             await WriteBoundedJsonAsync(
                 httpContext,
                 payload,
@@ -163,35 +176,28 @@ public static class PublicationApiEndpoints
             }
 
             var value = version.Value!;
-            var payload = new
-            {
-                version = value.Id,
-                columns = value.Columns.Where(column => column.IsReadable).Select(column => new
-                {
-                    name = column.PublicAlias,
-                    type = column.DataType.ToString(),
-                    nullable = column.IsNullable,
-                    filterable = column.IsFilterable,
-                    sortable = column.IsSortable,
-                    key = column.IsKey
-                }),
-                paging = new
-                {
-                    defaultPageSize = value.Settings.DefaultPageSize,
-                    maximumPageSize = value.Settings.MaximumPageSize,
-                    mode = "keyset"
-                },
-                filters = new
-                {
-                    syntax = "filter=alias:operator:value",
-                    nullSyntax = "filter=alias:isnull|isnotnull",
-                    operators = new
-                    {
-                        allTypes = new[] { "eq", "ne", "gt", "ge", "lt", "le", "isnull", "isnotnull" },
-                        stringOnly = new[] { "startswith", "contains" }
-                    }
-                }
-            };
+            var payload = new PublicationSchemaResponse(
+                value.Id,
+                value.Columns
+                    .Where(column => column.IsReadable)
+                    .Select(column => new PublicationSchemaColumnResponse(
+                        column.PublicAlias,
+                        column.DataType.ToString(),
+                        column.IsNullable,
+                        column.IsFilterable,
+                        column.IsSortable,
+                        column.IsKey))
+                    .ToArray(),
+                new PublicationPagingResponse(
+                    value.Settings.DefaultPageSize,
+                    value.Settings.MaximumPageSize,
+                    "keyset"),
+                new PublicationFilterContractResponse(
+                    "filter=alias:operator:value",
+                    "filter=alias:isnull|isnotnull",
+                    new PublicationFilterOperatorsResponse(
+                        ["eq", "ne", "gt", "ge", "lt", "le", "isnull", "isnotnull"],
+                        ["startswith", "contains"])));
             await WriteBoundedJsonAsync(
                 httpContext,
                 payload,

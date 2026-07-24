@@ -46,6 +46,7 @@ public sealed record CreatePublicationColumnCommand(
 public sealed record CreatePublicationVersionCommand(
     Guid PublicationId,
     Guid ConnectionId,
+    Guid? ApplyConnectionId,
     string SourceSchema,
     string SourceObject,
     PublicationSourceObjectKind SourceObjectKind,
@@ -81,6 +82,7 @@ public sealed record PublicationVersionSummaryDto(
     Guid Id,
     int VersionNumber,
     Guid ConnectionId,
+    Guid? ApplyConnectionId,
     string SourceSchema,
     string SourceObject,
     PublicationConcurrencyMode ConcurrencyMode,
@@ -91,6 +93,7 @@ public sealed record PublicationVersionDto(
     Guid PublicationId,
     int VersionNumber,
     Guid ConnectionId,
+    Guid? ApplyConnectionId,
     string SourceSchema,
     string SourceObject,
     PublicationSourceObjectKind SourceObjectKind,
