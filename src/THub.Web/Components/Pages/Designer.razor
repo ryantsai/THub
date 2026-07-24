@@ -249,15 +249,130 @@ else
                     <label>@Localizer["Step name"]<input @bind="SelectedNode.Name" /></label>
                     @if (ExpectedConnectionKind(SelectedNode.Kind) is { } connectionKind)
                     {
-                        <label>Approved connection
+                        var compatibleConnections = Connections
+                            .Where(connection => connection.IsEnabled && connection.Kind == connectionKind)
+                            .ToArray();
+                        <label>@Localizer["Approved connection"]
                             <select value="@(GetSettingString(SelectedNode, "connectionId"))" @onchange="SetSelectedConnection">
-                                <option value="">Select a @ConnectionKindLabel(connectionKind) connection…</option>
-                                @foreach (var connection in Connections.Where(connection => connection.IsEnabled && connection.Kind == connectionKind))
+                                <option value="">@Localizer["Select a {0} connection…", ConnectionKindLabel(connectionKind)]</option>
+                                @foreach (var connection in compatibleConnections)
                                 {
                                     <option value="@connection.Id.ToString("D")">@connection.Name</option>
                                 }
                             </select>
                         </label>
+                        @if (IsLocalFileTarget(SelectedNode.Kind) && compatibleConnections.Length == 0)
+                        {
+                            <div class="csv-connection-empty">
+                                <RadzenIcon Icon="folder_off" />
+                                <span>@Localizer["Add an approved Worker folder before choosing a local target file."]</span>
+                                <a href="/connections">@Localizer["Set up file folder"]</a>
+                            </div>
+                        }
+                        else if (SelectedNode.Kind == WorkflowNodeKind.FtpTarget && compatibleConnections.Length == 0)
+                        {
+                            <div class="csv-connection-empty">
+                                <RadzenIcon Icon="cloud_off" />
+                                <span>@Localizer["Add an approved FTP or FTPS connection before choosing a remote target file."]</span>
+                                <a href="/connections">@Localizer["Set up FTP connection"]</a>
+                            </div>
+                        }
+                    }
+                    @if (IsLocalFileTarget(SelectedNode.Kind))
+                    {
+                        <section class="csv-target-editor" aria-label='@Localizer["Local file output settings"]'>
+                            <label>@Localizer["Target file on Worker"]
+                                <input
+                                    value="@GetLocalTargetDisplayPath(SelectedNode)"
+                                    placeholder="@GetLocalTargetPlaceholder(SelectedNode)"
+                                    @onchange="SetLocalTargetPath" />
+                                <small>@Localizer["The file must stay inside the selected connection's approved folder."]</small>
+                            </label>
+                            <label>@Localizer["Write mode"]
+                                <select value="@GetFileTargetMode(SelectedNode)" @onchange="SetFileTargetMode">
+                                    <option value="createNew">@Localizer["Create new (fail if file exists)"]</option>
+                                    <option value="append">@Localizer["Append rows"]</option>
+                                    <option value="replace">@Localizer["Replace file"]</option>
+                                </select>
+                            </label>
+                            @if (SelectedNode.Kind == WorkflowNodeKind.ExcelTarget)
+                            {
+                                <label>@Localizer["Worksheet"]
+                                    <input value="@GetSettingString(SelectedNode, "worksheet")" @onchange="eventArgs => SetSettingString(SelectedNode, "worksheet", eventArgs.Value?.ToString())" />
+                                </label>
+                            }
+                            <label class="csv-header-option">
+                                <input type="checkbox" checked="@GetSettingBoolean(SelectedNode, "includeHeader", true)" @onchange="SetFileIncludeHeader" />
+                                <span>@Localizer["Include column headers"]</span>
+                                <small>@Localizer["Append writes headers only when the file is new or empty."]</small>
+                            </label>
+                            @if (SelectedNode.Kind == WorkflowNodeKind.CsvTarget)
+                            {
+                                <label>@Localizer["Delimiter"]
+                                    <input maxlength="1" value="@GetSettingString(SelectedNode, "delimiter")" @onchange="SetFileDelimiter" />
+                                </label>
+                            }
+                            <div class="csv-template-help">
+                                <strong>@Localizer["File name variables"]</strong>
+                                <code>{runStartedAtUtc:yyyyMMdd_HHmmss_fff}</code>
+                                <code>{runId}</code>
+                                @foreach (var variable in Variables.Where(variable => !string.IsNullOrWhiteSpace(variable.Name)))
+                                {
+                                    <code>@($"{{{variable.Name}}}")</code>
+                                }
+                                <small>@Localizer["Date/time variables accept .NET date formats. Variable values cannot contain path separators."]</small>
+                            </div>
+                        </section>
+                    }
+                    @if (SelectedNode.Kind == WorkflowNodeKind.FtpTarget)
+                    {
+                        <section class="csv-target-editor" aria-label='@Localizer["FTP output settings"]'>
+                            <label>@Localizer["Remote target file"]
+                                <input value="@GetSettingString(SelectedNode, "remotePath")" placeholder='@Localizer["/outbound/export_{runStartedAtUtc:yyyyMMdd_HHmmss_fff}.csv"]' @onchange="SetFtpTargetPath" />
+                                <small>@Localizer["Use an absolute remote path. THub will not create missing remote folders."]</small>
+                            </label>
+                            <label>@Localizer["File format"]
+                                <select value="@GetFtpTargetFormat(SelectedNode)" @onchange="SetFtpTargetFormat">
+                                    <option value="csv">@Localizer["CSV"]</option>
+                                    <option value="tabDelimited">@Localizer["Tab-delimited text"]</option>
+                                    <option value="excel">@Localizer["Excel workbook"]</option>
+                                </select>
+                            </label>
+                            <label>@Localizer["Write mode"]
+                                <select value="@GetFileTargetMode(SelectedNode)" @onchange="SetFileTargetMode">
+                                    <option value="createNew">@Localizer["Create new (fail if file exists)"]</option>
+                                    <option value="append">@Localizer["Append rows"]</option>
+                                    <option value="replace">@Localizer["Replace file"]</option>
+                                </select>
+                            </label>
+                            @if (GetFtpTargetFormat(SelectedNode) == "excel")
+                            {
+                                <label>@Localizer["Worksheet"]
+                                    <input value="@GetSettingString(SelectedNode, "worksheet")" @onchange="eventArgs => SetSettingString(SelectedNode, "worksheet", eventArgs.Value?.ToString())" />
+                                </label>
+                            }
+                            <label class="csv-header-option">
+                                <input type="checkbox" checked="@GetSettingBoolean(SelectedNode, "includeHeader", true)" @onchange="SetFileIncludeHeader" />
+                                <span>@Localizer["Include column headers"]</span>
+                                <small>@Localizer["Append writes headers only when the file is new or empty."]</small>
+                            </label>
+                            @if (GetFtpTargetFormat(SelectedNode) == "csv")
+                            {
+                                <label>@Localizer["Delimiter"]
+                                    <input maxlength="1" value="@GetSettingString(SelectedNode, "delimiter")" @onchange="SetFileDelimiter" />
+                                </label>
+                            }
+                            <div class="csv-template-help">
+                                <strong>@Localizer["File name variables"]</strong>
+                                <code>{runStartedAtUtc:yyyyMMdd_HHmmss_fff}</code>
+                                <code>{runId}</code>
+                                @foreach (var variable in Variables.Where(variable => !string.IsNullOrWhiteSpace(variable.Name)))
+                                {
+                                    <code>@($"{{{variable.Name}}}")</code>
+                                }
+                                <small>@Localizer["Variables are allowed only in the final remote file name."]</small>
+                            </div>
+                        </section>
                     }
                     @if (SelectedNode.Kind == WorkflowNodeKind.EmailAlert)
                     {
@@ -430,6 +545,14 @@ else
                             <button class="format-settings" type="button" @onclick="FormatSelectedSettings"><RadzenIcon Icon="data_object" /> @Localizer["Format JSON"]</button>
                         </details>
                     }
+                    else if (IsFileTarget(SelectedNode.Kind))
+                    {
+                        <details class="advanced-settings">
+                            <summary><RadzenIcon Icon="data_object" /> @Localizer["Advanced settings JSON"]</summary>
+                            <label>@Localizer["Settings JSON"]<textarea class="settings-json" rows="11" spellcheck="false" @bind="SelectedNode.SettingsJson"></textarea></label>
+                            <button class="format-settings" type="button" @onclick="FormatSelectedSettings"><RadzenIcon Icon="data_object" /> @Localizer["Format JSON"]</button>
+                        </details>
+                    }
                     else
                     {
                         <label>@Localizer["Settings JSON"]<textarea class="settings-json" rows="11" spellcheck="false" @bind="SelectedNode.SettingsJson"></textarea></label>
@@ -511,6 +634,7 @@ else
     private string? SchemaError { get; set; }
     private readonly Dictionary<string, WorkflowObjectSchemaDto> LoadedSchemas =
         new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<Guid, string> LocalFileConnectionRoots = [];
     private readonly List<DesignerNode> Nodes = [];
     private readonly List<DesignerEdge> Edges = [];
     private readonly List<WorkflowVariableEditor> Variables = [];
@@ -635,6 +759,7 @@ else
             await Task.WhenAll(connectionsTask, profilesTask, trustedActionsTask);
             var connections = await connectionsTask;
             var visibleConnections = new List<ConnectionSummary>(connections.Count);
+            LocalFileConnectionRoots.Clear();
             foreach (var connection in connections)
             {
                 if (await AccessControl.HasPermissionAsync(
@@ -645,6 +770,13 @@ else
                         cancellation.Token))
                 {
                     visibleConnections.Add(connection);
+                    if ((connection.Kind is ConnectionKind.CsvFile or ConnectionKind.ExcelFile)
+                        && await ConnectionService.GetAsync(
+                            connection.Id,
+                            cancellation.Token) is { Configuration: FileConnectionConfiguration file })
+                    {
+                        LocalFileConnectionRoots[connection.Id] = file.ApprovedRoot;
+                    }
                 }
             }
 
@@ -1019,6 +1151,25 @@ else
         }
     }
 
+    private static bool GetSettingBoolean(
+        DesignerNode node,
+        string propertyName,
+        bool defaultValue)
+    {
+        try
+        {
+            using var document = JsonDocument.Parse(node.SettingsJson);
+            return document.RootElement.TryGetProperty(propertyName, out var value)
+                && value.ValueKind is JsonValueKind.True or JsonValueKind.False
+                    ? value.GetBoolean()
+                    : defaultValue;
+        }
+        catch (JsonException)
+        {
+            return defaultValue;
+        }
+    }
+
     private void SetSettingString(DesignerNode node, string propertyName, string? value)
     {
         try
@@ -1048,6 +1199,168 @@ else
                 ClearMappings();
             }
             SchemaError = null;
+        }
+    }
+
+    private string GetLocalTargetDisplayPath(DesignerNode node)
+    {
+        var relativePath = GetSettingString(node, "relativePath") ?? string.Empty;
+        return Guid.TryParse(GetSettingString(node, "connectionId"), out var connectionId)
+            && LocalFileConnectionRoots.TryGetValue(connectionId, out var root)
+            && !string.IsNullOrWhiteSpace(relativePath)
+                ? Path.Combine(root, relativePath)
+                : relativePath;
+    }
+
+    private string GetLocalTargetPlaceholder(DesignerNode node) =>
+        node.Kind == WorkflowNodeKind.ExcelTarget
+            ? Localizer["C:\\export_{runStartedAtUtc:yyyyMMdd_HHmmss_fff}.xlsx"]
+            : Localizer["C:\\export_{runStartedAtUtc:yyyyMMdd_HHmmss_fff}.csv"];
+
+    private void SetLocalTargetPath(ChangeEventArgs eventArgs)
+    {
+        if (SelectedNode is null)
+        {
+            return;
+        }
+
+        var enteredPath = eventArgs.Value?.ToString()?.Trim() ?? string.Empty;
+        if (Path.IsPathRooted(enteredPath))
+        {
+            if (!Guid.TryParse(GetSettingString(SelectedNode, "connectionId"), out var connectionId)
+                || !LocalFileConnectionRoots.TryGetValue(connectionId, out var root))
+            {
+                Notifications.Notify(
+                    NotificationSeverity.Error,
+                    Localizer["Select an approved file connection first"],
+                    Localizer["The connection determines which Worker folder may receive the file."]);
+                return;
+            }
+
+            enteredPath = enteredPath.Replace(
+                Path.AltDirectorySeparatorChar,
+                Path.DirectorySeparatorChar);
+            var normalizedRoot = Path.TrimEndingDirectorySeparator(Path.GetFullPath(root));
+            var rootPrefix = normalizedRoot.EndsWith(Path.DirectorySeparatorChar)
+                ? normalizedRoot
+                : normalizedRoot + Path.DirectorySeparatorChar;
+            if (!enteredPath.StartsWith(rootPrefix, StringComparison.OrdinalIgnoreCase))
+            {
+                Notifications.Notify(
+                    NotificationSeverity.Error,
+                    Localizer["Target file is outside the approved folder"],
+                    Localizer["Choose a file beneath {0}.", normalizedRoot]);
+                return;
+            }
+
+            enteredPath = enteredPath[rootPrefix.Length..];
+        }
+
+        SetSettingString(SelectedNode, "relativePath", enteredPath);
+    }
+
+    private static string GetFileTargetMode(DesignerNode node) =>
+        GetSettingString(node, "mode") ?? "createNew";
+
+    private void SetFileTargetMode(ChangeEventArgs eventArgs)
+    {
+        var mode = eventArgs.Value?.ToString();
+        if (SelectedNode is not null
+            && mode is "createNew" or "append" or "replace")
+        {
+            SetSettingString(SelectedNode, "mode", mode);
+        }
+    }
+
+    private void SetFileIncludeHeader(ChangeEventArgs eventArgs)
+    {
+        if (SelectedNode is null || eventArgs.Value is not bool includeHeader)
+        {
+            return;
+        }
+
+        try
+        {
+            var settings = JsonNode.Parse(SelectedNode.SettingsJson) as JsonObject ?? new JsonObject();
+            settings["includeHeader"] = includeHeader;
+            SelectedNode.SettingsJson = settings.ToJsonString();
+            ValidationIssues = [];
+        }
+        catch (JsonException)
+        {
+            Notifications.Notify(
+                NotificationSeverity.Error,
+                Localizer["Settings JSON is invalid"],
+                Localizer["Repair the JSON object before changing file settings."]);
+        }
+    }
+
+    private void SetFileDelimiter(ChangeEventArgs eventArgs)
+    {
+        if (SelectedNode is null)
+        {
+            return;
+        }
+
+        var delimiter = eventArgs.Value?.ToString();
+        if (!string.IsNullOrEmpty(delimiter))
+        {
+            SetSettingString(SelectedNode, "delimiter", delimiter[..1]);
+        }
+    }
+
+    private void SetFtpTargetPath(ChangeEventArgs eventArgs)
+    {
+        if (SelectedNode is not null)
+        {
+            SetSettingString(
+                SelectedNode,
+                "remotePath",
+                eventArgs.Value?.ToString()?.Trim().Replace('\\', '/'));
+        }
+    }
+
+    private static string GetFtpTargetFormat(DesignerNode node) =>
+        GetSettingString(node, "format") ?? "csv";
+
+    private void SetFtpTargetFormat(ChangeEventArgs eventArgs)
+    {
+        if (SelectedNode is null)
+        {
+            return;
+        }
+
+        var format = eventArgs.Value?.ToString();
+        if (format is not ("csv" or "tabDelimited" or "excel"))
+        {
+            return;
+        }
+
+        SetSettingString(SelectedNode, "format", format);
+        var remotePath = GetSettingString(SelectedNode, "remotePath") ?? "/outbound/export";
+        var lastSlash = remotePath.LastIndexOf('/');
+        var lastDot = remotePath.LastIndexOf('.');
+        var pathWithoutExtension = lastDot > Math.Max(lastSlash, remotePath.LastIndexOf('}'))
+            ? remotePath[..lastDot]
+            : remotePath;
+        SetSettingString(
+            SelectedNode,
+            "remotePath",
+            pathWithoutExtension + (format == "excel" ? ".xlsx" : format == "tabDelimited" ? ".txt" : ".csv"));
+        if (format == "tabDelimited")
+        {
+            SetSettingString(SelectedNode, "delimiter", "\t");
+            RemoveSetting(SelectedNode, "worksheet");
+        }
+        else if (format == "excel")
+        {
+            RemoveSetting(SelectedNode, "delimiter");
+            SetSettingString(SelectedNode, "worksheet", "Results");
+        }
+        else
+        {
+            RemoveSetting(SelectedNode, "worksheet");
+            SetSettingString(SelectedNode, "delimiter", ",");
         }
     }
 
@@ -1877,6 +2190,12 @@ else
     private static bool IsRelationalTarget(WorkflowNodeKind kind) =>
         IsRelationalNode(kind) && !IsSource(kind);
 
+    private static bool IsLocalFileTarget(WorkflowNodeKind kind) =>
+        kind is WorkflowNodeKind.CsvTarget or WorkflowNodeKind.ExcelTarget;
+
+    private static bool IsFileTarget(WorkflowNodeKind kind) =>
+        IsLocalFileTarget(kind) || kind == WorkflowNodeKind.FtpTarget;
+
     private static bool IsRelationalConnection(ConnectionKind kind) => kind is
         ConnectionKind.SqlServer or ConnectionKind.MySql
             or ConnectionKind.PostgreSql or ConnectionKind.Oracle;
@@ -1897,9 +2216,9 @@ else
         WorkflowNodeKind.MySqlTarget => "{\"connectionId\":\"\",\"schema\":\"warehouse\",\"object\":\"\",\"mode\":\"insert\",\"bindings\":[]}",
         WorkflowNodeKind.PostgreSqlTarget => "{\"connectionId\":\"\",\"schema\":\"public\",\"object\":\"\",\"mode\":\"insert\",\"bindings\":[]}",
         WorkflowNodeKind.OracleTarget => "{\"connectionId\":\"\",\"schema\":\"APP\",\"object\":\"\",\"mode\":\"insert\",\"bindings\":[]}",
-        WorkflowNodeKind.FtpTarget => "{\"connectionId\":\"\",\"remotePath\":\"/outbound/result.csv\",\"format\":\"csv\",\"includeHeader\":true,\"delimiter\":\",\",\"mode\":\"createNew\"}",
-        WorkflowNodeKind.CsvTarget => "{\"connectionId\":\"\",\"relativePath\":\"outbound/result.csv\",\"mode\":\"createNew\",\"includeHeader\":true}",
-        WorkflowNodeKind.ExcelTarget => "{\"connectionId\":\"\",\"relativePath\":\"outbound/result.xlsx\",\"worksheet\":\"Results\",\"mode\":\"createNew\"}",
+        WorkflowNodeKind.FtpTarget => "{\"connectionId\":\"\",\"remotePath\":\"/outbound/export_{runStartedAtUtc:yyyyMMdd_HHmmss_fff}.csv\",\"format\":\"csv\",\"includeHeader\":true,\"delimiter\":\",\",\"mode\":\"createNew\"}",
+        WorkflowNodeKind.CsvTarget => "{\"connectionId\":\"\",\"relativePath\":\"export_{runStartedAtUtc:yyyyMMdd_HHmmss_fff}.csv\",\"mode\":\"createNew\",\"includeHeader\":true,\"delimiter\":\",\"}",
+        WorkflowNodeKind.ExcelTarget => "{\"connectionId\":\"\",\"relativePath\":\"export_{runStartedAtUtc:yyyyMMdd_HHmmss_fff}.xlsx\",\"worksheet\":\"Results\",\"includeHeader\":true,\"mode\":\"createNew\"}",
         WorkflowNodeKind.EmailAlert => "{\"profileId\":\"\",\"recipients\":[],\"subject\":\"THub workflow notification\",\"body\":\"The workflow reached this Email action.\",\"maximumAttempts\":5}",
         WorkflowNodeKind.Webhook => JsonSerializer.Serialize(new
         {

@@ -148,14 +148,27 @@ Workflow schema mapping uses the Web identity and the selected connection's refe
 - Plain FTP is an explicit compatibility mode. It provides no confidentiality or server authentication and exposes the username, password, and file contents to network observers.
 - Require absolute traversal-free remote file paths, apply configured file/time/row/column bounds, and never treat remote names as local paths.
 - Download into a unique bounded Worker temporary directory before parsing; remove temporary data on completion on a best-effort basis and monitor crash remnants.
-- Create new targets only. Do not overwrite a remote file, create arbitrary directory trees, or enable watchers without a separate policy.
+- Keep create-new, append, and replace explicit. Append downloads the prior bounded
+  target, while append/replace upload a completed file under a unique remote `.partial`
+  name before a same-directory move publishes it. Do not create arbitrary directory
+  trees or enable watchers.
+- Permit placeholders only in the final remote file name, expand only declared scalar
+  run/workflow variables, and revalidate the rendered absolute traversal-free path.
+- Treat stable append/replace paths as single-owner operational resources. The node is
+  not automatically retried, but whole-run recovery remains at-least-once.
 - SFTP is not FTP and is not implemented by this connector.
 
 ## Local files
 
 - Resolve paths against configured connection roots and verify the final canonical path remains inside the root.
+- Treat local CSV file-name templates as untrusted configuration. Expand only declared
+  scalar run/workflow variables, reject path separators and unsafe filename characters
+  in substitutions, and repeat approved-root containment checks after expansion.
 - Reject traversal, device paths, unexpected reparse points, and unauthorized UNC locations.
 - Bound file size, sheet/range size, row length, and parsing errors.
+- Keep create-new, append, and replace explicit for CSV and Excel. Append/replace targets require one
+  operational owner, are not automatically retried, and can still repeat after
+  whole-run recovery under the at-least-once execution model.
 - Do not execute file content or use uploaded filenames as trusted paths.
 - Define collision, partial-file, file-lock, archive, and quarantine behavior before file watchers are enabled.
 

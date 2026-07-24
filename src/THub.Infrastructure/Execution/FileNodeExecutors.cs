@@ -400,7 +400,25 @@ public sealed class CsvTargetNodeExecutor(
             settings.ConnectionId,
             ConnectionKind.CsvFile,
             cancellationToken);
-        var target = pathResolver.ResolveFile(connection.ApprovedRoot, settings.RelativePath, connection.AllowUncRoot);
+        string relativePath;
+        try
+        {
+            relativePath = WorkflowFilePathTemplate.Render(
+                settings.RelativePathTemplate,
+                context.Variables);
+        }
+        catch (InvalidOperationException exception)
+        {
+            throw ExecutionFailure.Configuration(
+                "execution.file.path.template",
+                "The CSV target file name template could not be resolved.",
+                exception);
+        }
+
+        var target = pathResolver.ResolveFile(
+            connection.ApprovedRoot,
+            relativePath,
+            connection.AllowUncRoot);
         await WriteCsvAsync(target, input.DataSet, settings, connection, context, cancellationToken);
         return WorkflowNodeExecutionResult.WithoutOutput;
     }
@@ -413,13 +431,29 @@ public sealed class CsvTargetNodeExecutor(
         WorkflowNodeExecutionContext context,
         CancellationToken cancellationToken)
     {
-        FileTargetSupport.EnsureNewTarget(target);
+        FileTargetSupport.ValidateFileTarget(target, settings.Mode);
         var temporary = FileTargetSupport.CreateTemporaryPath(target, context.WorkflowRunId, context.Node.Id, ".csv");
         try
         {
+            var appendExisting = settings.Mode == "append"
+                && File.Exists(target)
+                && new FileInfo(target).Length > 0;
+            if (appendExisting)
+            {
+                await FileTargetSupport.CopyFileAsync(
+                    target,
+                    temporary,
+                    cancellationToken);
+                FileTargetSupport.EnsureFileLimit(
+                    new FileInfo(temporary).Length,
+                    connection.MaximumFileBytes);
+            }
+            var appendNeedsNewLine = appendExisting
+                && !FileTargetSupport.EndsWithNewLine(temporary);
+
             await using (var stream = new FileStream(
                 temporary,
-                FileMode.CreateNew,
+                appendExisting ? FileMode.Append : FileMode.CreateNew,
                 FileAccess.Write,
                 FileShare.None,
                 64 * 1024,
@@ -431,7 +465,12 @@ public sealed class CsvTargetNodeExecutor(
                 HasHeaderRecord = settings.IncludeHeader
             }))
             {
-                if (settings.IncludeHeader)
+                if (appendNeedsNewLine)
+                {
+                    await textWriter.WriteLineAsync();
+                }
+
+                if (settings.IncludeHeader && !appendExisting)
                 {
                     foreach (var column in input.Schema.Columns)
                     {
@@ -441,7 +480,7 @@ public sealed class CsvTargetNodeExecutor(
                 }
 
                 long rowsWritten = 0;
-                long bytesWritten = 0;
+                var bytesWritten = stream.Length;
                 await foreach (var batch in input.ReadBatchesAsync(cancellationToken).ConfigureAwait(false))
                 {
                     await using (batch.ConfigureAwait(false))
@@ -473,7 +512,10 @@ public sealed class CsvTargetNodeExecutor(
                 }
             }
 
-            File.Move(temporary, target);
+            File.Move(
+                temporary,
+                target,
+                overwrite: settings.Mode is "append" or "replace");
         }
         catch
         {
@@ -501,7 +543,25 @@ public sealed class ExcelTargetNodeExecutor(
             settings.ConnectionId,
             ConnectionKind.ExcelFile,
             cancellationToken);
-        var target = pathResolver.ResolveFile(connection.ApprovedRoot, settings.RelativePath, connection.AllowUncRoot);
+        string relativePath;
+        try
+        {
+            relativePath = WorkflowFilePathTemplate.Render(
+                settings.RelativePathTemplate,
+                context.Variables);
+        }
+        catch (InvalidOperationException exception)
+        {
+            throw ExecutionFailure.Configuration(
+                "execution.file.path.template",
+                "The Excel target file name template could not be resolved.",
+                exception);
+        }
+
+        var target = pathResolver.ResolveFile(
+            connection.ApprovedRoot,
+            relativePath,
+            connection.AllowUncRoot);
         await WriteExcelAsync(target, input.DataSet, settings, connection, context, cancellationToken);
         return WorkflowNodeExecutionResult.WithoutOutput;
     }
@@ -514,7 +574,7 @@ public sealed class ExcelTargetNodeExecutor(
         WorkflowNodeExecutionContext context,
         CancellationToken cancellationToken)
     {
-        FileTargetSupport.EnsureNewTarget(target);
+        FileTargetSupport.ValidateFileTarget(target, settings.Mode);
         var temporary = FileTargetSupport.CreateTemporaryPath(
             target,
             context.WorkflowRunId,
@@ -522,10 +582,35 @@ public sealed class ExcelTargetNodeExecutor(
             Path.GetExtension(target));
         try
         {
-            using var workbook = new XLWorkbook();
-            var worksheet = workbook.AddWorksheet(settings.Worksheet);
-            var rowIndex = 1;
-            if (settings.IncludeHeader)
+            var appendExisting = settings.Mode == "append"
+                && File.Exists(target)
+                && new FileInfo(target).Length > 0;
+            if (appendExisting)
+            {
+                await FileTargetSupport.CopyFileAsync(
+                    target,
+                    temporary,
+                    cancellationToken);
+                FileTargetSupport.EnsureFileLimit(
+                    new FileInfo(temporary).Length,
+                    connection.MaximumFileBytes);
+            }
+
+            using var workbook = appendExisting
+                ? new XLWorkbook(temporary)
+                : new XLWorkbook();
+            var worksheet = workbook.Worksheets.FirstOrDefault(sheet =>
+                string.Equals(
+                    sheet.Name,
+                    settings.Worksheet,
+                    StringComparison.OrdinalIgnoreCase))
+                ?? workbook.AddWorksheet(settings.Worksheet);
+            var lastUsedRow = worksheet.LastRowUsed()?.RowNumber() ?? 0;
+            var existingDataRows = Math.Max(
+                0,
+                lastUsedRow - (settings.IncludeHeader ? 1 : 0));
+            var rowIndex = lastUsedRow + 1;
+            if (settings.IncludeHeader && lastUsedRow == 0)
             {
                 for (var columnIndex = 0; columnIndex < dataSet.Schema.Columns.Count; columnIndex++)
                 {
@@ -550,7 +635,9 @@ public sealed class ExcelTargetNodeExecutor(
                     }
 
                     rowsWritten += batch.Rows.Count;
-                    FileTargetSupport.EnsureRowLimit(rowsWritten, connection.MaximumRows);
+                    FileTargetSupport.EnsureRowLimit(
+                        checked(existingDataRows + rowsWritten),
+                        connection.MaximumRows);
                     await context.Progress.ReportAsync(
                         new WorkflowNodeProgress(
                             RowsRead: batch.Rows.Count,
@@ -562,9 +649,19 @@ public sealed class ExcelTargetNodeExecutor(
             }
 
             cancellationToken.ThrowIfCancellationRequested();
-            workbook.SaveAs(temporary);
+            if (appendExisting)
+            {
+                workbook.Save();
+            }
+            else
+            {
+                workbook.SaveAs(temporary);
+            }
             FileTargetSupport.EnsureFileLimit(new FileInfo(temporary).Length, connection.MaximumFileBytes);
-            File.Move(temporary, target);
+            File.Move(
+                temporary,
+                target,
+                overwrite: settings.Mode is "append" or "replace");
         }
         catch
         {
@@ -615,19 +712,28 @@ public sealed class ExcelTargetNodeExecutor(
 
 internal static class FileTargetSupport
 {
+    public static void ValidateFileTarget(string target, string mode)
+    {
+        EnsureTargetDirectory(target);
+        if (mode == "createNew" && File.Exists(target))
+        {
+            throw ExecutionFailure.ExternalSideEffect(
+                "execution.file.target.exists",
+                "The target file already exists; createNew mode never overwrites data.");
+        }
+    }
+
     public static void EnsureNewTarget(string target)
+    {
+        ValidateFileTarget(target, "createNew");
+    }
+
+    public static void EnsureTargetDirectory(string target)
     {
         var directory = Path.GetDirectoryName(target);
         if (directory is null || !Directory.Exists(directory))
         {
             throw new DirectoryNotFoundException("The approved target directory does not exist.");
-        }
-
-        if (File.Exists(target))
-        {
-            throw ExecutionFailure.ExternalSideEffect(
-                "execution.file.target.exists",
-                "The target file already exists; createNew mode never overwrites data.");
         }
     }
 
@@ -659,6 +765,42 @@ internal static class FileTargetSupport
                 "execution.file.bytes.limit",
                 $"The target exceeds its configured {maximumBytes}-byte limit.");
         }
+    }
+
+    public static bool EndsWithNewLine(string path)
+    {
+        using var stream = new FileStream(
+            path,
+            FileMode.Open,
+            FileAccess.Read,
+            FileShare.Read);
+        stream.Position = stream.Length - 1;
+        return stream.ReadByte() == '\n';
+    }
+
+    public static async Task CopyFileAsync(
+        string sourcePath,
+        string destinationPath,
+        CancellationToken cancellationToken)
+    {
+        await using var source = new FileStream(
+            sourcePath,
+            FileMode.Open,
+            FileAccess.Read,
+            FileShare.Read,
+            64 * 1024,
+            FileOptions.Asynchronous | FileOptions.SequentialScan);
+        await using var destination = new FileStream(
+            destinationPath,
+            FileMode.CreateNew,
+            FileAccess.Write,
+            FileShare.None,
+            64 * 1024,
+            FileOptions.Asynchronous | FileOptions.SequentialScan);
+        await source.CopyToAsync(
+            destination,
+            64 * 1024,
+            cancellationToken);
     }
 
     public static void DeleteTemporary(string temporary)

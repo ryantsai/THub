@@ -146,9 +146,65 @@ public sealed class FtpTargetNodeExecutor(
             settings.ConnectionId,
             ConnectionKind.Ftp,
             cancellationToken);
+        string remotePath;
+        try
+        {
+            remotePath = WorkflowFilePathTemplate.Render(
+                settings.RemotePathTemplate,
+                context.Variables);
+        }
+        catch (InvalidOperationException exception)
+        {
+            throw ExecutionFailure.Configuration(
+                "execution.ftp.path.template",
+                "The FTP target file name template could not be resolved.",
+                exception);
+        }
+
         var temporary = FtpTemporaryFile.Create(settings.Format);
         try
         {
+            var appendExisting = false;
+            await using (var client = await clientFactory.CreateConnectedAsync(
+                             configuration,
+                             cancellationToken))
+            {
+                var remoteExists = await client.FileExists(remotePath, cancellationToken);
+                if (settings.Mode == "createNew" && remoteExists)
+                {
+                    throw ExecutionFailure.ExternalSideEffect(
+                        "execution.ftp.target.exists",
+                        "The FTP target already exists; createNew mode never overwrites remote files.");
+                }
+
+                appendExisting = settings.Mode == "append" && remoteExists;
+                if (appendExisting)
+                {
+                    var size = await client.GetFileSize(remotePath, -1, cancellationToken);
+                    if (size < 0 || size > configuration.MaximumFileBytes)
+                    {
+                        throw new TabularLimitExceededException(
+                            "execution.ftp.bytes.limit",
+                            "The FTP target file is unavailable or exceeds its configured byte limit.");
+                    }
+
+                    var downloadStatus = await client.DownloadFile(
+                        temporary.Path,
+                        remotePath,
+                        FtpLocalExists.Overwrite,
+                        FtpVerify.None,
+                        progress: null,
+                        cancellationToken);
+                    if (downloadStatus != FtpStatus.Success)
+                    {
+                        throw ExecutionFailure.Connectivity(
+                            "execution.ftp.download",
+                            "The existing FTP target could not be downloaded for append.",
+                            isRetryable: false);
+                    }
+                }
+            }
+
             var localConfiguration = new FileConnectionConfiguration(
                 settings.Format == FtpFileFormat.Excel ? ConnectionKind.ExcelFile : ConnectionKind.CsvFile,
                 temporary.Directory,
@@ -165,7 +221,7 @@ public sealed class FtpTargetNodeExecutor(
                         temporary.FileName,
                         settings.Worksheet!,
                         settings.IncludeHeader,
-                        settings.Mode),
+                        appendExisting ? "append" : "replace"),
                     localConfiguration,
                     context,
                     cancellationToken);
@@ -180,38 +236,102 @@ public sealed class FtpTargetNodeExecutor(
                         temporary.FileName,
                         settings.IncludeHeader,
                         settings.Delimiter,
-                        settings.Mode),
+                        appendExisting ? "append" : "replace"),
                     localConfiguration,
                     context,
                     cancellationToken);
             }
 
-            await using var client = await clientFactory.CreateConnectedAsync(configuration, cancellationToken);
-            if (await client.FileExists(settings.RemotePath, cancellationToken))
-            {
-                throw ExecutionFailure.ExternalSideEffect(
-                    "execution.ftp.target.exists",
-                    "The FTP target already exists; createNew mode never overwrites remote files.");
-            }
-            var status = await client.UploadFile(
-                temporary.Path,
-                settings.RemotePath,
-                FtpRemoteExists.Skip,
-                createRemoteDir: false,
-                FtpVerify.None,
-                progress: null,
+            await using var publishClient = await clientFactory.CreateConnectedAsync(
+                configuration,
                 cancellationToken);
-            if (status != FtpStatus.Success)
+            var remoteStagingPath = CreateRemoteStagingPath(remotePath, context);
+            var published = false;
+            try
             {
-                throw ExecutionFailure.ExternalSideEffect(
-                    "execution.ftp.upload",
-                    "The FTP target could not be uploaded.");
+                var status = await publishClient.UploadFile(
+                    temporary.Path,
+                    remoteStagingPath,
+                    FtpRemoteExists.Skip,
+                    createRemoteDir: false,
+                    FtpVerify.None,
+                    progress: null,
+                    cancellationToken);
+                if (status != FtpStatus.Success)
+                {
+                    throw ExecutionFailure.ExternalSideEffect(
+                        "execution.ftp.upload",
+                        "The staged FTP target could not be uploaded.");
+                }
+
+                published = await publishClient.MoveFile(
+                    remoteStagingPath,
+                    remotePath,
+                    settings.Mode == "createNew"
+                        ? FtpRemoteExists.Skip
+                        : FtpRemoteExists.Overwrite,
+                    cancellationToken);
+                if (!published)
+                {
+                    throw ExecutionFailure.ExternalSideEffect(
+                        "execution.ftp.publish",
+                        "The staged FTP target could not be moved into place.");
+                }
+            }
+            finally
+            {
+                if (!published)
+                {
+                    await TryDeleteRemoteAsync(
+                        publishClient,
+                        remoteStagingPath,
+                        cancellationToken);
+                }
             }
             return WorkflowNodeExecutionResult.WithoutOutput;
         }
         finally
         {
             temporary.Delete();
+        }
+    }
+
+    private static string CreateRemoteStagingPath(
+        string remotePath,
+        WorkflowNodeExecutionContext context)
+    {
+        var separator = remotePath.LastIndexOf('/');
+        var directory = remotePath[..(separator + 1)];
+        var safeNode = string.Concat(context.Node.Id.Select(character =>
+            char.IsAsciiLetterOrDigit(character) ? character : '_'));
+        var fileName = $".thub-{context.WorkflowRunId:N}-{safeNode}-{Guid.NewGuid():N}.partial";
+        if (directory.Length + fileName.Length > WorkflowFilePathTemplate.MaximumLength)
+        {
+            throw ExecutionFailure.Configuration(
+                "execution.ftp.path.length",
+                "The FTP target directory leaves no room for a safe staged file name.");
+        }
+
+        return directory + fileName;
+    }
+
+    private static async Task TryDeleteRemoteAsync(
+        AsyncFtpClient client,
+        string remotePath,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            if (await client.FileExists(remotePath, cancellationToken))
+            {
+                await client.DeleteFile(remotePath, cancellationToken);
+            }
+        }
+        catch (Exception exception) when (
+            exception is not OperationCanceledException
+            && exception is not OutOfMemoryException)
+        {
+            // Best-effort cleanup; the explicit .partial name identifies crash remnants.
         }
     }
 }

@@ -38,6 +38,8 @@ Accepted ADRs are not immutable. Supersede them when evidence changes; do not si
 | [0021](0021-provider-neutral-governed-publications.md) | Accepted | Provider-neutral governed publications, separate Worker apply connections, and Swagger consumer contracts |
 | [0022](0022-append-only-control-plane-audit.md) | Accepted | Append-only, metadata-only control-plane audit trail and authorized viewer |
 | [0023](0023-single-credential-encryption-key.md) | Accepted | One external AES-GCM credential encryption key with no persisted key version |
+| [0024](0024-local-csv-target-modes-and-file-name-templates.md) | Accepted | Approved-root local CSV append/replace modes and run-variable file-name templates |
+| [0025](0025-excel-and-ftp-target-modes-and-file-name-templates.md) | Accepted | Local Excel and FTP append/replace modes with staged publication and file-name templates |
 
 ## Creating an ADR
 

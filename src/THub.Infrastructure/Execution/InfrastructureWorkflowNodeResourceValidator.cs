@@ -64,17 +64,19 @@ public sealed class InfrastructureWorkflowNodeResourceValidator(
                 await ValidateExcelSourceAsync(excelSource, limits, cancellationToken).ConfigureAwait(false);
                 break;
             case CsvTargetNodeSettings csvTarget:
-                await ValidateFileTargetAsync(
+                await ValidateLocalFileTargetAsync(
                     csvTarget.ConnectionId,
                     ConnectionKind.CsvFile,
-                    csvTarget.RelativePath,
+                    csvTarget.RelativePathTemplate,
+                    csvTarget.Mode,
                     cancellationToken).ConfigureAwait(false);
                 break;
             case ExcelTargetNodeSettings excelTarget:
-                await ValidateFileTargetAsync(
+                await ValidateLocalFileTargetAsync(
                     excelTarget.ConnectionId,
                     ConnectionKind.ExcelFile,
-                    excelTarget.RelativePath,
+                    excelTarget.RelativePathTemplate,
+                    excelTarget.Mode,
                     cancellationToken).ConfigureAwait(false);
                 break;
             case EmailAlertNodeSettings email:
@@ -250,7 +252,11 @@ public sealed class InfrastructureWorkflowNodeResourceValidator(
             ConnectionKind.Ftp,
             cancellationToken);
         await using var client = await ftpClientFactory.CreateConnectedAsync(configuration, cancellationToken);
-        if (await client.FileExists(settings.RemotePath, cancellationToken))
+        var validationPath = WorkflowFilePathTemplate.CreateValidationPath(
+            settings.RemotePathTemplate);
+        if (settings.Mode == "createNew"
+            && WorkflowFilePathTemplate.GetVariableNames(settings.RemotePathTemplate).Count == 0
+            && await client.FileExists(validationPath, cancellationToken))
         {
             throw ExecutionFailure.Configuration(
                 "execution.ftp.target.exists",
@@ -296,17 +302,26 @@ public sealed class InfrastructureWorkflowNodeResourceValidator(
             cancellationToken);
     }
 
-    private async Task ValidateFileTargetAsync(
+    private async Task ValidateLocalFileTargetAsync(
         Guid connectionId,
         ConnectionKind connectionKind,
-        string relativePath,
+        string relativePathTemplate,
+        string mode,
         CancellationToken cancellationToken)
     {
         var connection = await _connectionResolver.ResolveAsync<FileConnectionConfiguration>(
             connectionId,
             connectionKind,
             cancellationToken).ConfigureAwait(false);
-        FileTargetSupport.EnsureNewTarget(ResolveFile(connection, relativePath));
+        var validationPath = WorkflowFilePathTemplate.CreateValidationPath(
+            relativePathTemplate);
+        var target = ResolveFile(connection, validationPath);
+        FileTargetSupport.EnsureTargetDirectory(target);
+        if (mode == "createNew"
+            && WorkflowFilePathTemplate.GetVariableNames(relativePathTemplate).Count == 0)
+        {
+            FileTargetSupport.EnsureNewTarget(target);
+        }
     }
 
     private async Task ValidateEmailAsync(

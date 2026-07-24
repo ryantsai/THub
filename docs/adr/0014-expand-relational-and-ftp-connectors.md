@@ -10,6 +10,9 @@
   [ADR-0019](0019-encrypted-sql-connection-credentials.md)
 - Publication-provider restriction superseded by:
   [ADR-0021](0021-provider-neutral-governed-publications.md)
+- File-target create-new restriction superseded by:
+  [ADR-0024](0024-local-csv-target-modes-and-file-name-templates.md) and
+  [ADR-0025](0025-excel-and-ftp-target-modes-and-file-name-templates.md)
 
 ## Context
 

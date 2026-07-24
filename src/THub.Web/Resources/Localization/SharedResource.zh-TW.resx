@@ -2842,4 +2842,121 @@
   <data name="Save or discard changes first" xml:space="preserve">
     <value>請先儲存或捨棄變更</value>
   </data>
+  <data name="Approved connection" xml:space="preserve">
+    <value>已核准的連線</value>
+  </data>
+  <data name="Select a {0} connection…" xml:space="preserve">
+    <value>選擇 {0} 連線…</value>
+  </data>
+  <data name="Add an approved Worker folder before choosing a CSV target file." xml:space="preserve">
+    <value>選擇 CSV 目標檔案前，請先新增已核准的 Worker 資料夾。</value>
+  </data>
+  <data name="Set up CSV folder" xml:space="preserve">
+    <value>設定 CSV 資料夾</value>
+  </data>
+  <data name="CSV output settings" xml:space="preserve">
+    <value>CSV 輸出設定</value>
+  </data>
+  <data name="Target file on Worker" xml:space="preserve">
+    <value>Worker 上的目標檔案</value>
+  </data>
+  <data name="C:\export_{runStartedAtUtc:yyyyMMdd_HHmmss_fff}.csv" xml:space="preserve">
+    <value>C:\export_{runStartedAtUtc:yyyyMMdd_HHmmss_fff}.csv</value>
+  </data>
+  <data name="The file must stay inside the selected connection's approved folder." xml:space="preserve">
+    <value>檔案必須位於所選連線的已核准資料夾內。</value>
+  </data>
+  <data name="Write mode" xml:space="preserve">
+    <value>寫入模式</value>
+  </data>
+  <data name="Create new (fail if file exists)" xml:space="preserve">
+    <value>建立新檔案（檔案已存在時失敗）</value>
+  </data>
+  <data name="Append rows" xml:space="preserve">
+    <value>附加資料列</value>
+  </data>
+  <data name="Replace file" xml:space="preserve">
+    <value>取代檔案</value>
+  </data>
+  <data name="Include column headers" xml:space="preserve">
+    <value>包含欄位標題</value>
+  </data>
+  <data name="Append writes headers only when the file is new or empty." xml:space="preserve">
+    <value>附加模式只會在檔案為新檔或空白時寫入標題。</value>
+  </data>
+  <data name="Delimiter" xml:space="preserve">
+    <value>分隔符號</value>
+  </data>
+  <data name="File name variables" xml:space="preserve">
+    <value>檔名變數</value>
+  </data>
+  <data name="Date/time variables accept .NET date formats. Variable values cannot contain path separators." xml:space="preserve">
+    <value>日期／時間變數可使用 .NET 日期格式。變數值不可包含路徑分隔符號。</value>
+  </data>
+  <data name="Target file is outside the approved folder" xml:space="preserve">
+    <value>目標檔案不在已核准的資料夾內</value>
+  </data>
+  <data name="Choose a file beneath {0}." xml:space="preserve">
+    <value>請選擇 {0} 下的檔案。</value>
+  </data>
+  <data name="Repair the JSON object before changing CSV settings." xml:space="preserve">
+    <value>變更 CSV 設定前，請先修正 JSON 物件。</value>
+  </data>
+  <data name="Select an approved CSV connection first" xml:space="preserve">
+    <value>請先選擇已核准的 CSV 連線</value>
+  </data>
+  <data name="The connection determines which Worker folder may receive the file." xml:space="preserve">
+    <value>連線會決定可接收檔案的 Worker 資料夾。</value>
+  </data>
+  <data name="Add an approved Worker folder before choosing a local target file." xml:space="preserve">
+    <value>選擇本機目標檔案前，請先新增已核准的 Worker 資料夾。</value>
+  </data>
+  <data name="Set up file folder" xml:space="preserve">
+    <value>設定檔案資料夾</value>
+  </data>
+  <data name="Add an approved FTP or FTPS connection before choosing a remote target file." xml:space="preserve">
+    <value>選擇遠端目標檔案前，請先新增已核准的 FTP 或 FTPS 連線。</value>
+  </data>
+  <data name="Set up FTP connection" xml:space="preserve">
+    <value>設定 FTP 連線</value>
+  </data>
+  <data name="Local file output settings" xml:space="preserve">
+    <value>本機檔案輸出設定</value>
+  </data>
+  <data name="C:\export_{runStartedAtUtc:yyyyMMdd_HHmmss_fff}.xlsx" xml:space="preserve">
+    <value>C:\export_{runStartedAtUtc:yyyyMMdd_HHmmss_fff}.xlsx</value>
+  </data>
+  <data name="Worksheet" xml:space="preserve">
+    <value>工作表</value>
+  </data>
+  <data name="FTP output settings" xml:space="preserve">
+    <value>FTP 輸出設定</value>
+  </data>
+  <data name="Remote target file" xml:space="preserve">
+    <value>遠端目標檔案</value>
+  </data>
+  <data name="/outbound/export_{runStartedAtUtc:yyyyMMdd_HHmmss_fff}.csv" xml:space="preserve">
+    <value>/outbound/export_{runStartedAtUtc:yyyyMMdd_HHmmss_fff}.csv</value>
+  </data>
+  <data name="Use an absolute remote path. THub will not create missing remote folders." xml:space="preserve">
+    <value>請使用絕對遠端路徑。THub 不會建立不存在的遠端資料夾。</value>
+  </data>
+  <data name="File format" xml:space="preserve">
+    <value>檔案格式</value>
+  </data>
+  <data name="CSV" xml:space="preserve">
+    <value>CSV</value>
+  </data>
+  <data name="Tab-delimited text" xml:space="preserve">
+    <value>Tab 分隔文字</value>
+  </data>
+  <data name="Variables are allowed only in the final remote file name." xml:space="preserve">
+    <value>變數只能用於最後一段遠端檔名。</value>
+  </data>
+  <data name="Repair the JSON object before changing file settings." xml:space="preserve">
+    <value>變更檔案設定前，請先修正 JSON 物件。</value>
+  </data>
+  <data name="Select an approved file connection first" xml:space="preserve">
+    <value>請先選擇已核准的檔案連線</value>
+  </data>
 </root>

@@ -2842,4 +2842,121 @@ subsidiary.example.com</value>
   <data name="Save or discard changes first" xml:space="preserve">
     <value>Save or discard changes first</value>
   </data>
+  <data name="Approved connection" xml:space="preserve">
+    <value>Approved connection</value>
+  </data>
+  <data name="Select a {0} connection…" xml:space="preserve">
+    <value>Select a {0} connection…</value>
+  </data>
+  <data name="Add an approved Worker folder before choosing a CSV target file." xml:space="preserve">
+    <value>Add an approved Worker folder before choosing a CSV target file.</value>
+  </data>
+  <data name="Set up CSV folder" xml:space="preserve">
+    <value>Set up CSV folder</value>
+  </data>
+  <data name="CSV output settings" xml:space="preserve">
+    <value>CSV output settings</value>
+  </data>
+  <data name="Target file on Worker" xml:space="preserve">
+    <value>Target file on Worker</value>
+  </data>
+  <data name="C:\export_{runStartedAtUtc:yyyyMMdd_HHmmss_fff}.csv" xml:space="preserve">
+    <value>C:\export_{runStartedAtUtc:yyyyMMdd_HHmmss_fff}.csv</value>
+  </data>
+  <data name="The file must stay inside the selected connection's approved folder." xml:space="preserve">
+    <value>The file must stay inside the selected connection's approved folder.</value>
+  </data>
+  <data name="Write mode" xml:space="preserve">
+    <value>Write mode</value>
+  </data>
+  <data name="Create new (fail if file exists)" xml:space="preserve">
+    <value>Create new (fail if file exists)</value>
+  </data>
+  <data name="Append rows" xml:space="preserve">
+    <value>Append rows</value>
+  </data>
+  <data name="Replace file" xml:space="preserve">
+    <value>Replace file</value>
+  </data>
+  <data name="Include column headers" xml:space="preserve">
+    <value>Include column headers</value>
+  </data>
+  <data name="Append writes headers only when the file is new or empty." xml:space="preserve">
+    <value>Append writes headers only when the file is new or empty.</value>
+  </data>
+  <data name="Delimiter" xml:space="preserve">
+    <value>Delimiter</value>
+  </data>
+  <data name="File name variables" xml:space="preserve">
+    <value>File name variables</value>
+  </data>
+  <data name="Date/time variables accept .NET date formats. Variable values cannot contain path separators." xml:space="preserve">
+    <value>Date/time variables accept .NET date formats. Variable values cannot contain path separators.</value>
+  </data>
+  <data name="Target file is outside the approved folder" xml:space="preserve">
+    <value>Target file is outside the approved folder</value>
+  </data>
+  <data name="Choose a file beneath {0}." xml:space="preserve">
+    <value>Choose a file beneath {0}.</value>
+  </data>
+  <data name="Repair the JSON object before changing CSV settings." xml:space="preserve">
+    <value>Repair the JSON object before changing CSV settings.</value>
+  </data>
+  <data name="Select an approved CSV connection first" xml:space="preserve">
+    <value>Select an approved CSV connection first</value>
+  </data>
+  <data name="The connection determines which Worker folder may receive the file." xml:space="preserve">
+    <value>The connection determines which Worker folder may receive the file.</value>
+  </data>
+  <data name="Add an approved Worker folder before choosing a local target file." xml:space="preserve">
+    <value>Add an approved Worker folder before choosing a local target file.</value>
+  </data>
+  <data name="Set up file folder" xml:space="preserve">
+    <value>Set up file folder</value>
+  </data>
+  <data name="Add an approved FTP or FTPS connection before choosing a remote target file." xml:space="preserve">
+    <value>Add an approved FTP or FTPS connection before choosing a remote target file.</value>
+  </data>
+  <data name="Set up FTP connection" xml:space="preserve">
+    <value>Set up FTP connection</value>
+  </data>
+  <data name="Local file output settings" xml:space="preserve">
+    <value>Local file output settings</value>
+  </data>
+  <data name="C:\export_{runStartedAtUtc:yyyyMMdd_HHmmss_fff}.xlsx" xml:space="preserve">
+    <value>C:\export_{runStartedAtUtc:yyyyMMdd_HHmmss_fff}.xlsx</value>
+  </data>
+  <data name="Worksheet" xml:space="preserve">
+    <value>Worksheet</value>
+  </data>
+  <data name="FTP output settings" xml:space="preserve">
+    <value>FTP output settings</value>
+  </data>
+  <data name="Remote target file" xml:space="preserve">
+    <value>Remote target file</value>
+  </data>
+  <data name="/outbound/export_{runStartedAtUtc:yyyyMMdd_HHmmss_fff}.csv" xml:space="preserve">
+    <value>/outbound/export_{runStartedAtUtc:yyyyMMdd_HHmmss_fff}.csv</value>
+  </data>
+  <data name="Use an absolute remote path. THub will not create missing remote folders." xml:space="preserve">
+    <value>Use an absolute remote path. THub will not create missing remote folders.</value>
+  </data>
+  <data name="File format" xml:space="preserve">
+    <value>File format</value>
+  </data>
+  <data name="CSV" xml:space="preserve">
+    <value>CSV</value>
+  </data>
+  <data name="Tab-delimited text" xml:space="preserve">
+    <value>Tab-delimited text</value>
+  </data>
+  <data name="Variables are allowed only in the final remote file name." xml:space="preserve">
+    <value>Variables are allowed only in the final remote file name.</value>
+  </data>
+  <data name="Repair the JSON object before changing file settings." xml:space="preserve">
+    <value>Repair the JSON object before changing file settings.</value>
+  </data>
+  <data name="Select an approved file connection first" xml:space="preserve">
+    <value>Select an approved file connection first</value>
+  </data>
 </root>

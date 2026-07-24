@@ -90,21 +90,21 @@ public sealed record SqlTargetNodeSettings(
 
 public sealed record CsvTargetNodeSettings(
     Guid ConnectionId,
-    string RelativePath,
+    string RelativePathTemplate,
     bool IncludeHeader,
     char Delimiter,
     string Mode) : WorkflowNodeSettings;
 
 public sealed record ExcelTargetNodeSettings(
     Guid ConnectionId,
-    string RelativePath,
+    string RelativePathTemplate,
     string Worksheet,
     bool IncludeHeader,
     string Mode) : WorkflowNodeSettings;
 
 public sealed record FtpTargetNodeSettings(
     Guid ConnectionId,
-    string RemotePath,
+    string RemotePathTemplate,
     FtpFileFormat Format,
     bool IncludeHeader,
     char Delimiter,
@@ -205,6 +205,27 @@ public sealed class WorkflowNodeSettingsValidator
                     ValidateTargetVariables(graph, node, target);
                     ValidateJavaScriptBindings(target);
                 }
+                else if (settings is CsvTargetNodeSettings csvTarget)
+                {
+                    ValidateFilePathVariables(
+                        graph,
+                        node,
+                        csvTarget.RelativePathTemplate);
+                }
+                else if (settings is ExcelTargetNodeSettings excelTarget)
+                {
+                    ValidateFilePathVariables(
+                        graph,
+                        node,
+                        excelTarget.RelativePathTemplate);
+                }
+                else if (settings is FtpTargetNodeSettings ftpTarget)
+                {
+                    ValidateFilePathVariables(
+                        graph,
+                        node,
+                        ftpTarget.RemotePathTemplate);
+                }
             }
             catch (WorkflowNodeSettingsException exception)
             {
@@ -255,6 +276,27 @@ public sealed class WorkflowNodeSettingsValidator
                 throw Invalid(
                     "node.target.variable.missing",
                     $"Target node '{node.Name}' references unknown workflow variable '{binding.Value}'.");
+            }
+        }
+    }
+
+    private static void ValidateFilePathVariables(
+        WorkflowGraph graph,
+        WorkflowNode node,
+        string pathTemplate)
+    {
+        var variables = graph.Variables
+            .Select(variable => variable.Name)
+            .Concat(["runId", "runStartedAtUtc", "utcToday"])
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        foreach (var variableName in WorkflowFilePathTemplate.GetVariableNames(
+                     pathTemplate))
+        {
+            if (!variables.Contains(variableName))
+            {
+                throw Invalid(
+                    "node.file.path.variable.missing",
+                    $"File target '{node.Name}' references unknown workflow variable '{variableName}'.");
             }
         }
     }
@@ -571,14 +613,16 @@ public sealed class WorkflowNodeSettingsValidator
     {
         EnsureOnly(root, CsvTargetProperties);
         var mode = ReadOptionalText(root, "mode", 32) ?? "createNew";
-        if (mode != "createNew")
+        if (mode is not ("createNew" or "append" or "replace"))
         {
-            throw Invalid("node.file-target.mode.invalid", "File target v1 supports only createNew mode.");
+            throw Invalid(
+                "node.file-target.mode.invalid",
+                "CSV target mode must be 'createNew', 'append', or 'replace'.");
         }
 
         return new(
             ReadGuid(root, "connectionId"),
-            ReadRelativePath(root, "relativePath", ".csv"),
+            ReadLocalTargetPathTemplate(root, [".csv"]),
             ReadBoolean(root, "includeHeader"),
             ReadDelimiter(root, "delimiter", ','),
             mode);
@@ -588,14 +632,16 @@ public sealed class WorkflowNodeSettingsValidator
     {
         EnsureOnly(root, ExcelTargetProperties);
         var mode = ReadOptionalText(root, "mode", 32) ?? "createNew";
-        if (mode != "createNew")
+        if (mode is not ("createNew" or "append" or "replace"))
         {
-            throw Invalid("node.file-target.mode.invalid", "File target v1 supports only createNew mode.");
+            throw Invalid(
+                "node.file-target.mode.invalid",
+                "Excel target mode must be 'createNew', 'append', or 'replace'.");
         }
 
         return new(
             ReadGuid(root, "connectionId"),
-            ReadWorkbookPath(root, "relativePath"),
+            ReadLocalTargetPathTemplate(root, [".xlsx", ".xlsm"]),
             ReadText(root, "worksheet", 128),
             ReadOptionalBoolean(root, "includeHeader") ?? true,
             mode);
@@ -605,14 +651,16 @@ public sealed class WorkflowNodeSettingsValidator
     {
         EnsureOnly(root, FtpTargetProperties);
         var mode = ReadOptionalText(root, "mode", 32) ?? "createNew";
-        if (mode != "createNew")
+        if (mode is not ("createNew" or "append" or "replace"))
         {
-            throw Invalid("node.ftp-target.mode.invalid", "FTP target v1 supports only createNew mode.");
+            throw Invalid(
+                "node.ftp-target.mode.invalid",
+                "FTP target mode must be 'createNew', 'append', or 'replace'.");
         }
         var format = ReadFtpFormat(root);
         return new(
             ReadGuid(root, "connectionId"),
-            ReadRemotePath(root),
+            ReadRemoteTargetPathTemplate(root),
             format,
             ReadOptionalBoolean(root, "includeHeader") ?? true,
             format == FtpFileFormat.TabDelimited ? '\t' : ReadDelimiter(root, "delimiter", ','),
@@ -843,6 +891,82 @@ public sealed class WorkflowNodeSettingsValidator
         }
 
         return value;
+    }
+
+    private static string ReadLocalTargetPathTemplate(
+        JsonElement root,
+        IReadOnlyList<string> extensions)
+    {
+        var template = ReadText(root, "relativePath", WorkflowFilePathTemplate.MaximumLength);
+        string validationPath;
+        try
+        {
+            validationPath = WorkflowFilePathTemplate.CreateValidationPath(template);
+        }
+        catch (ArgumentException exception)
+        {
+            throw new WorkflowNodeSettingsException(
+                "node.file.path.template.invalid",
+                "File target paths may contain placeholders such as {runStartedAtUtc:yyyyMMdd_HHmmss}.",
+                exception);
+        }
+
+        var extension = Path.GetExtension(validationPath);
+        if (Path.IsPathRooted(validationPath)
+            || validationPath.Contains(':')
+            || template[..Math.Max(
+                    template.LastIndexOf(Path.DirectorySeparatorChar),
+                    template.LastIndexOf(Path.AltDirectorySeparatorChar)) + 1]
+                .Contains('{')
+            || validationPath
+                .Split(
+                    [Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar],
+                    StringSplitOptions.RemoveEmptyEntries)
+                .Any(segment =>
+                    segment is "." or ".."
+                    || segment.IndexOfAny(Path.GetInvalidFileNameChars()) >= 0)
+            || !extensions.Contains(extension, StringComparer.OrdinalIgnoreCase))
+        {
+            throw Invalid(
+                "node.file.path.invalid",
+                $"'relativePath' must resolve beneath an approved root to one of these file types: {string.Join(", ", extensions)}. Placeholders are allowed only in the file name.");
+        }
+
+        return template;
+    }
+
+    private static string ReadRemoteTargetPathTemplate(JsonElement root)
+    {
+        var template = ReadText(
+            root,
+            "remotePath",
+            WorkflowFilePathTemplate.MaximumLength).Replace('\\', '/');
+        string validationPath;
+        try
+        {
+            validationPath = WorkflowFilePathTemplate.CreateValidationPath(template);
+        }
+        catch (ArgumentException exception)
+        {
+            throw new WorkflowNodeSettingsException(
+                "node.ftp.path.template.invalid",
+                "FTP target paths may contain placeholders such as {runStartedAtUtc:yyyyMMdd_HHmmss}.",
+                exception);
+        }
+
+        var fileNameStart = template.LastIndexOf('/') + 1;
+        if (!validationPath.StartsWith("/", StringComparison.Ordinal)
+            || validationPath
+                .Split('/', StringSplitOptions.RemoveEmptyEntries)
+                .Any(segment => segment is "." or "..")
+            || template[..fileNameStart].Contains('{'))
+        {
+            throw Invalid(
+                "node.ftp.path.invalid",
+                "FTP target paths must be absolute and traversal-free, with placeholders only in the file name.");
+        }
+
+        return template;
     }
 
     private static string ReadWorkbookPath(JsonElement root, string propertyName)

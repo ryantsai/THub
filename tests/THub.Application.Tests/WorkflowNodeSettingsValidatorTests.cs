@@ -25,9 +25,9 @@ public sealed class WorkflowNodeSettingsValidatorTests
     [InlineData(WorkflowNodeKind.MySqlTarget, """{"connectionId":"11111111-1111-1111-1111-111111111111","schema":"warehouse","object":"Orders","mode":"upsert","keyColumns":["Id"]}""")]
     [InlineData(WorkflowNodeKind.PostgreSqlTarget, """{"connectionId":"11111111-1111-1111-1111-111111111111","schema":"public","object":"Orders","mode":"delete","keyColumns":["Id"]}""")]
     [InlineData(WorkflowNodeKind.OracleTarget, """{"connectionId":"11111111-1111-1111-1111-111111111111","schema":"APP","object":"ORDERS","mode":"delete","keyColumns":["ID"],"bindings":[{"targetColumn":"ID","kind":"Column","value":"Id"}]}""")]
-    [InlineData(WorkflowNodeKind.FtpTarget, """{"connectionId":"11111111-1111-1111-1111-111111111111","remotePath":"/outbound/orders.xlsx","format":"excel","worksheet":"Orders","includeHeader":true,"mode":"createNew"}""")]
-    [InlineData(WorkflowNodeKind.CsvTarget, """{"connectionId":"11111111-1111-1111-1111-111111111111","relativePath":"outbound/orders.csv","includeHeader":true}""")]
-    [InlineData(WorkflowNodeKind.ExcelTarget, """{"connectionId":"11111111-1111-1111-1111-111111111111","relativePath":"outbound/orders.xlsx","worksheet":"Orders"}""")]
+    [InlineData(WorkflowNodeKind.FtpTarget, """{"connectionId":"11111111-1111-1111-1111-111111111111","remotePath":"/outbound/orders_{runStartedAtUtc:yyyyMMdd}.xlsx","format":"excel","worksheet":"Orders","includeHeader":true,"mode":"replace"}""")]
+    [InlineData(WorkflowNodeKind.CsvTarget, """{"connectionId":"11111111-1111-1111-1111-111111111111","relativePath":"outbound/orders_{runStartedAtUtc:yyyyMMdd_HHmmss}.csv","includeHeader":true,"mode":"replace"}""")]
+    [InlineData(WorkflowNodeKind.ExcelTarget, """{"connectionId":"11111111-1111-1111-1111-111111111111","relativePath":"outbound/orders_{runId}.xlsx","worksheet":"Orders","mode":"append"}""")]
     [InlineData(WorkflowNodeKind.EmailAlert, """{"profileId":"11111111-1111-1111-1111-111111111111","recipients":["ops@example.test"],"subject":"Run {{run.id}}","body":"Done"}""")]
     [InlineData(WorkflowNodeKind.Webhook, """{"trustedActionId":"11111111-1111-1111-1111-111111111111","body":"{}"}""")]
     [InlineData(WorkflowNodeKind.Executable, """{"trustedActionId":"11111111-1111-1111-1111-111111111111"}""")]
@@ -143,6 +143,103 @@ public sealed class WorkflowNodeSettingsValidatorTests
         var issue = Assert.Single(_validator.Validate(graph));
 
         Assert.Equal("node.target.variable.missing", issue.Code);
+    }
+
+    [Fact]
+    public void ValidateRejectsUnknownCsvFileNameVariable()
+    {
+        var graph = new WorkflowGraph(
+            [
+                new(
+                    "target",
+                    WorkflowNodeKind.CsvTarget,
+                    "CSV target",
+                    0,
+                    0,
+                    """{"connectionId":"11111111-1111-1111-1111-111111111111","relativePath":"export_{missing}.csv","includeHeader":true,"mode":"append"}""")
+            ],
+            [],
+            [],
+            []);
+
+        var issue = Assert.Single(_validator.Validate(graph));
+
+        Assert.Equal("node.file.path.variable.missing", issue.Code);
+    }
+
+    [Theory]
+    [InlineData("append")]
+    [InlineData("replace")]
+    [InlineData("createNew")]
+    public void CsvTargetAcceptsSupportedWriteModes(string mode)
+    {
+        var node = new WorkflowNode(
+            "target",
+            WorkflowNodeKind.CsvTarget,
+            "CSV target",
+            0,
+            0,
+            $$"""{"connectionId":"11111111-1111-1111-1111-111111111111","relativePath":"export.csv","includeHeader":true,"mode":"{{mode}}"}""");
+
+        var settings = Assert.IsType<CsvTargetNodeSettings>(_validator.Parse(node));
+
+        Assert.Equal(mode, settings.Mode);
+    }
+
+    [Theory]
+    [InlineData("append")]
+    [InlineData("replace")]
+    [InlineData("createNew")]
+    public void ExcelTargetAcceptsSupportedWriteModes(string mode)
+    {
+        var node = new WorkflowNode(
+            "target",
+            WorkflowNodeKind.ExcelTarget,
+            "Excel target",
+            0,
+            0,
+            $$"""{"connectionId":"11111111-1111-1111-1111-111111111111","relativePath":"export_{runId}.xlsx","worksheet":"Results","includeHeader":true,"mode":"{{mode}}"}""");
+
+        var settings = Assert.IsType<ExcelTargetNodeSettings>(_validator.Parse(node));
+
+        Assert.Equal(mode, settings.Mode);
+    }
+
+    [Theory]
+    [InlineData("append")]
+    [InlineData("replace")]
+    [InlineData("createNew")]
+    public void FtpTargetAcceptsSupportedWriteModes(string mode)
+    {
+        var node = new WorkflowNode(
+            "target",
+            WorkflowNodeKind.FtpTarget,
+            "FTP target",
+            0,
+            0,
+            $$"""{"connectionId":"11111111-1111-1111-1111-111111111111","remotePath":"/outbound/export_{runId}.csv","format":"csv","includeHeader":true,"mode":"{{mode}}"}""");
+
+        var settings = Assert.IsType<FtpTargetNodeSettings>(_validator.Parse(node));
+
+        Assert.Equal(mode, settings.Mode);
+    }
+
+    [Theory]
+    [InlineData(
+        WorkflowNodeKind.ExcelTarget,
+        """{"connectionId":"11111111-1111-1111-1111-111111111111","relativePath":"{folder}/export.xlsx","worksheet":"Results","includeHeader":true,"mode":"append"}""")]
+    [InlineData(
+        WorkflowNodeKind.FtpTarget,
+        """{"connectionId":"11111111-1111-1111-1111-111111111111","remotePath":"/{folder}/export.csv","format":"csv","includeHeader":true,"mode":"append"}""")]
+    public void FileTargetRejectsVariablesInDirectorySegments(
+        WorkflowNodeKind kind,
+        string settingsJson)
+    {
+        var node = new WorkflowNode("target", kind, "Target", 0, 0, settingsJson);
+
+        var exception = Assert.Throws<WorkflowNodeSettingsException>(() => _validator.Parse(node));
+
+        Assert.Contains("path", exception.Code);
     }
 
     [Theory]
