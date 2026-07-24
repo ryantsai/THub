@@ -5,46 +5,46 @@
 @using THub.Domain.Auditing
 @inject AuditTrailService AuditTrail
 
-<PageTitle>Audit log · THub</PageTitle>
+<PageTitle>@Localizer["Audit log · THub"]</PageTitle>
 
 <div class="page-heading">
     <div>
-        <div class="eyebrow">Administration</div>
-        <h1>Audit log</h1>
-        <p>Trace persistent management, execution, delivery, and publication activity without exposing payloads or secrets.</p>
+        <div class="eyebrow">@Localizer["Administration"]</div>
+        <h1>@Localizer["Audit log"]</h1>
+        <p>@Localizer["Trace persistent management, execution, delivery, and publication activity without exposing payloads or secrets."]</p>
     </div>
     <div class="heading-actions audit-filters">
         <RadzenTextBox @bind-Value="Search" Placeholder="Actor, action, or resource" @onkeydown="HandleSearchKeyAsync" />
         <RadzenDropDown TValue="AuditOutcome?" Data="@OutcomeOptions" TextProperty="Label" ValueProperty="Value"
                         @bind-Value="Outcome" Placeholder="All outcomes" AllowClear="true" />
-        <RadzenButton Text="Search" Icon="search" Click="@ApplyFiltersAsync" Disabled="@Busy" />
-        <RadzenButton Text="Refresh" Icon="refresh" ButtonStyle="ButtonStyle.Light" Click="@LoadAsync" Disabled="@Busy" />
+        <RadzenButton Text='@Localizer["Search"]' Icon="search" Click="@ApplyFiltersAsync" Disabled="@Busy" />
+        <RadzenButton Text='@Localizer["Refresh"]' Icon="refresh" ButtonStyle="ButtonStyle.Light" Click="@LoadAsync" Disabled="@Busy" />
     </div>
 </div>
 
 <section class="panel">
     <div class="panel-head">
-        <div><h2>Persistent events</h2><p>@Summary</p></div>
-        <span class="audit-safety">Metadata only</span>
+        <div><h2>@Localizer["Persistent events"]</h2><p>@Summary</p></div>
+        <span class="audit-safety">@Localizer["Metadata only"]</span>
     </div>
 
     @if (Busy && Items.Count == 0)
     {
-        <div class="page-state"><RadzenProgressBar Mode="ProgressBarMode.Indeterminate" /><p>Loading audit events…</p></div>
+        <div class="page-state"><RadzenProgressBar Mode="ProgressBarMode.Indeterminate" /><p>@Localizer["Loading audit events…"]</p></div>
     }
     else if (Error is not null)
     {
-        <div class="page-state error"><RadzenIcon Icon="error_outline" /><p>@Error</p><button type="button" @onclick="LoadAsync">Try again</button></div>
+        <div class="page-state error"><RadzenIcon Icon="error_outline" /><p>@Error</p><button type="button" @onclick="LoadAsync">@Localizer["Try again"]</button></div>
     }
     else if (Items.Count == 0)
     {
-        <div class="page-state"><RadzenIcon Icon="policy" /><h3>No matching audit events</h3><p>Adjust the filters or return after an audited action has completed.</p></div>
+        <div class="page-state"><RadzenIcon Icon="policy" /><h3>@Localizer["No matching audit events"]</h3><p>@Localizer["Adjust the filters or return after an audited action has completed."]</p></div>
     }
     else
     {
         <div class="table-scroll">
             <table class="activity-table audit-table">
-                <thead><tr><th>When</th><th>Actor</th><th>Action</th><th>Resource</th><th>Source</th><th>Outcome</th><th></th></tr></thead>
+                <thead><tr><th>@Localizer["When"]</th><th>@Localizer["Actor"]</th><th>@Localizer["Action"]</th><th>@Localizer["Resource"]</th><th>@Localizer["Source"]</th><th>@Localizer["Outcome"]</th><th></th></tr></thead>
                 <tbody>
                     @foreach (var item in Items)
                     {
@@ -55,17 +55,17 @@
                             <td><strong>@item.ResourceType</strong><small>@ShortIdentifier(item.ResourceIdentifier)</small></td>
                             <td class="muted">@item.Source</td>
                             <td><span class="status-chip @OutcomeCss(item.Outcome)">@item.Outcome</span></td>
-                            <td><button class="audit-link" type="button" @onclick="() => SelectAsync(item.Id)">Details</button></td>
+                            <td><button class="audit-link" type="button" @onclick="() => SelectAsync(item.Id)">@Localizer["Details"]</button></td>
                         </tr>
                     }
                 </tbody>
             </table>
         </div>
-        <div class="audit-pager" aria-label="Audit pagination">
-            <span>Page @CurrentPage of @PageCount</span>
+        <div class="audit-pager" aria-label='@Localizer["Audit pagination"]'>
+            <span>@Localizer["Page {0} of {1}", CurrentPage, PageCount]</span>
             <div>
-                <button type="button" disabled="@(Busy || Offset == 0)" @onclick="PreviousAsync">Previous</button>
-                <button type="button" disabled="@(Busy || Offset + PageSize >= TotalCount)" @onclick="NextAsync">Next</button>
+                <button type="button" disabled="@(Busy || Offset == 0)" @onclick="PreviousAsync">@Localizer["Previous"]</button>
+                <button type="button" disabled="@(Busy || Offset + PageSize >= TotalCount)" @onclick="NextAsync">@Localizer["Next"]</button>
             </div>
         </div>
     }
@@ -73,21 +73,21 @@
 
 @if (Selected is not null)
 {
-    <section class="panel audit-detail" aria-label="Audit event details">
+    <section class="panel audit-detail" aria-label='@Localizer["Audit event details"]'>
         <div class="panel-head">
             <div><h2>@Selected.Action</h2><p>@Selected.Id</p></div>
             <span class="status-chip @OutcomeCss(Selected.Outcome)">@Selected.Outcome</span>
         </div>
         <div class="audit-detail-grid">
-            <dl><dt>Occurred</dt><dd>@Selected.OccurredAtUtc.ToLocalTime().ToString("O")</dd></dl>
-            <dl><dt>Actor</dt><dd>@Selected.ActorIdentifier <small>@Selected.ActorKind</small></dd></dl>
-            <dl><dt>Source host</dt><dd>@Selected.Source</dd></dl>
-            <dl><dt>Resource type</dt><dd>@Selected.ResourceType</dd></dl>
-            <dl><dt>Resource identifier</dt><dd>@(Selected.ResourceIdentifier ?? "—")</dd></dl>
-            <dl><dt>Correlation identifier</dt><dd>@(Selected.CorrelationIdentifier ?? "—")</dd></dl>
+            <dl><dt>@Localizer["Occurred"]</dt><dd>@Selected.OccurredAtUtc.ToLocalTime().ToString("O")</dd></dl>
+            <dl><dt>@Localizer["Actor"]</dt><dd>@Selected.ActorIdentifier <small>@Selected.ActorKind</small></dd></dl>
+            <dl><dt>@Localizer["Source host"]</dt><dd>@Selected.Source</dd></dl>
+            <dl><dt>@Localizer["Resource type"]</dt><dd>@Selected.ResourceType</dd></dl>
+            <dl><dt>@Localizer["Resource identifier"]</dt><dd>@(Selected.ResourceIdentifier ?? "—")</dd></dl>
+            <dl><dt>@Localizer["Correlation identifier"]</dt><dd>@(Selected.CorrelationIdentifier ?? "—")</dd></dl>
         </div>
         <p class="audit-boundary">
-            Audit records intentionally contain stable identifiers and outcomes only. Configuration, SQL, paths, headers, tokens, row values, and request or response bodies are not stored here.
+            @Localizer["Audit records intentionally contain stable identifiers and outcomes only. Configuration, SQL, paths, headers, tokens, row values, and request or response bodies are not stored here."]
         </p>
     </section>
 }
@@ -111,7 +111,7 @@
 
     private int CurrentPage => TotalCount == 0 ? 1 : (Offset / PageSize) + 1;
     private int PageCount => Math.Max(1, (int)Math.Ceiling(TotalCount / (double)PageSize));
-    private string Summary => $"{TotalCount:N0} matching events · newest first";
+    private string Summary => Localizer["{0:N0} matching events · newest first", TotalCount];
 
     protected override Task OnInitializedAsync() => LoadAsync();
 

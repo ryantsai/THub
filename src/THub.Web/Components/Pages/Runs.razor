@@ -10,47 +10,47 @@
 @inject NotificationService Notifications
 @inject AccessControlEvaluator AccessControl
 
-<PageTitle>Runs · THub</PageTitle>
+<PageTitle>@Localizer["Runs · THub"]</PageTitle>
 
 <div class="page-heading">
     <div>
-        <div class="eyebrow">Build and run</div>
-        <h1>Run history</h1>
-        <p>See what ran, whether it worked, and where to look when something needs attention.</p>
+        <div class="eyebrow">@Localizer["Build and run"]</div>
+        <h1>@Localizer["Run history"]</h1>
+        <p>@Localizer["See what ran, whether it worked, and where to look when something needs attention."]</p>
     </div>
     <div class="heading-actions">
         <RadzenDropDown TValue="WorkflowRunStatus?" Data="@StatusOptions" TextProperty="Label" ValueProperty="Value"
                         @bind-Value="StatusFilter" Change="@(_ => LoadAsync())" Placeholder="All statuses" AllowClear="true" />
-        <RadzenButton Text="Refresh" Icon="refresh" ButtonStyle="ButtonStyle.Light" Click="@LoadAsync" Disabled="@Busy" />
+        <RadzenButton Text='@Localizer["Refresh"]' Icon="refresh" ButtonStyle="ButtonStyle.Light" Click="@LoadAsync" Disabled="@Busy" />
     </div>
 </div>
 
 <section class="panel">
     <div class="panel-head">
-        <div><h2>Latest runs</h2><p>@Summary</p></div>
+        <div><h2>@Localizer["Latest runs"]</h2><p>@Summary</p></div>
         @if (Items.Any(run => run.Status is WorkflowRunStatus.Queued or WorkflowRunStatus.Running))
         {
-            <span class="status-chip running">Active work</span>
+            <span class="status-chip running">@Localizer["Active work"]</span>
         }
     </div>
 
     @if (Busy && Items.Count == 0)
     {
-        <div class="page-state"><RadzenProgressBar Mode="ProgressBarMode.Indeterminate" /><p>Loading runs…</p></div>
+        <div class="page-state"><RadzenProgressBar Mode="ProgressBarMode.Indeterminate" /><p>@Localizer["Loading runs…"]</p></div>
     }
     else if (Error is not null)
     {
-        <div class="page-state error"><RadzenIcon Icon="error_outline" /><p>@Error</p><button type="button" @onclick="LoadAsync">Try again</button></div>
+        <div class="page-state error"><RadzenIcon Icon="error_outline" /><p>@Error</p><button type="button" @onclick="LoadAsync">@Localizer["Try again"]</button></div>
     }
     else if (Items.Count == 0)
     {
-        <div class="page-state"><RadzenIcon Icon="history" /><h3>No runs yet</h3><p>Publish a workflow, then choose Run now or add a schedule.</p></div>
+        <div class="page-state"><RadzenIcon Icon="history" /><h3>@Localizer["No runs yet"]</h3><p>@Localizer["Publish a workflow, then choose Run now or add a schedule."]</p></div>
     }
     else
     {
         <div class="table-scroll">
             <table class="activity-table run-table">
-                <thead><tr><th>Workflow</th><th>Status</th><th>Version</th><th>Queued</th><th>Duration</th><th>Trigger</th><th></th></tr></thead>
+                <thead><tr><th>@Localizer["Workflow"]</th><th>@Localizer["Status"]</th><th>@Localizer["Version"]</th><th>@Localizer["Queued"]</th><th>@Localizer["Duration"]</th><th>@Localizer["Trigger"]</th><th></th></tr></thead>
                 <tbody>
                     @foreach (var run in Items)
                     {
@@ -62,7 +62,7 @@
                             <td class="duration">@FormatDuration(run.StartedAtUtc, run.CompletedAtUtc)</td>
                             <td class="muted">@run.TriggeredBy</td>
                             <td class="run-actions">
-                                <button type="button" @onclick="() => SelectAsync(run.Id)">Details</button>
+                                <button type="button" @onclick="() => SelectAsync(run.Id)">@Localizer["Details"]</button>
                                 @if (ExecutableRuns.Contains(run.Id))
                                 {
                                     @if (run.Status is WorkflowRunStatus.Queued or WorkflowRunStatus.Running)
@@ -71,7 +71,7 @@
                                     }
                                     else if (run.Status == WorkflowRunStatus.Failed)
                                     {
-                                        <button type="button" disabled="@Busy" @onclick="() => RetryAsync(run.Id)">Retry exact version</button>
+                                        <button type="button" disabled="@Busy" @onclick="() => RetryAsync(run.Id)">@Localizer["Retry exact version"]</button>
                                     }
                                 }
                             </td>
@@ -85,16 +85,16 @@
 
 @if (Selected is not null)
 {
-    <section class="panel run-detail" aria-label="Run details">
+    <section class="panel run-detail" aria-label='@Localizer["Run details"]'>
         <div class="panel-head">
             <div><h2>@Selected.WorkflowName · v@(Selected.WorkflowVersion)</h2><p>@Selected.Id</p></div>
             <span class="status-chip @StatusCss(Selected.Status)">@Selected.Status</span>
         </div>
         <div class="detail-grid">
-            <dl><dt>Queued</dt><dd>@Selected.QueuedAtUtc.ToLocalTime().ToString("G")</dd></dl>
-            <dl><dt>Started</dt><dd>@(Selected.StartedAtUtc?.ToLocalTime().ToString("G") ?? "—")</dd></dl>
-            <dl><dt>Completed</dt><dd>@(Selected.CompletedAtUtc?.ToLocalTime().ToString("G") ?? "—")</dd></dl>
-            <dl><dt>Worker lease</dt><dd>@(Selected.LeaseOwner ?? "—")</dd></dl>
+            <dl><dt>@Localizer["Queued"]</dt><dd>@Selected.QueuedAtUtc.ToLocalTime().ToString("G")</dd></dl>
+            <dl><dt>@Localizer["Started"]</dt><dd>@(Selected.StartedAtUtc?.ToLocalTime().ToString("G") ?? "—")</dd></dl>
+            <dl><dt>@Localizer["Completed"]</dt><dd>@(Selected.CompletedAtUtc?.ToLocalTime().ToString("G") ?? "—")</dd></dl>
+            <dl><dt>@Localizer["Worker lease"]</dt><dd>@(Selected.LeaseOwner ?? "—")</dd></dl>
         </div>
         @if (Selected.Error is not null)
         {
@@ -102,11 +102,11 @@
         }
         <div class="table-scroll">
             <table class="activity-table">
-                <thead><tr><th>Step</th><th>Attempt</th><th>Status</th><th>Rows read</th><th>Rows written</th><th>Batches</th><th>Error</th></tr></thead>
+                <thead><tr><th>@Localizer["Step"]</th><th>@Localizer["Attempt"]</th><th>@Localizer["Status"]</th><th>@Localizer["Rows read"]</th><th>@Localizer["Rows written"]</th><th>@Localizer["Batches"]</th><th>@Localizer["Error"]</th></tr></thead>
                 <tbody>
                     @if (Selected.Steps.Count == 0)
                     {
-                        <tr><td colspan="7" class="muted">No step attempts have been recorded.</td></tr>
+                        <tr><td colspan="7" class="muted">@Localizer["No step attempts have been recorded."]</td></tr>
                     }
                     else
                     {
@@ -136,7 +136,7 @@
         .Select(status => new StatusOption(status, status.ToString()))
         .ToArray();
 
-    private string Summary => $"{Items.Count} of the latest {Items.Count} shown";
+    private string Summary => Localizer["{0} of the latest {1} shown", Items.Count, Items.Count];
 
     protected override Task OnInitializedAsync() => LoadAsync();
 

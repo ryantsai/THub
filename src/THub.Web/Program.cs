@@ -1,4 +1,6 @@
+using System.Globalization;
 using Microsoft.AspNetCore.Authentication.Negotiate;
+using Microsoft.AspNetCore.Localization;
 using Radzen;
 using Serilog;
 using THub.Application;
@@ -20,6 +22,37 @@ try
 
     builder.Services.AddRazorComponents()
         .AddInteractiveServerComponents();
+    builder.Services.AddLocalization(options => options.ResourcesPath = "Resources");
+    builder.Services.Configure<RequestLocalizationOptions>(options =>
+    {
+        var supportedCultures = new[]
+        {
+            CultureInfo.GetCultureInfo("en"),
+            CultureInfo.GetCultureInfo("zh-TW")
+        };
+
+        options.DefaultRequestCulture = new RequestCulture("en");
+        options.SupportedCultures = supportedCultures;
+        options.SupportedUICultures = supportedCultures;
+        options.RequestCultureProviders =
+        [
+            new CookieRequestCultureProvider(),
+            new CustomRequestCultureProvider(context =>
+            {
+                var browserLanguages = context.Request.GetTypedHeaders().AcceptLanguage;
+                var preferredLanguage = browserLanguages?
+                    .OrderByDescending(language => language.Quality ?? 1)
+                    .Select(language => language.Value.Value)
+                    .FirstOrDefault();
+                var culture = preferredLanguage?
+                    .StartsWith("zh", StringComparison.OrdinalIgnoreCase) == true
+                    ? "zh-TW"
+                    : "en";
+
+                return Task.FromResult<ProviderCultureResult?>(new ProviderCultureResult(culture));
+            })
+        ];
+    });
     builder.Services.AddCascadingAuthenticationState();
     var useDevelopmentIdentity = builder.Environment.IsDevelopment()
         && builder.Configuration.GetValue<bool>("Authentication:DevelopmentBypass");
@@ -54,6 +87,7 @@ try
         StatusCodePageHandler.HandleAsync(statusCodeContext.HttpContext));
     app.UseHttpsRedirection();
     app.UseSerilogRequestLogging();
+    app.UseRequestLocalization();
     app.UseAuthentication();
     app.Use(async (context, next) =>
     {
@@ -68,6 +102,30 @@ try
 
     app.MapStaticAssets();
     app.MapHealthChecks("/healthz").AllowAnonymous();
+    app.MapGet("/culture/set", (HttpContext context, string culture, string? redirectUri) =>
+    {
+        var selectedCulture = string.Equals(culture, "zh-TW", StringComparison.OrdinalIgnoreCase)
+            ? "zh-TW"
+            : "en";
+        context.Response.Cookies.Append(
+            CookieRequestCultureProvider.DefaultCookieName,
+            CookieRequestCultureProvider.MakeCookieValue(new RequestCulture(selectedCulture)),
+            new CookieOptions
+            {
+                Expires = DateTimeOffset.UtcNow.AddYears(1),
+                HttpOnly = true,
+                IsEssential = true,
+                SameSite = SameSiteMode.Lax,
+                Secure = context.Request.IsHttps
+            });
+
+        var localRedirect = !string.IsNullOrWhiteSpace(redirectUri)
+            && redirectUri.StartsWith("/", StringComparison.Ordinal)
+            && !redirectUri.StartsWith("//", StringComparison.Ordinal)
+                ? redirectUri
+                : "/";
+        return Results.LocalRedirect(localRedirect);
+    }).AllowAnonymous();
     app.MapGet("/api/v1/runtime/status", () => Results.Ok(new
     {
         service = "THub.Web",

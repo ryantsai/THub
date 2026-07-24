@@ -18,7 +18,7 @@ Webhook calls and external executables run only through SQL-backed, role-granted
 
 | Area | Current implementation | Target direction |
 | --- | --- | --- |
-| Web | Global Interactive Server Blazor app, Radzen shell, Windows auth/RBAC, persisted workflow catalog/designer with live relational schema mapping, run controls/history, publication administration, bounded staged Spreadsheet editor, and authorized audit viewer | Retention and deeper live-run telemetry |
+| Web | Global Interactive Server Blazor app, Radzen shell, English/`zh-TW` localized UI with browser default and cookie preference, Windows auth/RBAC, persisted workflow catalog/designer with live relational schema mapping, run controls/history, publication administration, bounded staged Spreadsheet editor, and authorized audit viewer | Retention and deeper live-run telemetry |
 | Publications host | Separate managed-bearer ASP.NET Core host with bounded read-only `/schema` and `/rows` routes, Swagger/OpenAPI, atomic accepted-use metering, process-local admission, Problem Details, logging, and `/healthz` | Relational readiness/metrics and a gateway or distributed limiter before scale-out |
 | Worker | Windows Service host, persistent Quartz scheduling, atomic run claims/heartbeats/recovery, bounded graph execution, durable step attempts, Email-outbox dispatch, and claimed approved editor apply | Checkpoint/resume decisions, optional bounded spill, and expanded telemetry |
 | Database | `thub` control-plane schema including immutable workflow versions, leased runs/step attempts, Email, publication versions/tokens/grants/change sets, and append-only audit records plus `quartz` operational scheduler schema | Retention and capacity automation |
@@ -61,6 +61,8 @@ Responsibilities:
 - authenticate Windows users;
 - enforce permission policies at UI and endpoint boundaries;
 - render the Blazor/Radzen management experience;
+- resolve the supported `en` or `zh-TW` UI culture from the saved cookie or browser
+  language and render shared localized resources;
 - accept and validate workflow-management commands;
 - persist metadata through application/infrastructure services;
 - manage publication definitions, immutable versions, tokens, grants, staged edits, and approvals;

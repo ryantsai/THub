@@ -7,18 +7,18 @@
 @inject AuthenticationStateProvider AuthenticationStateProvider
 @inject NotificationService Notifications
 
-<PageTitle>Trusted actions · THub</PageTitle>
+<PageTitle>@Localizer["Trusted actions · THub"]</PageTitle>
 
 <div class="page-heading">
     <div>
-        <div class="eyebrow">Administration</div>
-        <h1>Trusted actions</h1>
-        <p>Approve fixed webhook destinations and executable definitions. Role grants control which workflow authors may select each action.</p>
+        <div class="eyebrow">@Localizer["Administration"]</div>
+        <h1>@Localizer["Trusted actions"]</h1>
+        <p>@Localizer["Approve fixed webhook destinations and executable definitions. Role grants control which workflow authors may select each action."]</p>
     </div>
     <div class="heading-actions">
-        <RadzenButton Text="New webhook" Icon="webhook" ButtonStyle="ButtonStyle.Primary" Click="@(() => StartCreate(TrustedActionKind.Webhook))" Disabled="@Busy" />
-        <RadzenButton Text="New executable" Icon="terminal" ButtonStyle="ButtonStyle.Light" Click="@(() => StartCreate(TrustedActionKind.Executable))" Disabled="@Busy" />
-        <RadzenButton Text="Refresh" Icon="refresh" ButtonStyle="ButtonStyle.Light" Click="@LoadAsync" Disabled="@Busy" />
+        <RadzenButton Text='@Localizer["New webhook"]' Icon="webhook" ButtonStyle="ButtonStyle.Primary" Click="@(() => StartCreate(TrustedActionKind.Webhook))" Disabled="@Busy" />
+        <RadzenButton Text='@Localizer["New executable"]' Icon="terminal" ButtonStyle="ButtonStyle.Light" Click="@(() => StartCreate(TrustedActionKind.Executable))" Disabled="@Busy" />
+        <RadzenButton Text='@Localizer["Refresh"]' Icon="refresh" ButtonStyle="ButtonStyle.Light" Click="@LoadAsync" Disabled="@Busy" />
     </div>
 </div>
 
@@ -28,9 +28,9 @@
 }
 
 <section class="panel">
-    <div class="panel-head"><div><h2>Approved definitions</h2><p>Use each resource ID when assigning <code>trusted-action.use</code> to a role.</p></div></div>
+    <div class="panel-head"><div><h2>@Localizer["Approved definitions"]</h2><p>@Localizer["Use each resource ID when assigning"] <code>@Localizer["trusted-action.use"]</code> @Localizer["to a role."]</p></div></div>
     <table class="activity-table">
-        <thead><tr><th>Name</th><th>Kind</th><th>Resource ID</th><th>Credential</th><th>Status</th><th></th></tr></thead>
+        <thead><tr><th>@Localizer["Name"]</th><th>@Localizer["Kind"]</th><th>@Localizer["Resource ID"]</th><th>@Localizer["Credential"]</th><th>@Localizer["Status"]</th><th></th></tr></thead>
         <tbody>
             @foreach (var action in Actions)
             {
@@ -40,7 +40,7 @@
                     <td><code>@action.Id</code></td>
                     <td>@(action.HasStoredCredential ? "Stored encrypted" : "Worker identity / none")</td>
                     <td>@(action.IsEnabled ? "Enabled" : "Disabled")</td>
-                    <td><button type="button" @onclick="() => EditAsync(action.Id)">Manage</button></td>
+                    <td><button type="button" @onclick="() => EditAsync(action.Id)">@Localizer["Manage"]</button></td>
                 </tr>
             }
         </tbody>
@@ -51,29 +51,29 @@
 {
     <section class="panel">
         <div class="panel-head">
-            <div><h2>@(Editor.Id is null ? $"New {Editor.Kind}" : Editor.Name)</h2><p>Definitions and credentials are visible only to System Administrators. Passwords are replacement-only and never read back.</p></div>
+            <div><h2>@(Editor.Id is null ? $"New {Editor.Kind}" : Editor.Name)</h2><p>@Localizer["Definitions and credentials are visible only to System Administrators. Passwords are replacement-only and never read back."]</p></div>
             <button class="icon-close" type="button" @onclick="CloseEditor">×</button>
         </div>
 
         <div class="inline-form">
-            <label><span>Name</span><input maxlength="100" @bind="Editor.Name" /></label>
-            <label><span>Kind</span><input value="@Editor.Kind" disabled /></label>
-            <label><span>Credential reference</span><input maxlength="185" autocomplete="off" spellcheck="false" @bind="Editor.CredentialReference" /><small>Required for authenticated webhooks; optional run-as identity for executables.</small></label>
+            <label><span>@Localizer["Name"]</span><input maxlength="100" @bind="Editor.Name" /></label>
+            <label><span>@Localizer["Kind"]</span><input value="@Editor.Kind" disabled /></label>
+            <label><span>@Localizer["Credential reference"]</span><input maxlength="185" autocomplete="off" spellcheck="false" @bind="Editor.CredentialReference" /><small>@Localizer["Required for authenticated webhooks; optional run-as identity for executables."]</small></label>
         </div>
         <div class="inline-form">
-            <label><span>Replacement username</span><input maxlength="256" autocomplete="off" @bind="Editor.CredentialUserName" /><small>Use <code>DOMAIN\user</code> or a UPN for executable impersonation.</small></label>
-            <label><span>Replacement password</span><input type="password" maxlength="4096" autocomplete="new-password" @bind="Editor.CredentialPassword" /></label>
+            <label><span>@Localizer["Replacement username"]</span><input maxlength="256" autocomplete="off" @bind="Editor.CredentialUserName" /><small>@Localizer["Use"] <code>@Localizer["DOMAIN\\user"]</code> @Localizer["or a UPN for executable impersonation."]</small></label>
+            <label><span>@Localizer["Replacement password"]</span><input type="password" maxlength="4096" autocomplete="new-password" @bind="Editor.CredentialPassword" /></label>
         </div>
         <label>Definition JSON
             <textarea class="settings-json" rows="18" spellcheck="false" @bind="Editor.DefinitionJson"></textarea>
         </label>
-        <small class="property-help">Executable arguments are passed with <code>ArgumentList</code>, never a shell. Supported placeholders: <code>{runId}</code>, <code>{nodeId}</code>, <code>{attempt}</code>, <code>{inputRowCount}</code>.</small>
+        <small class="property-help">@Localizer["Executable arguments are passed with"] <code>@Localizer["ArgumentList"]</code>@Localizer[", never a shell. Supported placeholders:"] <code>{runId}</code>, <code>{nodeId}</code>, <code>{attempt}</code>, <code>{inputRowCount}</code>.</small>
         <div class="form-actions">
             @if (Editor.Id is not null)
             {
                 <RadzenButton Text="@(Editor.IsEnabled ? "Disable" : "Enable")" Icon="power_settings_new" ButtonStyle="@(Editor.IsEnabled ? ButtonStyle.Danger : ButtonStyle.Success)" Click="@ToggleAsync" Disabled="@Busy" />
             }
-            <RadzenButton Text="Save" Icon="save" ButtonStyle="ButtonStyle.Primary" Click="@SaveAsync" Disabled="@Busy" />
+            <RadzenButton Text='@Localizer["Save"]' Icon="save" ButtonStyle="ButtonStyle.Primary" Click="@SaveAsync" Disabled="@Busy" />
         </div>
     </section>
 }

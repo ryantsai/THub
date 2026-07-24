@@ -27,35 +27,35 @@
 @inject NavigationManager Navigation
 @inject AccessControlEvaluator AccessControl
 
-<PageTitle>@WorkflowName · THub designer</PageTitle>
+<PageTitle>@Localizer["{0} · THub designer", WorkflowName]</PageTitle>
 
 <div class="designer-heading">
     <div class="designer-breadcrumb">
-        <a href="/workflows">Workflows</a><span>/</span>
-        <input aria-label="Workflow name" @bind="WorkflowName" disabled="@Busy" />
+        <a href="/workflows">@Localizer["Workflows"]</a><span>/</span>
+        <input aria-label='@Localizer["Workflow name"]' @bind="WorkflowName" disabled="@Busy" />
     </div>
     <div class="designer-actions">
         <span class="draft-state"><i></i>@StatusText</span>
-        <RadzenButton Text="Check workflow" Icon="fact_check" ButtonStyle="ButtonStyle.Light" Size="ButtonSize.Small" Click="@Validate" Disabled="@Busy" />
-        <RadzenButton Text="Save" Icon="save" ButtonStyle="ButtonStyle.Primary" Size="ButtonSize.Small" Click="@SaveDraftAsync" Disabled="@(Busy || !CanEdit)" />
-        <RadzenButton Text="Publish" Icon="rocket_launch" ButtonStyle="ButtonStyle.Success" Size="ButtonSize.Small" Click="@PublishAsync" Disabled="@(Busy || !CanPublish)" />
+        <RadzenButton Text='@Localizer["Check workflow"]' Icon="fact_check" ButtonStyle="ButtonStyle.Light" Size="ButtonSize.Small" Click="@Validate" Disabled="@Busy" />
+        <RadzenButton Text='@Localizer["Save"]' Icon="save" ButtonStyle="ButtonStyle.Primary" Size="ButtonSize.Small" Click="@SaveDraftAsync" Disabled="@(Busy || !CanEdit)" />
+        <RadzenButton Text='@Localizer["Publish"]' Icon="rocket_launch" ButtonStyle="ButtonStyle.Success" Size="ButtonSize.Small" Click="@PublishAsync" Disabled="@(Busy || !CanPublish)" />
     </div>
 </div>
 
 @if (Loading)
 {
-    <div class="page-state"><RadzenProgressBar Mode="ProgressBarMode.Indeterminate" /><p>Loading the workflow…</p></div>
+    <div class="page-state"><RadzenProgressBar Mode="ProgressBarMode.Indeterminate" /><p>@Localizer["Loading the workflow…"]</p></div>
 }
 else if (LoadError is not null)
 {
-    <div class="page-state error"><RadzenIcon Icon="error_outline" /><h3>Workflow unavailable</h3><p>@LoadError</p><a href="/workflows">Return to workflows</a></div>
+    <div class="page-state error"><RadzenIcon Icon="error_outline" /><h3>@Localizer["Workflow unavailable"]</h3><p>@LoadError</p><a href="/workflows">@Localizer["Return to workflows"]</a></div>
 }
 else
 {
     <div class="designer-shell">
         <aside class="node-palette">
-            <div class="palette-head"><strong>Add a step</strong><small>Choose what should happen next</small></div>
-            <div class="palette-search"><RadzenIcon Icon="search" /><input aria-label="Find a step" placeholder="Find a step…" @bind="Search" /></div>
+            <div class="palette-head"><strong>@Localizer["Add a step"]</strong><small>@Localizer["Choose what should happen next"]</small></div>
+            <div class="palette-search"><RadzenIcon Icon="search" /><input aria-label='@Localizer["Find a step"]' placeholder='@Localizer["Find a step…"]' @bind="Search" /></div>
             @foreach (var group in FilteredGroups)
             {
                 <section class="palette-group">
@@ -74,9 +74,9 @@ else
 
         <section class="workflow-canvas" @onclick="ClearSelection">
             <div class="canvas-toolbar">
-                <button type="button" title="Fit workflow" @onclick:stopPropagation @onclick="FitWorkflow"><RadzenIcon Icon="fit_screen" /></button>
+                <button type="button" title='@Localizer["Fit workflow"]' @onclick:stopPropagation @onclick="FitWorkflow"><RadzenIcon Icon="fit_screen" /></button>
                 <span></span>
-                <small>@Nodes.Count steps · @Edges.Count links</small>
+                <small>@Localizer["{0} steps · {1} links", Nodes.Count, Edges.Count]</small>
             </div>
 
             <svg class="edge-layer" aria-hidden="true">
@@ -100,35 +100,35 @@ else
 
             @if (Nodes.Count == 0)
             {
-                <div class="canvas-empty"><RadzenIcon Icon="account_tree" /><strong>Start with a source</strong><span>Add a database, local file, or FTP source from the left panel.</span></div>
+                <div class="canvas-empty"><RadzenIcon Icon="account_tree" /><strong>@Localizer["Start with a source"]</strong><span>@Localizer["Add a database, local file, or FTP source from the left panel."]</span></div>
             }
-            <div class="canvas-hint"><RadzenIcon Icon="lightbulb" /><span>Tip: start with a source, add the steps in order, then use Check workflow before publishing.</span></div>
+            <div class="canvas-hint"><RadzenIcon Icon="lightbulb" /><span>@Localizer["Tip: start with a source, add the steps in order, then use Check workflow before publishing."]</span></div>
         </section>
 
         <aside class="properties-panel">
-            <div class="properties-head"><div><strong>Workflow settings</strong><small>@StatusText</small></div></div>
+            <div class="properties-head"><div><strong>@Localizer["Workflow settings"]</strong><small>@StatusText</small></div></div>
             <div class="properties-body workflow-properties">
-                <label>What does this workflow do?<textarea rows="2" @bind="Description" disabled="@Busy"></textarea></label>
+                <label>@Localizer["What does this workflow do?"]<textarea rows="2" @bind="Description" disabled="@Busy"></textarea></label>
                 <details class="workflow-values">
-                    <summary><RadzenIcon Icon="schedule" /> Run automatically (optional)</summary>
-                    <label>Schedule<input placeholder="For example: 0 8 * * 1-5" @bind="CronExpression" disabled="@Busy" /><small>Uses a five-part cron schedule. Leave empty to run only when you choose Run now.</small></label>
-                    <label>Time zone<input @bind="TimeZoneId" disabled="@Busy" /></label>
+                    <summary><RadzenIcon Icon="schedule" /> @Localizer["Run automatically (optional)"]</summary>
+                    <label>@Localizer["Schedule"]<input placeholder='@Localizer["For example: 0 8 * * 1-5"]' @bind="CronExpression" disabled="@Busy" /><small>@Localizer["Uses a five-part cron schedule. Leave empty to run only when you choose Run now."]</small></label>
+                    <label>@Localizer["Time zone"]<input @bind="TimeZoneId" disabled="@Busy" /></label>
                 </details>
                 <details class="workflow-values">
-                    <summary><RadzenIcon Icon="data_object" /> Variables &amp; functions</summary>
+                    <summary><RadzenIcon Icon="data_object" /> @Localizer["Variables & functions"]</summary>
                     <div class="built-in-values">
-                        <strong>Run values</strong>
-                        <code>runId</code><code>runStartedAtUtc</code><code>utcToday</code>
+                        <strong>@Localizer["Run values"]</strong>
+                        <code>@Localizer["runId"]</code><code>@Localizer["runStartedAtUtc"]</code><code>@Localizer["utcToday"]</code>
                     </div>
                     <div class="value-editor-head">
-                        <strong>Global variables</strong>
-                        <button type="button" @onclick="AddVariable"><RadzenIcon Icon="add" /> Add</button>
+                        <strong>@Localizer["Global variables"]</strong>
+                        <button type="button" @onclick="AddVariable"><RadzenIcon Icon="add" /> @Localizer["Add"]</button>
                     </div>
                     @foreach (var variable in Variables)
                     {
                         <div class="value-editor-card">
                             <div class="value-editor-row">
-                                <label>Name<input value="@variable.Name" @onchange="eventArgs => SetVariableName(variable, eventArgs)" /></label>
+                                <label>@Localizer["Name"]<input value="@variable.Name" @onchange="eventArgs => SetVariableName(variable, eventArgs)" /></label>
                                 <label>Source
                                     <select value="@variable.Kind.ToString()" @onchange="eventArgs => SetVariableKind(variable, eventArgs)">
                                         @foreach (var kind in Enum.GetValues<WorkflowVariableKind>())
@@ -149,13 +149,13 @@ else
                             </label>
                             @if (variable.Kind == WorkflowVariableKind.Literal)
                             {
-                                <label>Value<input value="@variable.Value" @onchange="eventArgs => variable.Value = eventArgs.Value?.ToString() ?? string.Empty" /></label>
+                                <label>@Localizer["Value"]<input value="@variable.Value" @onchange="eventArgs => variable.Value = eventArgs.Value?.ToString() ?? string.Empty" /></label>
                             }
                             else
                             {
                                 <label>Approved database connection
                                     <select value="@variable.ConnectionId" @onchange="eventArgs => SetVariableConnection(variable, eventArgs)">
-                                        <option value="">Select a relational connection…</option>
+                                        <option value="">@Localizer["Select a relational connection…"]</option>
                                         @foreach (var connection in Connections.Where(connection => connection.IsEnabled && IsRelationalConnection(connection.Kind)))
                                         {
                                             <option value="@connection.Id.ToString("D")">@connection.Name · @ConnectionKindLabel(connection.Kind)</option>
@@ -163,10 +163,10 @@ else
                                     </select>
                                 </label>
                                 <div class="schema-object-fields">
-                                    <label>Schema<input value="@variable.Schema" @onchange="eventArgs => SetVariableText(variable, nameof(variable.Schema), eventArgs)" /></label>
-                                    <label>Table or view<input value="@variable.Object" @onchange="eventArgs => SetVariableText(variable, nameof(variable.Object), eventArgs)" /></label>
+                                    <label>@Localizer["Schema"]<input value="@variable.Schema" @onchange="eventArgs => SetVariableText(variable, nameof(variable.Schema), eventArgs)" /></label>
+                                    <label>@Localizer["Table or view"]<input value="@variable.Object" @onchange="eventArgs => SetVariableText(variable, nameof(variable.Object), eventArgs)" /></label>
                                 </div>
-                                <button class="lookup-schema-button" type="button" disabled="@SchemaBusy" @onclick="() => LoadVariableSchemaAsync(variable)"><RadzenIcon Icon="schema" /> Open lookup schema</button>
+                                <button class="lookup-schema-button" type="button" disabled="@SchemaBusy" @onclick="() => LoadVariableSchemaAsync(variable)"><RadzenIcon Icon="schema" /> @Localizer["Open lookup schema"]</button>
                                 @if (variable.Error is not null)
                                 {
                                     <div class="schema-message error" role="alert">@variable.Error</div>
@@ -176,7 +176,7 @@ else
                                     <div class="lookup-columns">
                                         <label>Value column
                                             <select value="@variable.ValueColumn" @onchange="eventArgs => variable.ValueColumn = eventArgs.Value?.ToString() ?? string.Empty">
-                                                <option value="">Select column…</option>
+                                                <option value="">@Localizer["Select column…"]</option>
                                                 @foreach (var column in lookupSchema.Columns)
                                                 {
                                                     <option value="@column.Name">@column.Name · @column.DataType</option>
@@ -185,7 +185,7 @@ else
                                         </label>
                                         <label>Filter column
                                             <select value="@variable.FilterColumn" @onchange="eventArgs => variable.FilterColumn = eventArgs.Value?.ToString() ?? string.Empty">
-                                                <option value="">Select column…</option>
+                                                <option value="">@Localizer["Select column…"]</option>
                                                 @foreach (var column in lookupSchema.Columns)
                                                 {
                                                     <option value="@column.Name">@column.Name · @column.DataType</option>
@@ -197,29 +197,29 @@ else
                                 else
                                 {
                                     <div class="lookup-columns">
-                                        <label>Value column<input value="@variable.ValueColumn" @onchange="eventArgs => variable.ValueColumn = eventArgs.Value?.ToString() ?? string.Empty" /></label>
-                                        <label>Filter column<input value="@variable.FilterColumn" @onchange="eventArgs => variable.FilterColumn = eventArgs.Value?.ToString() ?? string.Empty" /></label>
+                                        <label>@Localizer["Value column"]<input value="@variable.ValueColumn" @onchange="eventArgs => variable.ValueColumn = eventArgs.Value?.ToString() ?? string.Empty" /></label>
+                                        <label>@Localizer["Filter column"]<input value="@variable.FilterColumn" @onchange="eventArgs => variable.FilterColumn = eventArgs.Value?.ToString() ?? string.Empty" /></label>
                                     </div>
                                 }
-                                <label>Filter value<input value="@variable.FilterValue" @onchange="eventArgs => variable.FilterValue = eventArgs.Value?.ToString() ?? string.Empty" /></label>
-                                <small>The lookup must return exactly one scalar row. Object names are quoted and the filter value is parameterized.</small>
+                                <label>@Localizer["Filter value"]<input value="@variable.FilterValue" @onchange="eventArgs => variable.FilterValue = eventArgs.Value?.ToString() ?? string.Empty" /></label>
+                                <small>@Localizer["The lookup must return exactly one scalar row. Object names are quoted and the filter value is parameterized."]</small>
                             }
                         </div>
                     }
                     <div class="value-editor-head">
-                        <strong>JavaScript functions</strong>
-                        <button type="button" @onclick="AddFunction"><RadzenIcon Icon="add" /> Add</button>
+                        <strong>@Localizer["JavaScript functions"]</strong>
+                        <button type="button" @onclick="AddFunction"><RadzenIcon Icon="add" /> @Localizer["Add"]</button>
                     </div>
                     @foreach (var function in Functions)
                     {
                         <div class="value-editor-card">
                             <div class="value-editor-row">
-                                <label>Name<input value="@function.Name" @onchange="eventArgs => function.Name = eventArgs.Value?.ToString() ?? string.Empty" /></label>
-                                <label>Parameters<input placeholder="value, prefix" value="@function.Parameters" @onchange="eventArgs => function.Parameters = eventArgs.Value?.ToString() ?? string.Empty" /></label>
+                                <label>@Localizer["Name"]<input value="@function.Name" @onchange="eventArgs => function.Name = eventArgs.Value?.ToString() ?? string.Empty" /></label>
+                                <label>@Localizer["Parameters"]<input placeholder='@Localizer["value, prefix"]' value="@function.Parameters" @onchange="eventArgs => function.Parameters = eventArgs.Value?.ToString() ?? string.Empty" /></label>
                                 <button type="button" aria-label="Delete function @function.Name" @onclick="() => Functions.Remove(function)"><RadzenIcon Icon="delete_outline" /></button>
                             </div>
-                            <label>Return expression<input placeholder="String(value).trim()" value="@function.Expression" @onchange="eventArgs => function.Expression = eventArgs.Value?.ToString() ?? string.Empty" /></label>
-                            <small>Expression-only JavaScript. No CLR, filesystem, network, module, or dynamic code access.</small>
+                            <label>@Localizer["Return expression"]<input placeholder='@Localizer["String(value).trim()"]' value="@function.Expression" @onchange="eventArgs => function.Expression = eventArgs.Value?.ToString() ?? string.Empty" /></label>
+                            <small>@Localizer["Expression-only JavaScript. No CLR, filesystem, network, module, or dynamic code access."]</small>
                         </div>
                     }
                 </details>
@@ -229,15 +229,15 @@ else
             {
                 <div class="empty-properties">
                     <span><RadzenIcon Icon="tune" /></span>
-                    <h3>Nothing selected</h3>
-                                <p>Select a step to configure its data operation and incoming links.</p>
+                    <h3>@Localizer["Nothing selected"]</h3>
+                                <p>@Localizer["Select a step to configure its data operation and incoming links."]</p>
                 </div>
             }
             else
             {
-                <div class="properties-head"><div><strong>@SelectedNode.Name</strong><small>@SelectedNode.Kind</small></div><button type="button" @onclick="DeleteSelected" aria-label="Delete node"><RadzenIcon Icon="delete_outline" /></button></div>
+                <div class="properties-head"><div><strong>@SelectedNode.Name</strong><small>@SelectedNode.Kind</small></div><button type="button" @onclick="DeleteSelected" aria-label='@Localizer["Delete node"]'><RadzenIcon Icon="delete_outline" /></button></div>
                 <div class="properties-body">
-                    <label>Step name<input @bind="SelectedNode.Name" /></label>
+                    <label>@Localizer["Step name"]<input @bind="SelectedNode.Name" /></label>
                     @if (ExpectedConnectionKind(SelectedNode.Kind) is { } connectionKind)
                     {
                         <label>Approved connection
@@ -254,7 +254,7 @@ else
                     {
                         <label>Email delivery profile
                             <select value="@(GetSettingString(SelectedNode, "profileId"))" @onchange="SetSelectedEmailProfile">
-                                <option value="">Select an enabled profile…</option>
+                                <option value="">@Localizer["Select an enabled profile…"]</option>
                                 @foreach (var profile in EmailProfiles.Where(profile => profile.IsEnabled))
                                 {
                                     <option value="@profile.Id.ToString("D")">@profile.Name · @profile.SenderAddress</option>
@@ -269,7 +269,7 @@ else
                             : TrustedActionKind.Executable;
                         <label>Trusted action
                             <select value="@(GetSettingString(SelectedNode, "trustedActionId"))" @onchange="SetSelectedTrustedAction">
-                                <option value="">Select an authorized action…</option>
+                                <option value="">@Localizer["Select an authorized action…"]</option>
                                 @foreach (var action in TrustedActions.Where(action => action.Kind == trustedKind && action.IsEnabled))
                                 {
                                     <option value="@action.Id.ToString("D")">@action.Name</option>
@@ -279,11 +279,11 @@ else
                     }
                     @if (SelectedNode.Kind == WorkflowNodeKind.Join)
                     {
-                        <div class="join-input-summary"><span>Left input</span><code>@(GetSettingString(SelectedNode, "leftNodeId") ?? "Not connected")</code><span>Right input</span><code>@(GetSettingString(SelectedNode, "rightNodeId") ?? "Not connected")</code></div>
+                        <div class="join-input-summary"><span>@Localizer["Left input"]</span><code>@(GetSettingString(SelectedNode, "leftNodeId") ?? "Not connected")</code><span>@Localizer["Right input"]</span><code>@(GetSettingString(SelectedNode, "rightNodeId") ?? "Not connected")</code></div>
                     }
                     @if (IsRelationalNode(SelectedNode.Kind))
                     {
-                        <section class="schema-designer" aria-label="Database object schema">
+                        <section class="schema-designer" aria-label='@Localizer["Database object schema"]'>
                             <div class="schema-object-fields">
                                 <label>Schema
                                     <input value="@(GetSettingString(SelectedNode, "schema"))" @onchange="SetSchema" />
@@ -301,10 +301,10 @@ else
                             else
                             {
                                 <label>Write mode
-                                    <select aria-label="Database target write mode" value="@GetTargetMode(SelectedNode)" @onchange="SetTargetMode">
-                                        <option value="insert">Insert</option>
-                                        <option value="upsert" disabled="@(!CanTargetUpsert)">Upsert by primary key</option>
-                                        <option value="delete" disabled="@(!CanTargetDelete)">Delete incoming keys</option>
+                                    <select aria-label='@Localizer["Database target write mode"]' value="@GetTargetMode(SelectedNode)" @onchange="SetTargetMode">
+                                        <option value="insert">@Localizer["Insert"]</option>
+                                        <option value="upsert" disabled="@(!CanTargetUpsert)">@Localizer["Upsert by primary key"]</option>
+                                        <option value="delete" disabled="@(!CanTargetDelete)">@Localizer["Delete incoming keys"]</option>
                                     </select>
                                 </label>
                             }
@@ -312,7 +312,7 @@ else
                                 <button type="button" @onclick="LoadSelectedSchemaAsync" disabled="@SchemaBusy"><RadzenIcon Icon="schema" /> @(SchemaBusy ? "Loading…" : "Open schema")</button>
                                 @if (IsRelationalTarget(SelectedNode.Kind))
                                 {
-                                    <button type="button" @onclick="LoadMappingSchemasAsync" disabled="@SchemaBusy"><RadzenIcon Icon="account_tree" /> Load source + target</button>
+                                    <button type="button" @onclick="LoadMappingSchemasAsync" disabled="@SchemaBusy"><RadzenIcon Icon="account_tree" /> @Localizer["Load source + target"]</button>
                                 }
                             </div>
                             @if (SchemaError is not null)
@@ -324,11 +324,11 @@ else
                                 <div class="schema-browser">
                                     <div class="schema-browser-head">
                                         <div><strong>@selectedSchema.Schema.@selectedSchema.ObjectName</strong><span>@selectedSchema.Columns.Count columns</span></div>
-                                        <span class="schema-status">Live metadata</span>
+                                        <span class="schema-status">@Localizer["Live metadata"]</span>
                                     </div>
                                     @if (IsSource(SelectedNode.Kind))
                                     {
-                                        <div class="schema-column-list" aria-label="Source columns">
+                                        <div class="schema-column-list" aria-label='@Localizer["Source columns"]'>
                                             @foreach (var column in selectedSchema.Columns)
                                             {
                                                 <label class="schema-column">
@@ -342,7 +342,7 @@ else
                                     }
                                     else
                                     {
-                                        <div class="schema-column-list" aria-label="Target columns">
+                                        <div class="schema-column-list" aria-label='@Localizer["Target columns"]'>
                                             @foreach (var column in selectedSchema.Columns)
                                             {
                                                 <div class="schema-column @(column.IsWritable ? null : "locked")">
@@ -362,30 +362,30 @@ else
                                 GetMappingSourceNode(SelectedNode) is { } sourceNode &&
                                 GetLoadedSchema(sourceNode) is { } sourceSchema)
                             {
-                                <div class="mapping-designer" aria-label="Column mappings">
+                                <div class="mapping-designer" aria-label='@Localizer["Column mappings"]'>
                                     <div class="mapping-head">
-                                        <div><strong>Column mappings</strong><span>@sourceNode.Name → @SelectedNode.Name</span></div>
+                                        <div><strong>@Localizer["Column mappings"]</strong><span>@sourceNode.Name → @SelectedNode.Name</span></div>
                                         <div>
-                                            <button type="button" @onclick="AutoMapColumns"><RadzenIcon Icon="auto_fix_high" /> Match names</button>
-                                            <button type="button" @onclick="ClearMappings"><RadzenIcon Icon="clear_all" /> Clear</button>
+                                            <button type="button" @onclick="AutoMapColumns"><RadzenIcon Icon="auto_fix_high" /> @Localizer["Match names"]</button>
+                                            <button type="button" @onclick="ClearMappings"><RadzenIcon Icon="clear_all" /> @Localizer["Clear"]</button>
                                         </div>
                                     </div>
-                                    <div class="mapping-labels"><span>Destination</span><span>Value source</span><span>Value</span></div>
+                                    <div class="mapping-labels"><span>@Localizer["Destination"]</span><span>@Localizer["Value source"]</span><span>@Localizer["Value"]</span></div>
                                     @foreach (var targetColumn in GetMappableTargetColumns(SelectedNode, targetSchema))
                                     {
                                         var binding = GetBinding(SelectedNode, targetColumn.Name);
                                         <div class="mapping-row @(binding is null ? "unmapped" : "mapped")">
                                             <div class="mapping-column"><strong>@targetColumn.Name</strong><small>@targetColumn.DataType</small></div>
                                             <select aria-label="Value source for @targetColumn.Name" value="@(binding?.Kind.ToString() ?? string.Empty)" @onchange="eventArgs => SetBindingKind(targetColumn.Name, eventArgs)">
-                                                <option value="">Not mapped</option>
-                                                <option value="@WorkflowValueBindingKind.Column">Source column</option>
-                                                <option value="@WorkflowValueBindingKind.Variable">Variable</option>
-                                                <option value="@WorkflowValueBindingKind.JavaScript">JavaScript</option>
+                                                <option value="">@Localizer["Not mapped"]</option>
+                                                <option value="@WorkflowValueBindingKind.Column">@Localizer["Source column"]</option>
+                                                <option value="@WorkflowValueBindingKind.Variable">@Localizer["Variable"]</option>
+                                                <option value="@WorkflowValueBindingKind.JavaScript">@Localizer["JavaScript"]</option>
                                             </select>
                                             @if (binding?.Kind == WorkflowValueBindingKind.Column)
                                             {
                                                 <select aria-label="Source column for @targetColumn.Name" value="@binding.Value" @onchange="eventArgs => SetBindingValue(targetColumn.Name, eventArgs)">
-                                                    <option value="">Select column…</option>
+                                                    <option value="">@Localizer["Select column…"]</option>
                                                     @foreach (var sourceColumn in GetMappingSourceColumns(SelectedNode, sourceNode, sourceSchema))
                                                     {
                                                         <option value="@sourceColumn.Name">@sourceColumn.Name · @sourceColumn.DataType</option>
@@ -395,7 +395,7 @@ else
                                             else if (binding?.Kind == WorkflowValueBindingKind.Variable)
                                             {
                                                 <select aria-label="Variable for @targetColumn.Name" value="@binding.Value" @onchange="eventArgs => SetBindingValue(targetColumn.Name, eventArgs)">
-                                                    <option value="">Select variable…</option>
+                                                    <option value="">@Localizer["Select variable…"]</option>
                                                     @foreach (var variableName in AvailableVariableNames)
                                                     {
                                                         <option value="@variableName">@variableName</option>
@@ -408,7 +408,7 @@ else
                                             }
                                             else
                                             {
-                                                <span class="mapping-empty">Uses target default</span>
+                                                <span class="mapping-empty">@Localizer["Uses target default"]</span>
                                             }
                                         </div>
                                     }
@@ -416,17 +416,17 @@ else
                             }
                         </section>
                         <details class="advanced-settings">
-                            <summary><RadzenIcon Icon="data_object" /> Advanced settings JSON</summary>
-                            <label>Settings JSON<textarea class="settings-json" rows="11" spellcheck="false" @bind="SelectedNode.SettingsJson"></textarea></label>
-                            <button class="format-settings" type="button" @onclick="FormatSelectedSettings"><RadzenIcon Icon="data_object" /> Format JSON</button>
+                            <summary><RadzenIcon Icon="data_object" /> @Localizer["Advanced settings JSON"]</summary>
+                            <label>@Localizer["Settings JSON"]<textarea class="settings-json" rows="11" spellcheck="false" @bind="SelectedNode.SettingsJson"></textarea></label>
+                            <button class="format-settings" type="button" @onclick="FormatSelectedSettings"><RadzenIcon Icon="data_object" /> @Localizer["Format JSON"]</button>
                         </details>
                     }
                     else
                     {
-                        <label>Settings JSON<textarea class="settings-json" rows="11" spellcheck="false" @bind="SelectedNode.SettingsJson"></textarea></label>
-                        <button class="format-settings" type="button" @onclick="FormatSelectedSettings"><RadzenIcon Icon="data_object" /> Format JSON</button>
+                        <label>@Localizer["Settings JSON"]<textarea class="settings-json" rows="11" spellcheck="false" @bind="SelectedNode.SettingsJson"></textarea></label>
+                        <button class="format-settings" type="button" @onclick="FormatSelectedSettings"><RadzenIcon Icon="data_object" /> @Localizer["Format JSON"]</button>
                     }
-                    <small class="property-help">Settings are validated again at publication and execution boundaries. Connections and database objects must reference approved metadata.</small>
+                    <small class="property-help">@Localizer["Settings are validated again at publication and execution boundaries. Connections and database objects must reference approved metadata."]</small>
                     @if (DependencyWarning is not null)
                     {
                         <small class="property-help warning">@DependencyWarning Raw JSON editing remains available.</small>
@@ -434,16 +434,16 @@ else
 
                     @if (!IsSource(SelectedNode.Kind))
                     {
-                        <div class="property-section"><span>Incoming links</span></div>
+                        <div class="property-section"><span>@Localizer["Incoming links"]</span></div>
                         <div class="link-editor">
-                            <select aria-label="Connect from step" @bind="ConnectFromNodeId">
-                                <option value="">Select upstream step…</option>
+                            <select aria-label='@Localizer["Connect from step"]' @bind="ConnectFromNodeId">
+                                <option value="">@Localizer["Select upstream step…"]</option>
                                 @foreach (var candidate in Nodes.Where(candidate => candidate != SelectedNode))
                                 {
                                     <option value="@candidate.Id">@candidate.Name</option>
                                 }
                             </select>
-                            <button type="button" @onclick="ConnectSelected"><RadzenIcon Icon="add_link" /> Add</button>
+                            <button type="button" @onclick="ConnectSelected"><RadzenIcon Icon="add_link" /> @Localizer["Add"]</button>
                             @foreach (var edge in IncomingEdges)
                             {
                                 <div class="link-row"><span>@NodeName(edge.From)</span><button type="button" aria-label="Remove link from @NodeName(edge.From)" @onclick="() => RemoveEdge(edge)"><RadzenIcon Icon="close" /></button></div>
@@ -456,7 +456,7 @@ else
             @if (ValidationIssues.Count > 0)
             {
                 <div class="validation-panel" role="status">
-                    <strong>@ValidationIssues.Count validation issue@(ValidationIssues.Count == 1 ? "" : "s")</strong>
+                    <strong>@Localizer["{0} validation issues", ValidationIssues.Count]</strong>
                     @foreach (var issue in ValidationIssues.Take(8))
                     {
                         <button type="button" @onclick="() => SelectIssue(issue)"><span>@issue.Code</span>@issue.Message</button>

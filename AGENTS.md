@@ -41,6 +41,21 @@ on THub. It applies below the repository root unless a deeper `AGENTS.md` overri
 - If required authority, external coordination, or a material product choice is missing,
   stop and request direction instead of guessing.
 
+## UI localization
+
+- Every first-party UI addition or change must ship in both supported locales: English
+  (`en`) and Taiwan Traditional Chinese (`zh-TW`).
+- Use the shared localization resources and `IStringLocalizer`; do not hard-code new
+  user-facing text or rely on English fallback as the completed translation.
+- Localize visible text, titles, placeholders, validation and notification messages,
+  empty/error states, and accessibility labels. Keep user-entered values, identifiers,
+  paths, database metadata, and secrets unmodified.
+- Use placeholders for values rather than concatenating translated sentence fragments.
+- Use Taiwan terminology and punctuation. Do not add `zh-CN`, Simplified Chinese, or
+  Mainland China wording.
+- Keep the neutral resource, `SharedResource.zh-TW.resx`, and the post-render JSON mirror
+  synchronized as described in [docs/localization.md](docs/localization.md).
+
 ## Validation requires explicit user authorization
 
 - Never initiate a build, compile, restore, test run, browser/UI test, package audit, or

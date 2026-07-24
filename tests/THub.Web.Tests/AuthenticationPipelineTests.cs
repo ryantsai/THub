@@ -24,6 +24,44 @@ public sealed class AuthenticationPipelineTests
     }
 
     [Fact]
+    public async Task ChineseBrowserLanguageUsesTaiwanCultureWithoutPreferenceCookie()
+    {
+        await using var factory = CreateFactory(useDevelopmentIdentity: true);
+        using var client = factory.CreateClient(new WebApplicationFactoryClientOptions
+        {
+            AllowAutoRedirect = false
+        });
+        client.DefaultRequestHeaders.AcceptLanguage.ParseAdd("zh-CN,zh;q=0.9");
+
+        using var response = await client.GetAsync("/");
+        var content = await response.Content.ReadAsStringAsync();
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Contains("<html lang=\"zh-TW\">", content, StringComparison.Ordinal);
+        Assert.Contains("繁體中文（台灣）", content, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task CultureSelectionPersistsSupportedPreferenceAndRedirectsLocally()
+    {
+        await using var factory = CreateFactory(useDevelopmentIdentity: true);
+        using var client = factory.CreateClient(new WebApplicationFactoryClientOptions
+        {
+            AllowAutoRedirect = false,
+            HandleCookies = false
+        });
+
+        using var response = await client.GetAsync(
+            "/culture/set?culture=zh-TW&redirectUri=%2Fworkflows%3Fstatus%3Dactive");
+
+        Assert.Equal(HttpStatusCode.Redirect, response.StatusCode);
+        Assert.Equal("/workflows?status=active", response.Headers.Location?.OriginalString);
+        var cookie = Assert.Single(response.Headers.GetValues("Set-Cookie"));
+        Assert.Contains(".AspNetCore.Culture=", cookie, StringComparison.Ordinal);
+        Assert.Contains("zh-TW", cookie, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task UnauthorizedResponseIsNotRewrittenAsAnErrorPage()
     {
         var context = new DefaultHttpContext();

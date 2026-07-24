@@ -13,20 +13,20 @@
 @inject AccessControlEvaluator AccessControl
 @inject IJSRuntime JS
 
-<PageTitle>Workflows · THub</PageTitle>
+<PageTitle>@Localizer["Workflows · THub"]</PageTitle>
 
 <div class="page-heading">
     <div>
-        <div class="eyebrow">Build and run</div>
-        <h1>Workflows</h1>
-        <p>Build a repeatable series of steps that moves or changes your data.</p>
+        <div class="eyebrow">@Localizer["Build and run"]</div>
+        <h1>@Localizer["Workflows"]</h1>
+        <p>@Localizer["Build a repeatable series of steps that moves or changes your data."]</p>
     </div>
     @if (CanCreate)
     {
         <div class="heading-actions">
-            <RadzenButton Text="Import" Icon="upload_file" ButtonStyle="ButtonStyle.Light" Click="@OpenImportPickerAsync" />
+            <RadzenButton Text='@Localizer["Import"]' Icon="upload_file" ButtonStyle="ButtonStyle.Light" Click="@OpenImportPickerAsync" />
             <InputFile id="workflow-package-input" OnChange="@ImportAsync" accept=".json,.thub-workflow.json,application/json" hidden />
-            <RadzenButton Text="New workflow" Icon="add" ButtonStyle="ButtonStyle.Primary" Click="@NewWorkflow" />
+            <RadzenButton Text='@Localizer["New workflow"]' Icon="add" ButtonStyle="ButtonStyle.Primary" Click="@NewWorkflow" />
         </div>
     }
 </div>
@@ -34,29 +34,29 @@
 <section class="panel">
     <div class="panel-head">
         <div>
-            <h2>All workflows</h2>
+            <h2>@Localizer["All workflows"]</h2>
             <p>@Summary</p>
         </div>
-        <RadzenButton Text="Refresh" Icon="refresh" ButtonStyle="ButtonStyle.Light" Size="ButtonSize.Small" Click="@LoadAsync" Disabled="@Loading" />
+        <RadzenButton Text='@Localizer["Refresh"]' Icon="refresh" ButtonStyle="ButtonStyle.Light" Size="ButtonSize.Small" Click="@LoadAsync" Disabled="@Loading" />
     </div>
 
     @if (Loading)
     {
-        <div class="page-state"><RadzenProgressBar Mode="ProgressBarMode.Indeterminate" /><p>Loading workflows…</p></div>
+        <div class="page-state"><RadzenProgressBar Mode="ProgressBarMode.Indeterminate" /><p>@Localizer["Loading workflows…"]</p></div>
     }
     else if (Error is not null)
     {
-        <div class="page-state error"><RadzenIcon Icon="error_outline" /><p>@Error</p><button type="button" @onclick="LoadAsync">Try again</button></div>
+        <div class="page-state error"><RadzenIcon Icon="error_outline" /><p>@Error</p><button type="button" @onclick="LoadAsync">@Localizer["Try again"]</button></div>
     }
     else if (Items.Count == 0)
     {
-        <div class="page-state"><RadzenIcon Icon="account_tree" /><h3>No workflows yet</h3><p>Create a workflow, add its steps, check it for problems, then publish when it is ready to run.</p></div>
+        <div class="page-state"><RadzenIcon Icon="account_tree" /><h3>@Localizer["No workflows yet"]</h3><p>@Localizer["Create a workflow, add its steps, check it for problems, then publish when it is ready to run."]</p></div>
     }
     else
     {
         <div class="table-scroll">
             <table class="activity-table">
-                <thead><tr><th>Name</th><th>Status</th><th>Version</th><th>Schedule</th><th>Next run</th><th>Owner</th><th></th></tr></thead>
+                <thead><tr><th>@Localizer["Name"]</th><th>@Localizer["Status"]</th><th>@Localizer["Version"]</th><th>@Localizer["Schedule"]</th><th>@Localizer["Next run"]</th><th>@Localizer["Owner"]</th><th></th></tr></thead>
                 <tbody>
                     @foreach (var workflow in Items)
                     {
@@ -70,24 +70,24 @@
                             <td class="workflow-actions">
                                 @if (CanEdit.Contains(workflow.Id))
                                 {
-                                    <a href="@($"/designer/{workflow.Id}")" aria-label="Open @workflow.Name">Open</a>
+                                    <a href="@($"/designer/{workflow.Id}")" aria-label="Open @workflow.Name">@Localizer["Open"]</a>
                                 }
-                                <button type="button" disabled="@Loading" @onclick="() => ExportAsync(workflow.Id)">Export</button>
+                                <button type="button" disabled="@Loading" @onclick="() => ExportAsync(workflow.Id)">@Localizer["Export"]</button>
                                 @if (workflow.Status == THub.Domain.Workflows.WorkflowStatus.Published)
                                 {
                                     @if (CanExecute.Contains(workflow.Id))
                                     {
-                                        <button type="button" disabled="@Loading" @onclick="() => QueueAsync(workflow.Id)">Run now</button>
+                                        <button type="button" disabled="@Loading" @onclick="() => QueueAsync(workflow.Id)">@Localizer["Run now"]</button>
                                     }
                                 }
                                 @if (CanDelete.Contains(workflow.Id)
                                     && workflow.Status != THub.Domain.Workflows.WorkflowStatus.Archived)
                                 {
-                                    <button type="button" disabled="@Loading" @onclick="() => ArchiveAsync(workflow)">Archive</button>
+                                    <button type="button" disabled="@Loading" @onclick="() => ArchiveAsync(workflow)">@Localizer["Archive"]</button>
                                     @if (workflow.Status == THub.Domain.Workflows.WorkflowStatus.Draft
                                         && workflow.PublishedVersionNumber is null)
                                     {
-                                        <button type="button" disabled="@Loading" @onclick="() => DeleteAsync(workflow)">Delete</button>
+                                        <button type="button" disabled="@Loading" @onclick="() => DeleteAsync(workflow)">@Localizer["Delete"]</button>
                                     }
                                 }
                             </td>
@@ -109,10 +109,12 @@
     private HashSet<Guid> CanExecute { get; } = [];
     private HashSet<Guid> CanDelete { get; } = [];
 
-    private string Summary =>
-        $"{Items.Count} shown · {Items.Count(item => item.Status == THub.Domain.Workflows.WorkflowStatus.Published)} published · " +
-        $"{Items.Count(item => item.Status == THub.Domain.Workflows.WorkflowStatus.Draft)} drafts · " +
-        $"{Items.Count(item => item.Status == THub.Domain.Workflows.WorkflowStatus.Paused)} paused";
+    private string Summary => Localizer[
+        "{0} shown · {1} published · {2} drafts · {3} paused",
+        Items.Count,
+        Items.Count(item => item.Status == THub.Domain.Workflows.WorkflowStatus.Published),
+        Items.Count(item => item.Status == THub.Domain.Workflows.WorkflowStatus.Draft),
+        Items.Count(item => item.Status == THub.Domain.Workflows.WorkflowStatus.Paused)];
 
     protected override Task OnInitializedAsync() => LoadAsync();
 

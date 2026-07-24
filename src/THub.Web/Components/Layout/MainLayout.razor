@@ -1,46 +1,48 @@
 @inherits LayoutComponentBase
+@using System.Globalization
 @inject IHostEnvironment HostEnvironment
+@inject NavigationManager Navigation
 
 <div class="app-shell">
     <aside class="sidebar">
-        <a class="brand" href="/" aria-label="THub home">
+        <a class="brand" href="/" aria-label='@Localizer["THub home"]'>
             <span class="brand-mark"><span></span><span></span><span></span></span>
-            <span class="brand-copy"><strong>THub</strong><small>DATA OPERATIONS</small></span>
+            <span class="brand-copy"><strong>@Localizer["THub"]</strong><small>@Localizer["DATA OPERATIONS"]</small></span>
         </a>
 
-        <nav class="primary-nav" aria-label="Primary navigation">
-            <span class="nav-section">Build and run</span>
-            <NavLink href="/" Match="NavLinkMatch.All"><RadzenIcon Icon="home" />Home</NavLink>
-            <NavLink href="/workflows"><RadzenIcon Icon="account_tree" />Workflows</NavLink>
+        <nav class="primary-nav" aria-label='@Localizer["Primary navigation"]'>
+            <span class="nav-section">@Localizer["Build and run"]</span>
+            <NavLink href="/" Match="NavLinkMatch.All"><RadzenIcon Icon="home" />@Localizer["Home"]</NavLink>
+            <NavLink href="/workflows"><RadzenIcon Icon="account_tree" />@Localizer["Workflows"]</NavLink>
             <AuthorizeView Policy="@Permissions.ConnectionView">
-                <NavLink href="/connections"><RadzenIcon Icon="database" />Data connections</NavLink>
+                <NavLink href="/connections"><RadzenIcon Icon="database" />@Localizer["Data connections"]</NavLink>
             </AuthorizeView>
-            <NavLink href="/runs"><RadzenIcon Icon="play_circle" />Runs</NavLink>
+            <NavLink href="/runs"><RadzenIcon Icon="play_circle" />@Localizer["Runs"]</NavLink>
             <AuthorizeView Policy="@Permissions.ScheduleManage">
-                <NavLink href="/schedules"><RadzenIcon Icon="schedule" />Schedules</NavLink>
+                <NavLink href="/schedules"><RadzenIcon Icon="schedule" />@Localizer["Schedules"]</NavLink>
             </AuthorizeView>
 
-            <span class="nav-section">Share and monitor</span>
-            <NavLink href="/published-data"><RadzenIcon Icon="table_view" />Data tables</NavLink>
+            <span class="nav-section">@Localizer["Share and monitor"]</span>
+            <NavLink href="/published-data"><RadzenIcon Icon="table_view" />@Localizer["Data tables"]</NavLink>
             <AuthorizeView Policy="@Permissions.PublicationManage">
-                <NavLink href="/publications"><RadzenIcon Icon="api" />Data sharing</NavLink>
+                <NavLink href="/publications"><RadzenIcon Icon="api" />@Localizer["Data sharing"]</NavLink>
             </AuthorizeView>
             <AuthorizeView Policy="@Permissions.Administration">
-                <NavLink href="/alerts/email"><RadzenIcon Icon="notifications_active" />Alerts</NavLink>
+                <NavLink href="/alerts/email"><RadzenIcon Icon="notifications_active" />@Localizer["Alerts"]</NavLink>
             </AuthorizeView>
 
             <AuthorizeView Policy="@Permissions.Administration">
-                <span class="nav-section">Administration</span>
-                <NavLink href="/trusted-actions"><RadzenIcon Icon="verified_user" />Trusted actions</NavLink>
+                <span class="nav-section">@Localizer["Administration"]</span>
+                <NavLink href="/trusted-actions"><RadzenIcon Icon="verified_user" />@Localizer["Trusted actions"]</NavLink>
             </AuthorizeView>
             <AuthorizeView Policy="@Permissions.AuditView">
-                <NavLink href="/audit"><RadzenIcon Icon="policy" />Audit log</NavLink>
+                <NavLink href="/audit"><RadzenIcon Icon="policy" />@Localizer["Audit log"]</NavLink>
             </AuthorizeView>
         </nav>
 
         <div class="sidebar-foot">
             <AuthorizeView Policy="@Permissions.SecurityManage">
-                <NavLink class="settings-link" href="/settings"><RadzenIcon Icon="settings" />Settings</NavLink>
+                <NavLink class="settings-link" href="/settings"><RadzenIcon Icon="settings" />@Localizer["Settings"]</NavLink>
             </AuthorizeView>
         </div>
     </aside>
@@ -49,11 +51,19 @@
         <header class="topbar">
             <div class="environment-pill"><span></span>@HostEnvironment.EnvironmentName</div>
             <div class="topbar-actions">
+                <label class="language-switcher">
+                    <span class="visually-hidden">@Localizer["Language"]</span>
+                    <RadzenIcon Icon="language" />
+                    <select aria-label='@Localizer["Language"]' value="@CurrentCulture" @onchange="ChangeCulture">
+                        <option value="en">@Localizer["English"]</option>
+                        <option value="zh-TW">繁體中文（台灣）</option>
+                    </select>
+                </label>
                 <AuthorizeView>
                     <Authorized Context="authentication">
                         <div class="identity">
                             <div class="avatar">@Initials(authentication.User.Identity?.Name)</div>
-                            <div><strong>@DisplayName(authentication.User.Identity?.Name)</strong><small>Signed in</small></div>
+                            <div><strong>@DisplayName(authentication.User.Identity?.Name)</strong><small>@Localizer["Signed in"]</small></div>
                         </div>
                     </Authorized>
                 </AuthorizeView>
@@ -67,12 +77,28 @@
 </div>
 
 <div id="blazor-error-ui" data-nosnippet>
-    THub hit an unexpected error.
-    <a href="." class="reload">Reload</a>
+    @Localizer["THub hit an unexpected error."]
+    <a href="." class="reload">@Localizer["Reload"]</a>
     <span class="dismiss">×</span>
 </div>
 
 @code {
+    private string CurrentCulture =>
+        CultureInfo.CurrentUICulture.Name.StartsWith("zh", StringComparison.OrdinalIgnoreCase)
+            ? "zh-TW"
+            : "en";
+
+    private void ChangeCulture(ChangeEventArgs eventArgs)
+    {
+        var culture = string.Equals(eventArgs.Value?.ToString(), "zh-TW", StringComparison.Ordinal)
+            ? "zh-TW"
+            : "en";
+        var currentPath = new Uri(Navigation.Uri).PathAndQuery;
+        Navigation.NavigateTo(
+            $"/culture/set?culture={Uri.EscapeDataString(culture)}&redirectUri={Uri.EscapeDataString(currentPath)}",
+            forceLoad: true);
+    }
+
     private static string DisplayName(string? identityName)
     {
         var value = string.IsNullOrWhiteSpace(identityName) ? "Windows user" : identityName;

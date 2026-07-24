@@ -17,48 +17,48 @@
 @inject AccessControlAdministrationService AccessControl
 @inject IConfiguration Configuration
 
-<PageTitle>Data sharing · THub</PageTitle>
+<PageTitle>@Localizer["Data sharing · THub"]</PageTitle>
 
 <div class="page-heading">
-    <div><div class="eyebrow">Share and monitor</div><h1>Data sharing</h1><p>Safely share approved database data as an API or editable table.</p></div>
+    <div><div class="eyebrow">@Localizer["Share and monitor"]</div><h1>@Localizer["Data sharing"]</h1><p>@Localizer["Safely share approved database data as an API or editable table."]</p></div>
     <div class="heading-actions">
-        <RadzenButton Text="New publication" Icon="add" ButtonStyle="ButtonStyle.Primary" Click="@StartCreate" Disabled="@Busy" />
-        <RadzenButton Text="Refresh" Icon="refresh" ButtonStyle="ButtonStyle.Light" Click="@LoadAsync" Disabled="@Busy" />
+        <RadzenButton Text='@Localizer["New publication"]' Icon="add" ButtonStyle="ButtonStyle.Primary" Click="@StartCreate" Disabled="@Busy" />
+        <RadzenButton Text='@Localizer["Refresh"]' Icon="refresh" ButtonStyle="ButtonStyle.Light" Click="@LoadAsync" Disabled="@Busy" />
     </div>
 </div>
 
 @if (CreateVisible)
 {
     <section class="panel publication-create">
-        <div class="panel-head"><div><h2>Create governed surface</h2><p>The route kind cannot change after creation.</p></div><button class="icon-close" type="button" @onclick="() => CreateVisible = false">×</button></div>
+        <div class="panel-head"><div><h2>@Localizer["Create governed surface"]</h2><p>@Localizer["The route kind cannot change after creation."]</p></div><button class="icon-close" type="button" @onclick="() => CreateVisible = false">×</button></div>
         <div class="inline-form three">
-            <label><span>Name</span><input maxlength="200" @bind="CreateName" /></label>
-            <label><span>Route slug</span><input maxlength="100" placeholder="customer-lookup" @bind="CreateSlug" /></label>
-            <label><span>Kind</span><select @bind="CreateKind"><option value="@PublicationKind.RestApi">REST API · read only</option><option value="@PublicationKind.Editor">Spreadsheet editor · staged</option></select></label>
+            <label><span>@Localizer["Name"]</span><input maxlength="200" @bind="CreateName" /></label>
+            <label><span>@Localizer["Route slug"]</span><input maxlength="100" placeholder='@Localizer["customer-lookup"]' @bind="CreateSlug" /></label>
+            <label><span>@Localizer["Kind"]</span><select @bind="CreateKind"><option value="@PublicationKind.RestApi">@Localizer["REST API · read only"]</option><option value="@PublicationKind.Editor">@Localizer["Spreadsheet editor · staged"]</option></select></label>
         </div>
-        <div class="form-actions"><RadzenButton Text="Cancel" ButtonStyle="ButtonStyle.Light" Click="@(() => CreateVisible = false)" /><RadzenButton Text="Create" Icon="add" ButtonStyle="ButtonStyle.Primary" Click="@CreateAsync" Disabled="@Busy" /></div>
+        <div class="form-actions"><RadzenButton Text='@Localizer["Cancel"]' ButtonStyle="ButtonStyle.Light" Click="@(() => CreateVisible = false)" /><RadzenButton Text='@Localizer["Create"]' Icon="add" ButtonStyle="ButtonStyle.Primary" Click="@CreateAsync" Disabled="@Busy" /></div>
     </section>
 }
 
 <section class="panel">
-    <div class="panel-head"><div><h2>Published surfaces</h2><p>@Items.Count resources · routes expose no caller-selected database identifiers</p></div></div>
+    <div class="panel-head"><div><h2>@Localizer["Published surfaces"]</h2><p>@Items.Count resources · routes expose no caller-selected database identifiers</p></div></div>
     @if (Loading)
     {
-        <div class="page-state"><RadzenProgressBar Mode="ProgressBarMode.Indeterminate" /><p>Loading publications…</p></div>
+        <div class="page-state"><RadzenProgressBar Mode="ProgressBarMode.Indeterminate" /><p>@Localizer["Loading publications…"]</p></div>
     }
     else if (Error is not null)
     {
-        <div class="page-state error" role="alert"><RadzenIcon Icon="error_outline" /><p>@Error</p><button type="button" @onclick="LoadAsync">Try again</button></div>
+        <div class="page-state error" role="alert"><RadzenIcon Icon="error_outline" /><p>@Error</p><button type="button" @onclick="LoadAsync">@Localizer["Try again"]</button></div>
     }
     else if (Items.Count == 0)
     {
-        <div class="page-state"><RadzenIcon Icon="dataset" /><h3>No publications yet</h3><p>Create a resource, discover an approved database object, review its columns and foreign keys, then activate an immutable version.</p></div>
+        <div class="page-state"><RadzenIcon Icon="dataset" /><h3>@Localizer["No publications yet"]</h3><p>@Localizer["Create a resource, discover an approved database object, review its columns and foreign keys, then activate an immutable version."]</p></div>
     }
     else
     {
         <div class="table-scroll">
             <table class="activity-table">
-                <thead><tr><th>Name</th><th>Route</th><th>Mode</th><th>State</th><th>Updated</th><th></th></tr></thead>
+                <thead><tr><th>@Localizer["Name"]</th><th>@Localizer["Route"]</th><th>@Localizer["Mode"]</th><th>@Localizer["State"]</th><th>@Localizer["Updated"]</th><th></th></tr></thead>
                 <tbody>
                     @foreach (var publication in Items)
                     {
@@ -68,7 +68,7 @@
                             <td>@(publication.Kind == PublicationKind.RestApi ? "REST · read only" : "Spreadsheet · staged writes")</td>
                             <td><span class="status-chip @StateCss(publication.State)">@publication.State</span></td>
                             <td class="muted">@publication.UpdatedAtUtc.ToLocalTime().ToString("g")</td>
-                            <td class="publication-actions"><button type="button" @onclick="() => SelectAsync(publication.Id)">Manage</button>@if (publication.Kind == PublicationKind.Editor && publication.State == PublicationState.Active){<a href="@($"/data/{publication.Slug}")">Open editor</a>}</td>
+                            <td class="publication-actions"><button type="button" @onclick="() => SelectAsync(publication.Id)">@Localizer["Manage"]</button>@if (publication.Kind == PublicationKind.Editor && publication.State == PublicationState.Active){<a href="@($"/data/{publication.Slug}")">@Localizer["Open editor"]</a>}</td>
                         </tr>
                     }
                 </tbody>
@@ -80,79 +80,79 @@
 @if (Selected is not null)
 {
     <section class="panel publication-detail">
-        <div class="panel-head"><div><h2>@Selected.Name</h2><p>@Selected.Kind · @Selected.Slug · created by @Selected.CreatedBy</p></div><div class="detail-head-actions">@if (Selected.State == PublicationState.Active){<RadzenButton Text="Disable" Icon="pause_circle" Size="ButtonSize.Small" ButtonStyle="ButtonStyle.Light" Click="@DisableAsync" Disabled="@Busy" />}@if (Selected.Kind == PublicationKind.Editor && Selected.State == PublicationState.Active){<a class="button-link" href="@($"/data/{Selected.Slug}")">Open published data</a>}</div></div>
+        <div class="panel-head"><div><h2>@Selected.Name</h2><p>@Selected.Kind · @Selected.Slug · created by @Selected.CreatedBy</p></div><div class="detail-head-actions">@if (Selected.State == PublicationState.Active){<RadzenButton Text='@Localizer["Disable"]' Icon="pause_circle" Size="ButtonSize.Small" ButtonStyle="ButtonStyle.Light" Click="@DisableAsync" Disabled="@Busy" />}@if (Selected.Kind == PublicationKind.Editor && Selected.State == PublicationState.Active){<a class="button-link" href="@($"/data/{Selected.Slug}")">@Localizer["Open published data"]</a>}</div></div>
         <div class="publication-facts">
-            <div><span>State</span><strong>@Selected.State</strong></div>
-            <div><span>Active version</span><strong>@(Selected.ActiveVersionId is null ? "None" : Selected.Versions.FirstOrDefault(version => version.Id == Selected.ActiveVersionId)?.VersionNumber.ToString() ?? "Unknown")</strong></div>
-            <div><span>Versions</span><strong>@Selected.Versions.Count</strong></div>
-            <div><span>Public route</span><code>@RouteText(Selected)</code></div>
+            <div><span>@Localizer["State"]</span><strong>@Selected.State</strong></div>
+            <div><span>@Localizer["Active version"]</span><strong>@(Selected.ActiveVersionId is null ? "None" : Selected.Versions.FirstOrDefault(version => version.Id == Selected.ActiveVersionId)?.VersionNumber.ToString() ?? "Unknown")</strong></div>
+            <div><span>@Localizer["Versions"]</span><strong>@Selected.Versions.Count</strong></div>
+            <div><span>@Localizer["Public route"]</span><code>@RouteText(Selected)</code></div>
         </div>
 
         <div class="detail-tabs">
-            <button class="@(SelectedTab == DetailTab.Source ? "active" : null)" type="button" @onclick="() => SelectedTab = DetailTab.Source">Source & versions</button>
+            <button class="@(SelectedTab == DetailTab.Source ? "active" : null)" type="button" @onclick="() => SelectedTab = DetailTab.Source">@Localizer["Source & versions"]</button>
             @if (Selected.Kind == PublicationKind.RestApi)
             {
-                <button class="@(SelectedTab == DetailTab.Tokens ? "active" : null)" type="button" @onclick="OpenTokensAsync">Consumer access</button>
+                <button class="@(SelectedTab == DetailTab.Tokens ? "active" : null)" type="button" @onclick="OpenTokensAsync">@Localizer["Consumer access"]</button>
             }
             else
             {
-                <button class="@(SelectedTab == DetailTab.Grants ? "active" : null)" type="button" @onclick="OpenGrantsAsync">Role grants</button>
+                <button class="@(SelectedTab == DetailTab.Grants ? "active" : null)" type="button" @onclick="OpenGrantsAsync">@Localizer["Role grants"]</button>
             }
         </div>
 
         @if (SelectedTab == DetailTab.Source)
         {
             <div class="detail-section">
-                <div class="section-heading"><div><h3>Immutable source versions</h3><p>Schema and column policy are rediscovered and reviewed for every version.</p></div><RadzenButton Text="Discover source" Icon="travel_explore" Size="ButtonSize.Small" ButtonStyle="ButtonStyle.Primary" Click="@StartVersion" Disabled="@Busy" /></div>
+                <div class="section-heading"><div><h3>@Localizer["Immutable source versions"]</h3><p>@Localizer["Schema and column policy are rediscovered and reviewed for every version."]</p></div><RadzenButton Text='@Localizer["Discover source"]' Icon="travel_explore" Size="ButtonSize.Small" ButtonStyle="ButtonStyle.Primary" Click="@StartVersion" Disabled="@Busy" /></div>
                 @if (VersionVisible)
                 {
                     <div class="version-wizard">
-                        <ol class="builder-steps" aria-label="Publication setup progress">
-                            <li class="complete"><span>1</span><div><strong>Surface</strong><small>@Selected.Kind · @Selected.Slug</small></div></li>
-                            <li class="@(Inspection is null ? "current" : "complete")"><span>2</span><div><strong>Source</strong><small>Choose a provider and object</small></div></li>
-                            <li class="@(Inspection is not null ? "current" : null)"><span>3</span><div><strong>Contract</strong><small>Review columns and relationships</small></div></li>
-                            <li><span>4</span><div><strong>Activate</strong><small>Limits, access, and handoff</small></div></li>
+                        <ol class="builder-steps" aria-label='@Localizer["Publication setup progress"]'>
+                            <li class="complete"><span>1</span><div><strong>@Localizer["Surface"]</strong><small>@Selected.Kind · @Selected.Slug</small></div></li>
+                            <li class="@(Inspection is null ? "current" : "complete")"><span>2</span><div><strong>@Localizer["Source"]</strong><small>@Localizer["Choose a provider and object"]</small></div></li>
+                            <li class="@(Inspection is not null ? "current" : null)"><span>3</span><div><strong>@Localizer["Contract"]</strong><small>@Localizer["Review columns and relationships"]</small></div></li>
+                            <li><span>4</span><div><strong>@Localizer["Activate"]</strong><small>@Localizer["Limits, access, and handoff"]</small></div></li>
                         </ol>
                         <div class="inline-form source-select">
-                            <label><span>Approved database connection</span><select @bind="VersionConnectionId" @bind:after="VersionConnectionChanged"><option value="@Guid.Empty">Select connection…</option>@foreach (var connection in DatabaseConnections){<option value="@connection.Id">@connection.Name · @connection.Kind</option>}</select></label>
-                            <div class="field-button"><RadzenButton Text="List tables and views" Icon="search" ButtonStyle="ButtonStyle.Light" Click="@DiscoverObjectsAsync" Disabled="@(Busy || VersionConnectionId == Guid.Empty)" /></div>
+                            <label><span>@Localizer["Approved database connection"]</span><select @bind="VersionConnectionId" @bind:after="VersionConnectionChanged"><option value="@Guid.Empty">@Localizer["Select connection…"]</option>@foreach (var connection in DatabaseConnections){<option value="@connection.Id">@connection.Name · @connection.Kind</option>}</select></label>
+                            <div class="field-button"><RadzenButton Text='@Localizer["List tables and views"]' Icon="search" ButtonStyle="ButtonStyle.Light" Click="@DiscoverObjectsAsync" Disabled="@(Busy || VersionConnectionId == Guid.Empty)" /></div>
                             @if (SourceObjects.Count > 0)
                             {
-                                <label><span>Source object</span><select @bind="SelectedObjectKey"><option value="">Select object…</option>@foreach (var source in SourceObjects){<option value="@ObjectKey(source)">@source.Schema.@source.Name (@source.Kind)</option>}</select></label>
-                                <div class="field-button"><RadzenButton Text="Inspect schema" Icon="fact_check" ButtonStyle="ButtonStyle.Light" Click="@InspectObjectAsync" Disabled="@(Busy || string.IsNullOrEmpty(SelectedObjectKey))" /></div>
+                                <label><span>@Localizer["Source object"]</span><select @bind="SelectedObjectKey"><option value="">@Localizer["Select object…"]</option>@foreach (var source in SourceObjects){<option value="@ObjectKey(source)">@source.Schema.@source.Name (@source.Kind)</option>}</select></label>
+                                <div class="field-button"><RadzenButton Text='@Localizer["Inspect schema"]' Icon="fact_check" ButtonStyle="ButtonStyle.Light" Click="@InspectObjectAsync" Disabled="@(Busy || string.IsNullOrEmpty(SelectedObjectKey))" /></div>
                             }
                         </div>
 
                         @if (Inspection is not null)
                         {
-                            <div class="inspection-summary"><RadzenIcon Icon="verified" /><span><strong>@Inspection.Schema.@Inspection.Name</strong> · @Inspection.Columns.Count columns · @Inspection.ForeignKeys.Count foreign keys · fingerprint @Inspection.SchemaFingerprint[..Math.Min(12, Inspection.SchemaFingerprint.Length)]…</span></div>
+                            <div class="inspection-summary"><RadzenIcon Icon="verified" /><span><strong>@Inspection.Schema.@Inspection.Name</strong> · @Localizer["{0} columns · {1} foreign keys · fingerprint {2}…", Inspection.Columns.Count, Inspection.ForeignKeys.Count, Inspection.SchemaFingerprint[..Math.Min(12, Inspection.SchemaFingerprint.Length)]]</span></div>
                             @if (!Inspection.Columns.Any(column => column.IsKey))
                             {
-                                <div class="form-warning" role="alert"><RadzenIcon Icon="warning" />A stable, non-null unique key is required for bounded paging; this object cannot be published.</div>
+                                <div class="form-warning" role="alert"><RadzenIcon Icon="warning" />@Localizer["A stable, non-null unique key is required for bounded paging; this object cannot be published."]</div>
                             }
                             @if (Selected.Kind == PublicationKind.Editor &&
                                  Inspection.Kind == PublicationSourceObjectKind.Table)
                             {
                                 <div class="inline-form apply-connection">
                                     <label>
-                                        <span>Worker apply connection</span>
+                                        <span>@Localizer["Worker apply connection"]</span>
                                         <select @bind="VersionApplyConnectionId">
-                                            <option value="@Guid.Empty">Keep this editor read-only</option>
+                                            <option value="@Guid.Empty">@Localizer["Keep this editor read-only"]</option>
                                             @foreach (var connection in EligibleApplyConnections)
                                             {
                                                 <option value="@connection.Id">@connection.Name · @connection.Kind</option>
                                             }
                                         </select>
-                                        <small>Select a separate, write-capable connection to the same database. It is used only by the Worker when approved changes are applied.</small>
+                                        <small>@Localizer["Select a separate, write-capable connection to the same database. It is used only by the Worker when approved changes are applied."]</small>
                                     </label>
                                 </div>
                                 @if (!SupportsWritableEditor)
                                 {
-                                    <div class="form-warning" role="status"><RadzenIcon Icon="info" />This version will remain read-only until a separate Worker apply connection is selected and writable columns are explicitly enabled.</div>
+                                    <div class="form-warning" role="status"><RadzenIcon Icon="info" />@Localizer["This version will remain read-only until a separate Worker apply connection is selected and writable columns are explicitly enabled."]</div>
                                 }
                             }
                             <div class="table-scroll policy-table-wrap">
-                                <table class="policy-table"><thead><tr><th>Include</th><th>Source column</th><th>Public alias</th><th>Type</th><th>Read</th><th>Filter</th><th>Sort</th><th>Write</th><th>Detected policy</th></tr></thead><tbody>
+                                <table class="policy-table"><thead><tr><th>@Localizer["Include"]</th><th>@Localizer["Source column"]</th><th>@Localizer["Public alias"]</th><th>@Localizer["Type"]</th><th>@Localizer["Read"]</th><th>@Localizer["Filter"]</th><th>@Localizer["Sort"]</th><th>@Localizer["Write"]</th><th>@Localizer["Detected policy"]</th></tr></thead><tbody>
                                 @foreach (var column in ColumnPolicies)
                                 {
                                     <tr class="@(!column.IsSupported ? "unsupported" : null)">
@@ -171,25 +171,25 @@
                             </div>
                             @if (ForeignKeyPolicies.Count > 0)
                             {
-                                <section class="foreign-key-policy" aria-label="Foreign-key lookup approvals">
+                                <section class="foreign-key-policy" aria-label='@Localizer["Foreign-key lookup approvals"]'>
                                     <div class="foreign-key-policy-head">
-                                        <div><h4>Foreign-key lookup policy</h4><p>Detected display and search suggestions are not saved. An administrator must approve each lookup and select every exposed column explicitly.</p></div>
+                                        <div><h4>@Localizer["Foreign-key lookup policy"]</h4><p>@Localizer["Detected display and search suggestions are not saved. An administrator must approve each lookup and select every exposed column explicitly."]</p></div>
                                         <span>@ForeignKeyPolicies.Count detected</span>
                                     </div>
                                     @foreach (var foreignKey in ForeignKeyPolicies)
                                     {
                                         <fieldset>
                                             <legend>
-                                                <label><input type="checkbox" @bind="foreignKey.IsApproved" /> Approve lookup</label>
+                                                <label><input type="checkbox" @bind="foreignKey.IsApproved" /> @Localizer["Approve lookup"]</label>
                                                 <span>@foreignKey.ConstraintName · @foreignKey.LocalMapping</span>
                                             </legend>
-                                            <p class="lookup-suggestion">Inspector suggestion only: display <strong>@foreignKey.RecommendedDisplayColumn</strong>, mode <strong>@foreignKey.RecommendedLookupMode</strong>.</p>
+                                            <p class="lookup-suggestion">@Localizer["Inspector suggestion only: display"] <strong>@foreignKey.RecommendedDisplayColumn</strong>@Localizer[", mode"] <strong>@foreignKey.RecommendedLookupMode</strong>.</p>
                                             <div class="foreign-key-controls">
-                                                <label><span>Approved display column</span><select @bind="foreignKey.DisplayColumn" disabled="@(!foreignKey.IsApproved)"><option value="">Select explicitly…</option>@foreach (var candidate in foreignKey.DisplayCandidates){<option value="@candidate">@candidate</option>}</select></label>
-                                                <label><span>Lookup mode</span><select @bind="foreignKey.LookupMode" disabled="@(!foreignKey.IsApproved)"><option value="@PublicationLookupMode.DropDown">Bounded dropdown</option><option value="@PublicationLookupMode.ServerFiltered">Server filtered</option></select></label>
+                                                <label><span>@Localizer["Approved display column"]</span><select @bind="foreignKey.DisplayColumn" disabled="@(!foreignKey.IsApproved)"><option value="">@Localizer["Select explicitly…"]</option>@foreach (var candidate in foreignKey.DisplayCandidates){<option value="@candidate">@candidate</option>}</select></label>
+                                                <label><span>@Localizer["Lookup mode"]</span><select @bind="foreignKey.LookupMode" disabled="@(!foreignKey.IsApproved)"><option value="@PublicationLookupMode.DropDown">@Localizer["Bounded dropdown"]</option><option value="@PublicationLookupMode.ServerFiltered">@Localizer["Server filtered"]</option></select></label>
                                             </div>
-                                            <div class="search-column-choices" aria-label="Approved search columns">
-                                                <span>Approved search columns</span>
+                                            <div class="search-column-choices" aria-label='@Localizer["Approved search columns"]'>
+                                                <span>@Localizer["Approved search columns"]</span>
                                                 @foreach (var candidate in foreignKey.SearchCandidates)
                                                 {
                                                     <label><input type="checkbox" checked="@foreignKey.IsSearchColumnApproved(candidate)" @onchange="args => foreignKey.SetSearchColumn(candidate, args.Value is true)" disabled="@(!foreignKey.IsApproved)" /> @candidate</label>
@@ -200,28 +200,28 @@
                                 </section>
                             }
                             <div class="inline-form settings-grid">
-                                <label><span>Default page rows</span><input type="number" min="1" max="1000" @bind="VersionSettings.DefaultPageSize" /></label>
-                                <label><span>Maximum page rows</span><input type="number" min="1" max="1000" @bind="VersionSettings.MaximumPageSize" /></label>
-                                <label><span>Requests / window</span><input type="number" min="1" max="100000" @bind="VersionSettings.RequestsPerWindow" /></label>
-                                <label><span>Window seconds</span><input type="number" min="1" max="3600" @bind="VersionSettings.RateLimitWindowSeconds" /></label>
-                                <label><span>Concurrent requests</span><input type="number" min="1" max="100" @bind="VersionSettings.MaximumConcurrentRequests" /></label>
-                                <label><span>Editor window rows</span><input type="number" min="1" max="1000" @bind="VersionSettings.EditorWindowSize" disabled="@(Selected.Kind != PublicationKind.Editor)" /></label>
-                                <label><span>Request timeout seconds</span><input type="number" min="1" max="300" @bind="VersionSettings.RequestTimeoutSeconds" /></label>
-                                <label><span>Database timeout seconds</span><input type="number" min="1" max="300" @bind="VersionSettings.CommandTimeoutSeconds" /></label>
-                                <label><span>Maximum response MiB</span><input type="number" min="1" max="100" @bind="VersionSettings.MaximumResponseMiB" /></label>
+                                <label><span>@Localizer["Default page rows"]</span><input type="number" min="1" max="1000" @bind="VersionSettings.DefaultPageSize" /></label>
+                                <label><span>@Localizer["Maximum page rows"]</span><input type="number" min="1" max="1000" @bind="VersionSettings.MaximumPageSize" /></label>
+                                <label><span>@Localizer["Requests / window"]</span><input type="number" min="1" max="100000" @bind="VersionSettings.RequestsPerWindow" /></label>
+                                <label><span>@Localizer["Window seconds"]</span><input type="number" min="1" max="3600" @bind="VersionSettings.RateLimitWindowSeconds" /></label>
+                                <label><span>@Localizer["Concurrent requests"]</span><input type="number" min="1" max="100" @bind="VersionSettings.MaximumConcurrentRequests" /></label>
+                                <label><span>@Localizer["Editor window rows"]</span><input type="number" min="1" max="1000" @bind="VersionSettings.EditorWindowSize" disabled="@(Selected.Kind != PublicationKind.Editor)" /></label>
+                                <label><span>@Localizer["Request timeout seconds"]</span><input type="number" min="1" max="300" @bind="VersionSettings.RequestTimeoutSeconds" /></label>
+                                <label><span>@Localizer["Database timeout seconds"]</span><input type="number" min="1" max="300" @bind="VersionSettings.CommandTimeoutSeconds" /></label>
+                                <label><span>@Localizer["Maximum response MiB"]</span><input type="number" min="1" max="100" @bind="VersionSettings.MaximumResponseMiB" /></label>
                             </div>
-                            <div class="form-actions"><RadzenButton Text="Cancel" ButtonStyle="ButtonStyle.Light" Click="@(() => VersionVisible = false)" /><RadzenButton Text="Create and activate version" Icon="publish" ButtonStyle="ButtonStyle.Success" Click="@CreateVersionAsync" Disabled="@Busy" /></div>
+                            <div class="form-actions"><RadzenButton Text='@Localizer["Cancel"]' ButtonStyle="ButtonStyle.Light" Click="@(() => VersionVisible = false)" /><RadzenButton Text='@Localizer["Create and activate version"]' Icon="publish" ButtonStyle="ButtonStyle.Success" Click="@CreateVersionAsync" Disabled="@Busy" /></div>
                         }
                     </div>
                 }
 
                 @if (Selected.Versions.Count == 0)
                 {
-                    <div class="page-state compact"><p>No source version exists. Discover an approved database table or view to continue.</p></div>
+                    <div class="page-state compact"><p>@Localizer["No source version exists. Discover an approved database table or view to continue."]</p></div>
                 }
                 else
                 {
-                    <table class="activity-table"><thead><tr><th>Version</th><th>Source</th><th>Mode</th><th>Connection boundary</th><th>Created</th><th>State</th><th></th></tr></thead><tbody>@foreach (var version in Selected.Versions.OrderByDescending(version => version.VersionNumber)){<tr><td><strong>v@(version.VersionNumber)</strong></td><td>@version.SourceSchema.@version.SourceObject</td><td>@version.ConcurrencyMode</td><td>@(version.ApplyConnectionId is null ? "Read only" : "Separate Worker apply")</td><td class="muted">@version.CreatedAtUtc.ToLocalTime().ToString("g")</td><td>@(Selected.ActiveVersionId == version.Id ? "Active" : "Inactive")</td><td class="publication-actions">@if (Selected.ActiveVersionId != version.Id){<button type="button" @onclick="() => ActivateAsync(version.Id)">Activate</button>}</td></tr>}</tbody></table>
+                    <table class="activity-table"><thead><tr><th>@Localizer["Version"]</th><th>@Localizer["Source"]</th><th>@Localizer["Mode"]</th><th>@Localizer["Connection boundary"]</th><th>@Localizer["Created"]</th><th>@Localizer["State"]</th><th></th></tr></thead><tbody>@foreach (var version in Selected.Versions.OrderByDescending(version => version.VersionNumber)){<tr><td><strong>v@(version.VersionNumber)</strong></td><td>@version.SourceSchema.@version.SourceObject</td><td>@version.ConcurrencyMode</td><td>@(version.ApplyConnectionId is null ? "Read only" : "Separate Worker apply")</td><td class="muted">@version.CreatedAtUtc.ToLocalTime().ToString("g")</td><td>@(Selected.ActiveVersionId == version.Id ? "Active" : "Inactive")</td><td class="publication-actions">@if (Selected.ActiveVersionId != version.Id){<button type="button" @onclick="() => ActivateAsync(version.Id)">@Localizer["Activate"]</button>}</td></tr>}</tbody></table>
                 }
             </div>
         }
@@ -230,43 +230,43 @@
             <div class="detail-section">
                 <div class="consumer-handoff">
                     <div class="consumer-handoff-head">
-                        <div><span class="handoff-kicker">Consumer handoff</span><h3>Everything an API consumer needs</h3><p>The generic Swagger contract documents authentication, filters, sorts, and paging. The token-protected schema endpoint describes this publication's active columns.</p></div>
+                        <div><span class="handoff-kicker">@Localizer["Consumer handoff"]</span><h3>@Localizer["Everything an API consumer needs"]</h3><p>@Localizer["The generic Swagger contract documents authentication, filters, sorts, and paging. The token-protected schema endpoint describes this publication's active columns."]</p></div>
                         @if (PublicationApiBaseUrl is not null)
                         {
-                            <a class="swagger-link" href="@($"{PublicationApiBaseUrl}/swagger")" target="_blank" rel="noopener noreferrer"><RadzenIcon Icon="description" />Open Swagger</a>
+                            <a class="swagger-link" href="@($"{PublicationApiBaseUrl}/swagger")" target="_blank" rel="noopener noreferrer"><RadzenIcon Icon="description" />@Localizer["Open Swagger"]</a>
                         }
                     </div>
                     @if (PublicationApiBaseUrl is null)
                     {
-                        <div class="handoff-warning" role="status"><RadzenIcon Icon="info" />Configure <code>PublicationApi:PublicBaseUrl</code> to show deployable consumer links.</div>
+                        <div class="handoff-warning" role="status"><RadzenIcon Icon="info" />@Localizer["Configure"] <code>@Localizer["PublicationApi:PublicBaseUrl"]</code> @Localizer["to show deployable consumer links."]</div>
                     }
                     <div class="endpoint-list">
-                        <div><span>Schema contract</span><code>@ConsumerUrl("schema")</code><small>Call first when generating a client or validating aliases.</small></div>
-                        <div><span>Published rows</span><code>@ConsumerUrl("rows")</code><small>Use the returned opaque cursor for the next deterministic page.</small></div>
-                        <div><span>OpenAPI document</span><code>@OpenApiUrl</code><small>Generic v1 contract; it does not disclose protected publication columns.</small></div>
+                        <div><span>@Localizer["Schema contract"]</span><code>@ConsumerUrl("schema")</code><small>@Localizer["Call first when generating a client or validating aliases."]</small></div>
+                        <div><span>@Localizer["Published rows"]</span><code>@ConsumerUrl("rows")</code><small>@Localizer["Use the returned opaque cursor for the next deterministic page."]</small></div>
+                        <div><span>@Localizer["OpenAPI document"]</span><code>@OpenApiUrl</code><small>@Localizer["Generic v1 contract; it does not disclose protected publication columns."]</small></div>
                     </div>
                     <ol class="handoff-sequence">
-                        <li><span>1</span>Create a named, expiring token below.</li>
-                        <li><span>2</span>Copy it once into the consumer's approved secret store.</li>
-                        <li><span>3</span>Authorize in Swagger or send it as <code>Authorization: Bearer</code>.</li>
+                        <li><span>1</span>@Localizer["Create a named, expiring token below."]</li>
+                        <li><span>2</span>@Localizer["Copy it once into the consumer's approved secret store."]</li>
+                        <li><span>3</span>@Localizer["Authorize in Swagger or send it as"] <code>@Localizer["Authorization: Bearer"]</code>.</li>
                     </ol>
                 </div>
-                <div class="section-heading"><div><h3>Application credentials</h3><p>Each token rotates independently; plaintext is shown only once and accepted requests are metered.</p></div><RadzenButton Text="New token" Icon="key" Size="ButtonSize.Small" ButtonStyle="ButtonStyle.Primary" Click="@(() => TokenCreateVisible = true)" Disabled="@(Busy || Selected.State != PublicationState.Active)" /></div>
+                <div class="section-heading"><div><h3>@Localizer["Application credentials"]</h3><p>@Localizer["Each token rotates independently; plaintext is shown only once and accepted requests are metered."]</p></div><RadzenButton Text='@Localizer["New token"]' Icon="key" Size="ButtonSize.Small" ButtonStyle="ButtonStyle.Primary" Click="@(() => TokenCreateVisible = true)" Disabled="@(Busy || Selected.State != PublicationState.Active)" /></div>
                 @if (CreatedToken is not null)
                 {
-                    <div class="token-once"><RadzenIcon Icon="key" /><div><strong>Copy @CreatedToken.Name now — it will not be shown again.</strong><code>@CreatedToken.PlaintextToken</code><small>Expires @CreatedToken.ExpiresAtUtc.ToLocalTime().ToString("G")</small></div><button type="button" @onclick="() => CreatedToken = null">Dismiss</button></div>
+                    <div class="token-once"><RadzenIcon Icon="key" /><div><strong>@Localizer["Copy {0} now — it will not be shown again.", CreatedToken.Name]</strong><code>@CreatedToken.PlaintextToken</code><small>@Localizer["Expires {0}", CreatedToken.ExpiresAtUtc.ToLocalTime().ToString("G")]</small></div><button type="button" @onclick="() => CreatedToken = null">@Localizer["Dismiss"]</button></div>
                 }
                 @if (TokenCreateVisible)
                 {
-                    <div class="inline-form token-form"><label><span>Token name</span><input maxlength="200" @bind="TokenName" /></label><label><span>Expires (local)</span><input type="datetime-local" @bind="TokenExpiresLocal" /></label><div class="field-button"><RadzenButton Text="Create token" Icon="add" ButtonStyle="ButtonStyle.Primary" Click="@CreateTokenAsync" Disabled="@Busy" /></div></div>
+                    <div class="inline-form token-form"><label><span>@Localizer["Token name"]</span><input maxlength="200" @bind="TokenName" /></label><label><span>@Localizer["Expires (local)"]</span><input type="datetime-local" @bind="TokenExpiresLocal" /></label><div class="field-button"><RadzenButton Text='@Localizer["Create token"]' Icon="add" ButtonStyle="ButtonStyle.Primary" Click="@CreateTokenAsync" Disabled="@Busy" /></div></div>
                 }
                 @if (Tokens.Count == 0)
                 {
-                    <div class="page-state compact"><p>No bearer tokens exist for this REST publication.</p></div>
+                    <div class="page-state compact"><p>@Localizer["No bearer tokens exist for this REST publication."]</p></div>
                 }
                 else
                 {
-                    <table class="activity-table"><thead><tr><th>Name</th><th>Prefix</th><th>Status</th><th>Accepted uses</th><th>Last used</th><th>Expires</th><th></th></tr></thead><tbody>@foreach (var token in Tokens){<tr><td><strong>@token.Name</strong></td><td><code>@token.DisplayPrefix…</code></td><td><span class="status-chip @TokenCss(token.Status)">@token.Status</span></td><td class="duration">@token.AcceptedRequestCount.ToString("N0")</td><td class="muted">@(token.LastUsedAtUtc?.ToLocalTime().ToString("g") ?? "Never")</td><td class="muted">@token.ExpiresAtUtc.ToLocalTime().ToString("g")</td><td class="publication-actions">@if (token.Status != PublicationAccessTokenStatus.Revoked){<button type="button" @onclick="() => RevokeTokenAsync(token.Id)">Revoke</button>}</td></tr>}</tbody></table>
+                    <table class="activity-table"><thead><tr><th>@Localizer["Name"]</th><th>@Localizer["Prefix"]</th><th>@Localizer["Status"]</th><th>@Localizer["Accepted uses"]</th><th>@Localizer["Last used"]</th><th>@Localizer["Expires"]</th><th></th></tr></thead><tbody>@foreach (var token in Tokens){<tr><td><strong>@token.Name</strong></td><td><code>@token.DisplayPrefix…</code></td><td><span class="status-chip @TokenCss(token.Status)">@token.Status</span></td><td class="duration">@token.AcceptedRequestCount.ToString("N0")</td><td class="muted">@(token.LastUsedAtUtc?.ToLocalTime().ToString("g") ?? "Never")</td><td class="muted">@token.ExpiresAtUtc.ToLocalTime().ToString("g")</td><td class="publication-actions">@if (token.Status != PublicationAccessTokenStatus.Revoked){<button type="button" @onclick="() => RevokeTokenAsync(token.Id)">@Localizer["Revoke"]</button>}</td></tr>}</tbody></table>
                 }
             </div>
         }
@@ -275,15 +275,15 @@
             <div class="detail-section">
                 <div class="editor-handoff">
                     <div>
-                        <span class="handoff-kicker">Consumer handoff</span>
-                        <h3>Assign roles, then share one stable editor URL</h3>
-                        <p>The route follows the active immutable version. Users still need View and any separate edit or approval capabilities below.</p>
+                        <span class="handoff-kicker">@Localizer["Consumer handoff"]</span>
+                        <h3>@Localizer["Assign roles, then share one stable editor URL"]</h3>
+                        <p>@Localizer["The route follows the active immutable version. Users still need View and any separate edit or approval capabilities below."]</p>
                     </div>
                     <a href="@($"/data/{Selected.Slug}")"><code>/data/@Selected.Slug</code><RadzenIcon Icon="open_in_new" /></a>
                 </div>
-                <div class="section-heading"><div><h3>Editor role grants</h3><p>Management permission does not imply data access. Every load, lookup, stage, review, and apply is checked server-side.</p></div></div>
-                <table class="grant-table"><thead><tr><th>Role</th><th>View</th><th>Insert</th><th>Update</th><th>Delete</th><th>Approve</th></tr></thead><tbody>@foreach (var grant in GrantRows){<tr><td><strong>@grant.RoleName</strong></td><td><input type="checkbox" @bind="grant.CanView" /></td><td><input type="checkbox" @bind="grant.CanInsert" /></td><td><input type="checkbox" @bind="grant.CanUpdate" /></td><td><input type="checkbox" @bind="grant.CanDelete" /></td><td><input type="checkbox" @bind="grant.CanApprove" /></td></tr>}</tbody></table>
-                <div class="form-actions"><RadzenButton Text="Save role grants" Icon="save" ButtonStyle="ButtonStyle.Primary" Click="@SaveGrantsAsync" Disabled="@Busy" /></div>
+                <div class="section-heading"><div><h3>@Localizer["Editor role grants"]</h3><p>@Localizer["Management permission does not imply data access. Every load, lookup, stage, review, and apply is checked server-side."]</p></div></div>
+                <table class="grant-table"><thead><tr><th>@Localizer["Role"]</th><th>@Localizer["View"]</th><th>@Localizer["Insert"]</th><th>@Localizer["Update"]</th><th>@Localizer["Delete"]</th><th>@Localizer["Approve"]</th></tr></thead><tbody>@foreach (var grant in GrantRows){<tr><td><strong>@grant.RoleName</strong></td><td><input type="checkbox" @bind="grant.CanView" /></td><td><input type="checkbox" @bind="grant.CanInsert" /></td><td><input type="checkbox" @bind="grant.CanUpdate" /></td><td><input type="checkbox" @bind="grant.CanDelete" /></td><td><input type="checkbox" @bind="grant.CanApprove" /></td></tr>}</tbody></table>
+                <div class="form-actions"><RadzenButton Text='@Localizer["Save role grants"]' Icon="save" ButtonStyle="ButtonStyle.Primary" Click="@SaveGrantsAsync" Disabled="@Busy" /></div>
             </div>
         }
     </section>

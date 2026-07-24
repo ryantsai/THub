@@ -1,0 +1,2713 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <resheader name="resmimetype">
+    <value>text/microsoft-resx</value>
+  </resheader>
+  <resheader name="version">
+    <value>2.0</value>
+  </resheader>
+  <resheader name="reader">
+    <value>System.Resources.ResXResourceReader, System.Windows.Forms</value>
+  </resheader>
+  <resheader name="writer">
+    <value>System.Resources.ResXResourceWriter, System.Windows.Forms</value>
+  </resheader>
+  <data name=", mode" xml:space="preserve">
+    <value>， 模式</value>
+  </data>
+  <data name=", never a shell. Supported placeholders:" xml:space="preserve">
+    <value>，從來沒有命令殼層。支援的預留位置：</value>
+  </data>
+  <data name="· active governed spreadsheet" xml:space="preserve">
+    <value>· 啟用中的受治理試算表</value>
+  </data>
+  <data name="{0:N0} matching events · newest first" xml:space="preserve">
+    <value>{0:N0} 筆相符事件 · 最新優先</value>
+  </data>
+  <data name="{0} · THub" xml:space="preserve">
+    <value>{0} · THub</value>
+  </data>
+  <data name="{0} · THub designer" xml:space="preserve">
+    <value>{0} · THub 設計工具</value>
+  </data>
+  <data name="{0} bounded changes submitted by {1} on {2}. Review the keys and before/after values before deciding." xml:space="preserve">
+    <value>{1} 於 {2} 送出 {0} 筆有限變更。決定前請審查索引鍵及變更前後的值。</value>
+  </data>
+  <data name="{0} columns · {1} foreign keys · fingerprint {2}…" xml:space="preserve">
+    <value>{0} 個欄位 · {1} 個外鍵 · 指紋 {2}…</value>
+  </data>
+  <data name="{0} configured · {1} active · {2} paused" xml:space="preserve">
+    <value>{0} 個已設定 · {1} 個啟用中 · {2} 個已暫停</value>
+  </data>
+  <data name="{0} failed · {1} paused" xml:space="preserve">
+    <value>{0} 個失敗 · {1} 個已暫停</value>
+  </data>
+  <data name="{0} matching deliveries; newest 100 are shown." xml:space="preserve">
+    <value>{0} 筆相符傳遞；顯示最新 100 筆。</value>
+  </data>
+  <data name="{0} new and {1} deleted rows are marked in this window. Stage them to create a reviewable change set." xml:space="preserve">
+    <value>此視窗已標示 {0} 筆新增及 {1} 筆刪除資料列。請暫存以建立可審查的變更集。</value>
+  </data>
+  <data name="{0} of the latest {1} shown" xml:space="preserve">
+    <value>顯示最新 {1} 筆中的 {0} 筆</value>
+  </data>
+  <data name="{0} policy:" xml:space="preserve">
+    <value>{0} 原則：</value>
+  </data>
+  <data name="{0} recipients, {1} subject characters, {2} body characters." xml:space="preserve">
+    <value>{0} 位收件者、主旨 {1} 個字元、本文 {2} 個字元。</value>
+  </data>
+  <data name="{0} shown · {1} published · {2} drafts · {3} paused" xml:space="preserve">
+    <value>顯示 {0} 個 · {1} 個已發佈 · {2} 個草稿 · {3} 個已暫停</value>
+  </data>
+  <data name="{0} steps · {1} links" xml:space="preserve">
+    <value>{0} 個步驟 · {1} 個連結</value>
+  </data>
+  <data name="{0} total" xml:space="preserve">
+    <value>共 {0} 個</value>
+  </data>
+  <data name="{0} validation issues" xml:space="preserve">
+    <value>{0} 個驗證問題</value>
+  </data>
+  <data name="A credential is stored. Leave both fields blank to keep it, or enter both to rotate it." xml:space="preserve">
+    <value>儲存憑證。將兩個欄位留空以保留它，或同時輸入兩個欄位以旋轉它。</value>
+  </data>
+  <data name="A rejection reason is required." xml:space="preserve">
+    <value>需要提供拒絕原因。</value>
+  </data>
+  <data name="A schedule always runs the exact workflow version you published. Editing a draft will not change active runs until you publish again." xml:space="preserve">
+    <value>排程始終執行您發佈的確切工作流程版本。編輯草稿不會變更活動執行，直到您再次發佈。</value>
+  </data>
+  <data name="A stable, non-null unique key is required for bounded paging; this object cannot be published." xml:space="preserve">
+    <value>有界分頁需要一個穩定的、非空白的唯一鍵；無法發佈此物件。</value>
+  </data>
+  <data name="A stable, non-null unique key is required." xml:space="preserve">
+    <value>需要穩定且不可為空值的唯一索引鍵。</value>
+  </data>
+  <data name="Accepted uses" xml:space="preserve">
+    <value>已接受的使用次數</value>
+  </data>
+  <data name="Access" xml:space="preserve">
+    <value>存取權</value>
+  </data>
+  <data name="ACCESS CONTROL" xml:space="preserve">
+    <value>存取控制</value>
+  </data>
+  <data name="Access control · THub" xml:space="preserve">
+    <value>存取控制 · THub</value>
+  </data>
+  <data name="Access update failed" xml:space="preserve">
+    <value>存取更新失敗</value>
+  </data>
+  <data name="Access updated" xml:space="preserve">
+    <value>存取已更新</value>
+  </data>
+  <data name="Action" xml:space="preserve">
+    <value>動作</value>
+  </data>
+  <data name="Activate" xml:space="preserve">
+    <value>啟用</value>
+  </data>
+  <data name="Active schedules" xml:space="preserve">
+    <value>啟用中的排程</value>
+  </data>
+  <data name="Active server filters" xml:space="preserve">
+    <value>啟用中的伺服器端篩選條件</value>
+  </data>
+  <data name="Active version" xml:space="preserve">
+    <value>啟用中的版本</value>
+  </data>
+  <data name="Active work" xml:space="preserve">
+    <value>進行中的工作</value>
+  </data>
+  <data name="Actor" xml:space="preserve">
+    <value>執行者</value>
+  </data>
+  <data name="Actor, action, or resource" xml:space="preserve">
+    <value>參與者、動作或資源</value>
+  </data>
+  <data name="Add" xml:space="preserve">
+    <value>新增</value>
+  </data>
+  <data name="Add a data connection" xml:space="preserve">
+    <value>新增資料連線</value>
+  </data>
+  <data name="Add a database, local file, or FTP source from the left panel." xml:space="preserve">
+    <value>從左側面板新增資料庫、本機檔案或 FTP 來源。</value>
+  </data>
+  <data name="Add a rule for failure, success, cancellation, or any supported combination." xml:space="preserve">
+    <value>新增失敗、成功、取消或任何支援的組合的規則。</value>
+  </data>
+  <data name="Add a step" xml:space="preserve">
+    <value>新增一個步驟</value>
+  </data>
+  <data name="Add connection" xml:space="preserve">
+    <value>新增連線</value>
+  </data>
+  <data name="Add filter" xml:space="preserve">
+    <value>新增篩選條件</value>
+  </data>
+  <data name="Add principal" xml:space="preserve">
+    <value>新增安全性主體</value>
+  </data>
+  <data name="Add resource grant" xml:space="preserve">
+    <value>新增資源授權</value>
+  </data>
+  <data name="Add staged row" xml:space="preserve">
+    <value>新增暫存資料列</value>
+  </data>
+  <data name="Add the database or files you want to use." xml:space="preserve">
+    <value>新增您要使用的資料庫或檔案。</value>
+  </data>
+  <data name="Add the first database, file folder, or FTP location you want to use in a workflow." xml:space="preserve">
+    <value>新增要在工作流程中使用的第一個資料庫、資料夾或 FTP 位置。</value>
+  </data>
+  <data name="Adjust the filters or return after an audited action has completed." xml:space="preserve">
+    <value>調整篩選條件或在審核操作完成後返回。</value>
+  </data>
+  <data name="Administration" xml:space="preserve">
+    <value>系統管理</value>
+  </data>
+  <data name="Administrator approved this UNC root" xml:space="preserve">
+    <value>管理員核准了此 UNC 根</value>
+  </data>
+  <data name="Administrator-owned relay, sender, TLS, recipient, and message limits." xml:space="preserve">
+    <value>管理員擁有的中繼、寄件者、TLS、收件者和訊息限制。</value>
+  </data>
+  <data name="Advanced settings JSON" xml:space="preserve">
+    <value>進階設定 JSON</value>
+  </data>
+  <data name="After" xml:space="preserve">
+    <value>後</value>
+  </data>
+  <data name="afternoon" xml:space="preserve">
+    <value>午安</value>
+  </data>
+  <data name="Alerts" xml:space="preserve">
+    <value>警示</value>
+  </data>
+  <data name="All outcomes" xml:space="preserve">
+    <value>所有結果</value>
+  </data>
+  <data name="All profiles" xml:space="preserve">
+    <value>所有設定檔</value>
+  </data>
+  <data name="All statuses" xml:space="preserve">
+    <value>所有狀態</value>
+  </data>
+  <data name="All workflows" xml:space="preserve">
+    <value>所有工作流程</value>
+  </data>
+  <data name="Allowed Email template variables" xml:space="preserve">
+    <value>允許的電子郵件範本變數</value>
+  </data>
+  <data name="Allowed recipient domains" xml:space="preserve">
+    <value>允許的收件者網域</value>
+  </data>
+  <data name="Allowed variables" xml:space="preserve">
+    <value>允許的變數</value>
+  </data>
+  <data name="An authenticated actor identity is required." xml:space="preserve">
+    <value>需要經過身分驗證的執行者身分。</value>
+  </data>
+  <data name="An error occurred while processing your request." xml:space="preserve">
+    <value>處理您的請求時發生錯誤。</value>
+  </data>
+  <data name="An exact-version retry was queued." xml:space="preserve">
+    <value>精確版本重試已排入佇列。</value>
+  </data>
+  <data name="Application credentials" xml:space="preserve">
+    <value>應用程式憑證</value>
+  </data>
+  <data name="Apply filters" xml:space="preserve">
+    <value>套用篩選條件</value>
+  </data>
+  <data name="Apply sort" xml:space="preserve">
+    <value>套用排序</value>
+  </data>
+  <data name="Apply typed conditions" xml:space="preserve">
+    <value>套用具型別的條件</value>
+  </data>
+  <data name="Approval and durable application are separate operations. Conflicts do not overwrite newer source data." xml:space="preserve">
+    <value>核准與持久套用是分開的作業。發生衝突時不會覆寫較新的來源資料。</value>
+  </data>
+  <data name="Approve" xml:space="preserve">
+    <value>核准</value>
+  </data>
+  <data name="Approve fixed webhook destinations and executable definitions. Role grants control which workflow authors may select each action." xml:space="preserve">
+    <value>核准固定的 Webhook 目標和可執行定義。角色授予控制哪些工作流程作者可以選擇每個操作。</value>
+  </data>
+  <data name="Approve inspected changes" xml:space="preserve">
+    <value>核准檢查的變更</value>
+  </data>
+  <data name="Approve lookup" xml:space="preserve">
+    <value>核准查閱</value>
+  </data>
+  <data name="Approved anonymous relay" xml:space="preserve">
+    <value>核准的匿名中繼</value>
+  </data>
+  <data name="Approved database connection" xml:space="preserve">
+    <value>核准的資料庫連線</value>
+  </data>
+  <data name="Approved definitions" xml:space="preserve">
+    <value>核准的定義</value>
+  </data>
+  <data name="Approved display column" xml:space="preserve">
+    <value>核准的顯示欄</value>
+  </data>
+  <data name="Approved foreign-key value" xml:space="preserve">
+    <value>核准的外鍵值</value>
+  </data>
+  <data name="Approved lookup" xml:space="preserve">
+    <value>核准的查閱</value>
+  </data>
+  <data name="Approved MySQL object" xml:space="preserve">
+    <value>核准的 MySQL 物件</value>
+  </data>
+  <data name="Approved Oracle object" xml:space="preserve">
+    <value>核准的 Oracle 物件</value>
+  </data>
+  <data name="Approved PostgreSQL object" xml:space="preserve">
+    <value>核准的 PostgreSQL 物件</value>
+  </data>
+  <data name="Approved root" xml:space="preserve">
+    <value>核准的根目錄</value>
+  </data>
+  <data name="Approved search columns" xml:space="preserve">
+    <value>核准的搜尋欄</value>
+  </data>
+  <data name="Approved sender" xml:space="preserve">
+    <value>核准的寄件者</value>
+  </data>
+  <data name="Approved SQL table" xml:space="preserve">
+    <value>核准的 SQL 表</value>
+  </data>
+  <data name="Archive" xml:space="preserve">
+    <value>封存</value>
+  </data>
+  <data name="Archive failed" xml:space="preserve">
+    <value>封存失敗</value>
+  </data>
+  <data name="Archive workflow" xml:space="preserve">
+    <value>封存工作流程</value>
+  </data>
+  <data name="ArgumentList" xml:space="preserve">
+    <value>引數清單</value>
+  </data>
+  <data name="Ask a THub administrator to map your Windows account or AD group to the required application role." xml:space="preserve">
+    <value>請 THub 管理員將您的 Windows 帳號或 AD 群組對應到所需的應用程式角色。</value>
+  </data>
+  <data name="Ask an administrator to share a table with your role." xml:space="preserve">
+    <value>請求管理員與您的角色共用一個表格。</value>
+  </data>
+  <data name="ASPNETCORE_ENVIRONMENT" xml:space="preserve">
+    <value>ASPNETCORE_ENVIRONMENT</value>
+  </data>
+  <data name="Assign roles, then share one stable editor URL" xml:space="preserve">
+    <value>指派角色，然後共用一個穩定的編輯器 URL</value>
+  </data>
+  <data name="Assignments match the authenticated Windows user name or Windows/AD group membership." xml:space="preserve">
+    <value>指派與經過驗證的 Windows 使用者名稱或 Windows/AD 群組成員身分相符。</value>
+  </data>
+  <data name="At most 16 server-side filters can be active." xml:space="preserve">
+    <value>最多可以有 16 個伺服器端篩選條件處於活動狀態。</value>
+  </data>
+  <data name="Attempt" xml:space="preserve">
+    <value>試圖</value>
+  </data>
+  <data name="Attempts" xml:space="preserve">
+    <value>嘗試</value>
+  </data>
+  <data name="Audit event details" xml:space="preserve">
+    <value>審核事件詳細資訊</value>
+  </data>
+  <data name="Audit log" xml:space="preserve">
+    <value>稽核記錄</value>
+  </data>
+  <data name="Audit log · THub" xml:space="preserve">
+    <value>稽核記錄 · THub</value>
+  </data>
+  <data name="Audit pagination" xml:space="preserve">
+    <value>審計分頁</value>
+  </data>
+  <data name="Audit records are temporarily unavailable." xml:space="preserve">
+    <value>審計記錄暫時無法取得。</value>
+  </data>
+  <data name="Audit records intentionally contain stable identifiers and outcomes only. Configuration, SQL, paths, headers, tokens, row values, and request or response bodies are not stored here." xml:space="preserve">
+    <value>稽核記錄僅包含穩定識別碼與結果。設定、SQL、路徑、標頭、權杖、資料列值，以及要求或回應本文都不會儲存在此處。</value>
+  </data>
+  <data name="AuditOutcome?" xml:space="preserve">
+    <value>審計結果？</value>
+  </data>
+  <data name="Authentication" xml:space="preserve">
+    <value>驗證</value>
+  </data>
+  <data name="Authorization: Bearer" xml:space="preserve">
+    <value>授權：持票人</value>
+  </data>
+  <data name="Authorize in Swagger or send it as" xml:space="preserve">
+    <value>在 Swagger 中授權或發送為</value>
+  </data>
+  <data name="Authorizing and loading the governed window…" xml:space="preserve">
+    <value>授權並載入受控視窗...</value>
+  </data>
+  <data name="Awaiting outcome" xml:space="preserve">
+    <value>等待結果</value>
+  </data>
+  <data name="Awaiting review" xml:space="preserve">
+    <value>等待審核</value>
+  </data>
+  <data name="Batches" xml:space="preserve">
+    <value>批次</value>
+  </data>
+  <data name="Before" xml:space="preserve">
+    <value>前</value>
+  </data>
+  <data name="Bounded CSV file root" xml:space="preserve">
+    <value>有界 CSV 檔根</value>
+  </data>
+  <data name="Bounded CSV input" xml:space="preserve">
+    <value>有界 CSV 輸入</value>
+  </data>
+  <data name="Bounded dropdown" xml:space="preserve">
+    <value>有界下拉選單</value>
+  </data>
+  <data name="Bounded FTP file input" xml:space="preserve">
+    <value>有界 FTP 檔輸入</value>
+  </data>
+  <data name="Bounded template" xml:space="preserve">
+    <value>有界範本</value>
+  </data>
+  <data name="Build a repeatable series of steps that moves or changes your data." xml:space="preserve">
+    <value>建立一系列可重複的步驟來移動或變更資料。</value>
+  </data>
+  <data name="Build a workflow" xml:space="preserve">
+    <value>建構工作流程</value>
+  </data>
+  <data name="Build and run" xml:space="preserve">
+    <value>建立與執行</value>
+  </data>
+  <data name="Build your first automation in four steps" xml:space="preserve">
+    <value>透過四個步驟建立您的第一個自動化</value>
+  </data>
+  <data name="By" xml:space="preserve">
+    <value>經過</value>
+  </data>
+  <data name="Call an authorized trusted destination" xml:space="preserve">
+    <value>呼叫授權的可信任目的地</value>
+  </data>
+  <data name="Call first when generating a client or validating aliases." xml:space="preserve">
+    <value>產生客戶端或驗證別名時首先呼叫。</value>
+  </data>
+  <data name="Cancel" xml:space="preserve">
+    <value>取消</value>
+  </data>
+  <data name="Cancellation could not be confirmed. Reload the run before retrying." xml:space="preserve">
+    <value>無法確認取消。重試之前重新載入執行。</value>
+  </data>
+  <data name="Cancellation was requested." xml:space="preserve">
+    <value>已要求取消。</value>
+  </data>
+  <data name="Changes" xml:space="preserve">
+    <value>變化</value>
+  </data>
+  <data name="Changes saved" xml:space="preserve">
+    <value>變更已儲存</value>
+  </data>
+  <data name="Check results" xml:space="preserve">
+    <value>檢查結果</value>
+  </data>
+  <data name="Check workflow" xml:space="preserve">
+    <value>檢查工作流程</value>
+  </data>
+  <data name="Checked when this page loaded" xml:space="preserve">
+    <value>此頁面載入時檢查</value>
+  </data>
+  <data name="Checking which tables you can access…" xml:space="preserve">
+    <value>檢查您可以存取哪些表...</value>
+  </data>
+  <data name="Choose a provider and object" xml:space="preserve">
+    <value>選擇提供者和物件</value>
+  </data>
+  <data name="Choose a workflow" xml:space="preserve">
+    <value>選擇工作流程</value>
+  </data>
+  <data name="Choose a workflow to view its alert policy." xml:space="preserve">
+    <value>選擇一個工作流程以查看其警報策略。</value>
+  </data>
+  <data name="Choose an enabled profile" xml:space="preserve">
+    <value>選擇啟用的設定檔</value>
+  </data>
+  <data name="Choose the steps and what each one should do." xml:space="preserve">
+    <value>選擇步驟以及每個步驟應該做什麼。</value>
+  </data>
+  <data name="Choose what should happen next" xml:space="preserve">
+    <value>選擇接下來會發生什麼</value>
+  </data>
+  <data name="Clear" xml:space="preserve">
+    <value>清除</value>
+  </data>
+  <data name="Clear filters" xml:space="preserve">
+    <value>清除篩選條件</value>
+  </data>
+  <data name="Close" xml:space="preserve">
+    <value>關閉</value>
+  </data>
+  <data name="Close profile editor" xml:space="preserve">
+    <value>關閉個人資料編輯器</value>
+  </data>
+  <data name="Close rule editor" xml:space="preserve">
+    <value>關閉規則編輯器</value>
+  </data>
+  <data name="Column mapping" xml:space="preserve">
+    <value>欄位對應</value>
+  </data>
+  <data name="Column mappings" xml:space="preserve">
+    <value>欄位對應</value>
+  </data>
+  <data name="Combine exactly two streams" xml:space="preserve">
+    <value>恰好合併兩個流</value>
+  </data>
+  <data name="Command timeout (seconds)" xml:space="preserve">
+    <value>命令逾時（秒）</value>
+  </data>
+  <data name="Comment (required to reject)" xml:space="preserve">
+    <value>評論（需拒絕）</value>
+  </data>
+  <data name="Common tasks" xml:space="preserve">
+    <value>常見任務</value>
+  </data>
+  <data name="Completed" xml:space="preserve">
+    <value>完全的</value>
+  </data>
+  <data name="Concurrent requests" xml:space="preserve">
+    <value>並發請求</value>
+  </data>
+  <data name="Configure" xml:space="preserve">
+    <value>設定</value>
+  </data>
+  <data name="Configured connections" xml:space="preserve">
+    <value>設定的連線</value>
+  </data>
+  <data name="Confirm success or see exactly where a run stopped." xml:space="preserve">
+    <value>確認成功或查看運轉停止的確切位置。</value>
+  </data>
+  <data name="Connect data" xml:space="preserve">
+    <value>連線資料</value>
+  </data>
+  <data name="Connect from step" xml:space="preserve">
+    <value>從步驟連線</value>
+  </data>
+  <data name="Connect timeout (seconds)" xml:space="preserve">
+    <value>連線逾時（秒）</value>
+  </data>
+  <data name="Connection boundary" xml:space="preserve">
+    <value>連線邊界</value>
+  </data>
+  <data name="Connection editor" xml:space="preserve">
+    <value>連線編輯器</value>
+  </data>
+  <data name="Connection failed" xml:space="preserve">
+    <value>連線失敗</value>
+  </data>
+  <data name="Connection metadata was saved." xml:space="preserve">
+    <value>連線元資料已儲存。</value>
+  </data>
+  <data name="Connection references were resolved." xml:space="preserve">
+    <value>連線引用已解決。</value>
+  </data>
+  <data name="Connection updated" xml:space="preserve">
+    <value>連線已更新</value>
+  </data>
+  <data name="Connections" xml:space="preserve">
+    <value>連線</value>
+  </data>
+  <data name="Connections · THub" xml:space="preserve">
+    <value>連線·THub</value>
+  </data>
+  <data name="Connections are temporarily unavailable." xml:space="preserve">
+    <value>連線暫時無法使用。</value>
+  </data>
+  <data name="Connector" xml:space="preserve">
+    <value>連線器</value>
+  </data>
+  <data name="Consumer access" xml:space="preserve">
+    <value>消費者存取</value>
+  </data>
+  <data name="Consumer handoff" xml:space="preserve">
+    <value>消費者交接</value>
+  </data>
+  <data name="Contract" xml:space="preserve">
+    <value>合約</value>
+  </data>
+  <data name="Copy {0} now — it will not be shown again." xml:space="preserve">
+    <value>立即複製 {0} — 之後將不再顯示。</value>
+  </data>
+  <data name="Copy it once into the consumer's approved secret store." xml:space="preserve">
+    <value>將其複製到消費者核准的秘密儲存中一次。</value>
+  </data>
+  <data name="Correlation identifier" xml:space="preserve">
+    <value>相關標識符</value>
+  </data>
+  <data name="Create" xml:space="preserve">
+    <value>建立</value>
+  </data>
+  <data name="Create a named, expiring token below." xml:space="preserve">
+    <value>在下方建立一個已命名的過期權杖。</value>
+  </data>
+  <data name="Create a resource, discover an approved database object, review its columns and foreign keys, then activate an immutable version." xml:space="preserve">
+    <value>建立資源，發現已核准的資料庫物件，檢查其欄位和外鍵，然後啟動不可變版本。</value>
+  </data>
+  <data name="Create a workflow" xml:space="preserve">
+    <value>建立工作流程</value>
+  </data>
+  <data name="Create a workflow, add its steps, check it for problems, then publish when it is ready to run." xml:space="preserve">
+    <value>建立工作流程，新增其步驟，檢查是否有問題，然後在準備好執行時發佈。</value>
+  </data>
+  <data name="Create an approved relay profile before adding workflow rules or Email actions." xml:space="preserve">
+    <value>在新增工作流程規則或電子郵件操作之前建立已核准的中繼設定檔。</value>
+  </data>
+  <data name="Create and activate version" xml:space="preserve">
+    <value>建立並啟動版本</value>
+  </data>
+  <data name="Create CSV, tab text, or Excel" xml:space="preserve">
+    <value>建立 CSV、選項卡文字或 Excel</value>
+  </data>
+  <data name="Create custom role" xml:space="preserve">
+    <value>建立自訂角色</value>
+  </data>
+  <data name="Create governed surface" xml:space="preserve">
+    <value>建立受控曲面</value>
+  </data>
+  <data name="Create token" xml:space="preserve">
+    <value>建立權杖</value>
+  </data>
+  <data name="Create workflow" xml:space="preserve">
+    <value>建立工作流程</value>
+  </data>
+  <data name="Create workflow →" xml:space="preserve">
+    <value>建立工作流程 →</value>
+  </data>
+  <data name="Created" xml:space="preserve">
+    <value>已建立</value>
+  </data>
+  <data name="Credential" xml:space="preserve">
+    <value>憑證</value>
+  </data>
+  <data name="Credential encryption is unavailable. Ask an administrator to configure the THub credential master key." xml:space="preserve">
+    <value>憑證加密不可用。請求管理員設定 THub 憑證主金鑰。</value>
+  </data>
+  <data name="Credential reference" xml:space="preserve">
+    <value>憑證參考</value>
+  </data>
+  <data name="Credential reference configured" xml:space="preserve">
+    <value>已設定憑證參考</value>
+  </data>
+  <data name="Credential secret reference" xml:space="preserve">
+    <value>憑證秘密參考</value>
+  </data>
+  <data name="Cron" xml:space="preserve">
+    <value>克朗</value>
+  </data>
+  <data name="CSV file" xml:space="preserve">
+    <value>CSV 檔案</value>
+  </data>
+  <data name="CSV file output" xml:space="preserve">
+    <value>CSV 檔案輸出</value>
+  </data>
+  <data name="CSV files" xml:space="preserve">
+    <value>CSV 檔案</value>
+  </data>
+  <data name="CSV target" xml:space="preserve">
+    <value>CSV 目標</value>
+  </data>
+  <data name="customer-lookup" xml:space="preserve">
+    <value>客戶查閱</value>
+  </data>
+  <data name="Data connections" xml:space="preserve">
+    <value>資料連線</value>
+  </data>
+  <data name="DATA OPERATIONS" xml:space="preserve">
+    <value>資料作業</value>
+  </data>
+  <data name="Data sharing" xml:space="preserve">
+    <value>資料分享</value>
+  </data>
+  <data name="Data sharing · THub" xml:space="preserve">
+    <value>資料分享 · THub</value>
+  </data>
+  <data name="Data tables" xml:space="preserve">
+    <value>資料表</value>
+  </data>
+  <data name="Data tables · THub" xml:space="preserve">
+    <value>資料表·THub</value>
+  </data>
+  <data name="Database object schema" xml:space="preserve">
+    <value>資料庫物件結構定義</value>
+  </data>
+  <data name="Database password" xml:space="preserve">
+    <value>資料庫密碼</value>
+  </data>
+  <data name="Database target write mode" xml:space="preserve">
+    <value>資料庫目標寫入模式</value>
+  </data>
+  <data name="Database timeout seconds" xml:space="preserve">
+    <value>資料庫超時秒數</value>
+  </data>
+  <data name="Database username" xml:space="preserve">
+    <value>資料庫使用者名稱</value>
+  </data>
+  <data name="Database username/password" xml:space="preserve">
+    <value>資料庫使用者名稱/密碼</value>
+  </data>
+  <data name="db01.contoso.local" xml:space="preserve">
+    <value>db01.contoso.local</value>
+  </data>
+  <data name="Default page rows" xml:space="preserve">
+    <value>預設每頁資料列數</value>
+  </data>
+  <data name="Definitions and credentials are visible only to System Administrators. Passwords are replacement-only and never read back." xml:space="preserve">
+    <value>定義和憑證僅對系統管理員可見。密碼只能替換且永遠不會讀回。</value>
+  </data>
+  <data name="Delete" xml:space="preserve">
+    <value>刪除</value>
+  </data>
+  <data name="Delete failed" xml:space="preserve">
+    <value>刪除失敗</value>
+  </data>
+  <data name="Delete incoming keys" xml:space="preserve">
+    <value>刪除傳入的金鑰</value>
+  </data>
+  <data name="Delete node" xml:space="preserve">
+    <value>刪除節點</value>
+  </data>
+  <data name="Delete role" xml:space="preserve">
+    <value>刪除角色</value>
+  </data>
+  <data name="Delete workflow" xml:space="preserve">
+    <value>刪除工作流程</value>
+  </data>
+  <data name="Delivery" xml:space="preserve">
+    <value>送貨</value>
+  </data>
+  <data name="Delivery monitor" xml:space="preserve">
+    <value>交貨監控</value>
+  </data>
+  <data name="Delivery profile" xml:space="preserve">
+    <value>交付概況</value>
+  </data>
+  <data name="Delivery profiles" xml:space="preserve">
+    <value>交付概況</value>
+  </data>
+  <data name="Delivery rows appear after a terminal workflow rule or Email action queues durable intent." xml:space="preserve">
+    <value>結束狀態工作流程規則或電子郵件動作將持久性意圖排入佇列後，傳遞資料列就會出現。</value>
+  </data>
+  <data name="Descending" xml:space="preserve">
+    <value>降序</value>
+  </data>
+  <data name="Description" xml:space="preserve">
+    <value>描述</value>
+  </data>
+  <data name="Destination" xml:space="preserve">
+    <value>目的地</value>
+  </data>
+  <data name="Details" xml:space="preserve">
+    <value>細節</value>
+  </data>
+  <data name="Detected display and search suggestions are not saved. An administrator must approve each lookup and select every exposed column explicitly." xml:space="preserve">
+    <value>不會儲存偵測到的顯示和搜尋建議。管理員必須核准每個查閱並明確選擇每個公開的欄位。</value>
+  </data>
+  <data name="Detected policy" xml:space="preserve">
+    <value>檢測到的政策</value>
+  </data>
+  <data name="Development" xml:space="preserve">
+    <value>發展</value>
+  </data>
+  <data name="Development Mode" xml:space="preserve">
+    <value>發展模式</value>
+  </data>
+  <data name="Disable" xml:space="preserve">
+    <value>停用</value>
+  </data>
+  <data name="Discard and reload" xml:space="preserve">
+    <value>丟棄並重新載入</value>
+  </data>
+  <data name="Discover source" xml:space="preserve">
+    <value>發現來源</value>
+  </data>
+  <data name="Dismiss" xml:space="preserve">
+    <value>解僱</value>
+  </data>
+  <data name="Display value" xml:space="preserve">
+    <value>顯示值</value>
+  </data>
+  <data name="DOMAIN\alice" xml:space="preserve">
+    <value>DOMAIN\alice</value>
+  </data>
+  <data name="DOMAIN\THub Developers" xml:space="preserve">
+    <value>DOMAIN\THub Developers</value>
+  </data>
+  <data name="DOMAIN\user" xml:space="preserve">
+    <value>DOMAIN\user</value>
+  </data>
+  <data name="Draft deleted" xml:space="preserve">
+    <value>草稿已刪除</value>
+  </data>
+  <data name="Draft was not saved" xml:space="preserve">
+    <value>草稿未儲存</value>
+  </data>
+  <data name="Durable delivery monitor" xml:space="preserve">
+    <value>耐用的輸送監視器</value>
+  </data>
+  <data name="Durable Email outbox" xml:space="preserve">
+    <value>耐用的電子郵件寄件箱</value>
+  </data>
+  <data name="Durable, policy-controlled delivery" xml:space="preserve">
+    <value>持久性、策略控制的交付</value>
+  </data>
+  <data name="Duration" xml:space="preserve">
+    <value>期間</value>
+  </data>
+  <data name="Each token rotates independently; plaintext is shown only once and accepted requests are metered." xml:space="preserve">
+    <value>每個權杖可獨立輪替；純文字只會顯示一次，且已接受的要求都會計量。</value>
+  </data>
+  <data name="Edit connection" xml:space="preserve">
+    <value>編輯連線</value>
+  </data>
+  <data name="Edit delivery profile" xml:space="preserve">
+    <value>編輯交付資料</value>
+  </data>
+  <data name="Edit workflow rule" xml:space="preserve">
+    <value>編輯工作流程規則</value>
+  </data>
+  <data name="Editor operation failed" xml:space="preserve">
+    <value>編輯器操作失敗</value>
+  </data>
+  <data name="Editor permissions and controls" xml:space="preserve">
+    <value>編輯者權限和控制</value>
+  </data>
+  <data name="Editor role grants" xml:space="preserve">
+    <value>編輯角色補助金</value>
+  </data>
+  <data name="Editor role grants saved." xml:space="preserve">
+    <value>已儲存編輯者角色授予。</value>
+  </data>
+  <data name="Editor window rows" xml:space="preserve">
+    <value>編輯器視窗資料列</value>
+  </data>
+  <data name="Edits are validated and staged against the active immutable schema. They are never written directly from this browser." xml:space="preserve">
+    <value>編輯內容會依啟用中的不可變結構描述進行驗證及暫存，絕不會直接從瀏覽器寫入。</value>
+  </data>
+  <data name="Effective roles" xml:space="preserve">
+    <value>有效的角色</value>
+  </data>
+  <data name="Email actions queue intent in SQL Server. SMTP delivery is at-least-once, so an ambiguous relay acknowledgement can produce a duplicate." xml:space="preserve">
+    <value>電子郵件動作會在 SQL Server 中將意圖排入佇列。SMTP 傳遞採至少一次語意，因此不明確的中繼確認可能造成重複傳送。</value>
+  </data>
+  <data name="Email alert" xml:space="preserve">
+    <value>電子郵件警示</value>
+  </data>
+  <data name="Email alert management" xml:space="preserve">
+    <value>電子郵件警報管理</value>
+  </data>
+  <data name="Email alert policy is temporarily unavailable." xml:space="preserve">
+    <value>電子郵件警報策略暫時無法使用。</value>
+  </data>
+  <data name="Email alerts" xml:space="preserve">
+    <value>電子郵件警示</value>
+  </data>
+  <data name="Email alerts · THub" xml:space="preserve">
+    <value>電子郵件警示 · THub</value>
+  </data>
+  <data name="Email deliveries are temporarily unavailable." xml:space="preserve">
+    <value>暫時無法傳送電子郵件。</value>
+  </data>
+  <data name="Email deliveries could not be loaded." xml:space="preserve">
+    <value>無法載入電子郵件遞送。</value>
+  </data>
+  <data name="Email delivery boundary" xml:space="preserve">
+    <value>電子郵件傳遞邊界</value>
+  </data>
+  <data name="Email delivery monitor" xml:space="preserve">
+    <value>電子郵件發送監控</value>
+  </data>
+  <data name="Email delivery profile saved." xml:space="preserve">
+    <value>已儲存電子郵件傳送設定檔。</value>
+  </data>
+  <data name="Email delivery profiles" xml:space="preserve">
+    <value>電子郵件傳送設定檔</value>
+  </data>
+  <data name="Email delivery profiles could not be loaded." xml:space="preserve">
+    <value>無法載入電子郵件傳送設定檔。</value>
+  </data>
+  <data name="Email policy operation failed" xml:space="preserve">
+    <value>電子郵件策略操作失敗</value>
+  </data>
+  <data name="Email policy updated" xml:space="preserve">
+    <value>電子郵件政策已更新</value>
+  </data>
+  <data name="Email profiles could not be listed." xml:space="preserve">
+    <value>無法列出電子郵件設定檔。</value>
+  </data>
+  <data name="English" xml:space="preserve">
+    <value>English</value>
+  </data>
+  <data name="Enter a filter value or select a null operator." xml:space="preserve">
+    <value>輸入篩選條件值或選擇空運算符。</value>
+  </data>
+  <data name="Enter both fields to create the encrypted credential." xml:space="preserve">
+    <value>輸入這兩個欄位以建立加密憑證。</value>
+  </data>
+  <data name="Enter both the credential username and password." xml:space="preserve">
+    <value>輸入憑證使用者名稱和密碼。</value>
+  </data>
+  <data name="Enter only an approved secret-provider lookup key; never paste a username or password." xml:space="preserve">
+    <value>僅輸入經核准的秘密提供者查閱金鑰；切勿貼上使用者名稱或密碼。</value>
+  </data>
+  <data name="environment by setting the" xml:space="preserve">
+    <value>環境透過設定</value>
+  </data>
+  <data name="environment variable to" xml:space="preserve">
+    <value>環境變數為</value>
+  </data>
+  <data name="Error" xml:space="preserve">
+    <value>錯誤</value>
+  </data>
+  <data name="Error." xml:space="preserve">
+    <value>錯誤。</value>
+  </data>
+  <data name="evening" xml:space="preserve">
+    <value>晚安</value>
+  </data>
+  <data name="Events" xml:space="preserve">
+    <value>活動</value>
+  </data>
+  <data name="Everything an API consumer needs" xml:space="preserve">
+    <value>API 消費者所需的一切</value>
+  </data>
+  <data name="example.com&#xA;subsidiary.example.com" xml:space="preserve">
+    <value>example.com
+子公司.example.com</value>
+  </data>
+  <data name="Excel output" xml:space="preserve">
+    <value>Excel輸出</value>
+  </data>
+  <data name="Excel target" xml:space="preserve">
+    <value>Excel 目標</value>
+  </data>
+  <data name="Excel workbook" xml:space="preserve">
+    <value>Excel工作簿</value>
+  </data>
+  <data name="Excel workbooks" xml:space="preserve">
+    <value>Excel 工作簿</value>
+  </data>
+  <data name="Executable arguments are passed with" xml:space="preserve">
+    <value>可執行參數通過</value>
+  </data>
+  <data name="Expires" xml:space="preserve">
+    <value>過期</value>
+  </data>
+  <data name="Expires (local)" xml:space="preserve">
+    <value>到期時間（本機）</value>
+  </data>
+  <data name="Expires {0}" xml:space="preserve">
+    <value>到期時間：{0}</value>
+  </data>
+  <data name="Explicit FTPS" xml:space="preserve">
+    <value>顯式 FTPS</value>
+  </data>
+  <data name="Export" xml:space="preserve">
+    <value>出口</value>
+  </data>
+  <data name="Export failed" xml:space="preserve">
+    <value>匯出失敗</value>
+  </data>
+  <data name="Expression-only JavaScript. No CLR, filesystem, network, module, or dynamic code access." xml:space="preserve">
+    <value>純表達式 JavaScript。沒有 CLR、檔案系統、網路、模組或動態程式碼存取。</value>
+  </data>
+  <data name="Failed to rejoin." xml:space="preserve">
+    <value>無法重新連線。</value>
+  </data>
+  <data name="Failed to resume the session." xml:space="preserve">
+    <value>無法恢復工作階段。</value>
+  </data>
+  <data name="Filter" xml:space="preserve">
+    <value>篩選</value>
+  </data>
+  <data name="Filter column" xml:space="preserve">
+    <value>篩選欄位</value>
+  </data>
+  <data name="Filter loaded approved values…" xml:space="preserve">
+    <value>篩選已載入的核准值…</value>
+  </data>
+  <data name="Filter rows" xml:space="preserve">
+    <value>篩選資料列</value>
+  </data>
+  <data name="Filter value" xml:space="preserve">
+    <value>篩選值</value>
+  </data>
+  <data name="Find a step" xml:space="preserve">
+    <value>找到一個步驟</value>
+  </data>
+  <data name="Find a step…" xml:space="preserve">
+    <value>找出一個步驟...</value>
+  </data>
+  <data name="Find workflow" xml:space="preserve">
+    <value>尋找工作流程</value>
+  </data>
+  <data name="Fit workflow" xml:space="preserve">
+    <value>適合工作流程</value>
+  </data>
+  <data name="For example: 0 8 * * 1-5" xml:space="preserve">
+    <value>例如：0 8 ** 1-5</value>
+  </data>
+  <data name="For local debugging, set ASPNETCORE_ENVIRONMENT to Development and restart the app." xml:space="preserve">
+    <value>若要在本機偵錯，請將 ASPNETCORE_ENVIRONMENT 設為 Development，然後重新啟動應用程式。</value>
+  </data>
+  <data name="Foreign-key lookup approvals" xml:space="preserve">
+    <value>外鍵查閱核准</value>
+  </data>
+  <data name="Foreign-key lookup policy" xml:space="preserve">
+    <value>外鍵查閱策略</value>
+  </data>
+  <data name="Foreign-key value" xml:space="preserve">
+    <value>外鍵值</value>
+  </data>
+  <data name="Format JSON" xml:space="preserve">
+    <value>格式化 JSON</value>
+  </data>
+  <data name="Four steps from data to result" xml:space="preserve">
+    <value>從資料到結果的四個步驟</value>
+  </data>
+  <data name="FTP / FTPS" xml:space="preserve">
+    <value>FTP/FTPS</value>
+  </data>
+  <data name="FTP file" xml:space="preserve">
+    <value>FTP檔案</value>
+  </data>
+  <data name="FTP file output" xml:space="preserve">
+    <value>FTP 檔案輸出</value>
+  </data>
+  <data name="FTP host" xml:space="preserve">
+    <value>FTP主機</value>
+  </data>
+  <data name="FTP password" xml:space="preserve">
+    <value>FTP密碼</value>
+  </data>
+  <data name="FTP target" xml:space="preserve">
+    <value>FTP目標</value>
+  </data>
+  <data name="FTP username" xml:space="preserve">
+    <value>FTP使用者名稱</value>
+  </data>
+  <data name="ftp_partner" xml:space="preserve">
+    <value>ftp_夥伴</value>
+  </data>
+  <data name="ftp.contoso.local" xml:space="preserve">
+    <value>ftp.contoso.local</value>
+  </data>
+  <data name="Generic v1 contract; it does not disclose protected publication columns." xml:space="preserve">
+    <value>通用 v1 合約；它不公開受保護的發佈項目欄。</value>
+  </data>
+  <data name="Global permissions" xml:space="preserve">
+    <value>全域權限</value>
+  </data>
+  <data name="Global variables" xml:space="preserve">
+    <value>全域變數</value>
+  </data>
+  <data name="Go straight to the work you need" xml:space="preserve">
+    <value>直接從事您需要的工作</value>
+  </data>
+  <data name="Good {0}, {1}." xml:space="preserve">
+    <value>{0}，{1}。</value>
+  </data>
+  <data name="Govern approved SMTP relays and durable workflow-event notifications." xml:space="preserve">
+    <value>管理核准的 SMTP 中繼和持久性工作流程事件通知。</value>
+  </data>
+  <data name="Governed editing" xml:space="preserve">
+    <value>受控編輯</value>
+  </data>
+  <data name="Governed publication data" xml:space="preserve">
+    <value>受監管的出版資料</value>
+  </data>
+  <data name="Grant a capability only on one workflow, publication, or connection identifier." xml:space="preserve">
+    <value>僅授予針對一個工作流程、發佈或連線標識符的功能。</value>
+  </data>
+  <data name="Graph could not be serialized" xml:space="preserve">
+    <value>無法序列化工作流程圖</value>
+  </data>
+  <data name="Home" xml:space="preserve">
+    <value>首頁</value>
+  </data>
+  <data name="Host / server" xml:space="preserve">
+    <value>主機/伺服器</value>
+  </data>
+  <data name="Immutable source versions" xml:space="preserve">
+    <value>不可變的來源版本</value>
+  </data>
+  <data name="Implicit FTPS" xml:space="preserve">
+    <value>隱式FTPS</value>
+  </data>
+  <data name="Implicit TLS" xml:space="preserve">
+    <value>隱式 TLS</value>
+  </data>
+  <data name="Import" xml:space="preserve">
+    <value>進口</value>
+  </data>
+  <data name="Import failed" xml:space="preserve">
+    <value>導入失敗</value>
+  </data>
+  <data name="Include" xml:space="preserve">
+    <value>包括</value>
+  </data>
+  <data name="Incoming links" xml:space="preserve">
+    <value>傳入連結</value>
+  </data>
+  <data name="Insert" xml:space="preserve">
+    <value>插入</value>
+  </data>
+  <data name="Insert, upsert, or delete approved rows" xml:space="preserve">
+    <value>插入、新增或更新，或刪除核准的資料列</value>
+  </data>
+  <data name="Inspect changes" xml:space="preserve">
+    <value>檢查變更</value>
+  </data>
+  <data name="Inspect schema" xml:space="preserve">
+    <value>檢查架構</value>
+  </data>
+  <data name="Inspected change set {0}" xml:space="preserve">
+    <value>已檢查的變更集 {0}</value>
+  </data>
+  <data name="Inspection" xml:space="preserve">
+    <value>檢查</value>
+  </data>
+  <data name="Inspector suggestion only: display" xml:space="preserve">
+    <value>僅檢查員建議：顯示</value>
+  </data>
+  <data name="It can expose sensitive exception information to end users." xml:space="preserve">
+    <value>這可能會向終端使用者暴露敏感的例外狀況資訊。</value>
+  </data>
+  <data name="JavaScript" xml:space="preserve">
+    <value>JavaScript</value>
+  </data>
+  <data name="JavaScript functions" xml:space="preserve">
+    <value>JavaScript 函數</value>
+  </data>
+  <data name="Keep this editor read-only" xml:space="preserve">
+    <value>保持此編輯器只讀</value>
+  </data>
+  <data name="Key" xml:space="preserve">
+    <value>鑰匙</value>
+  </data>
+  <data name="Kind" xml:space="preserve">
+    <value>種類</value>
+  </data>
+  <data name="Language" xml:space="preserve">
+    <value>語言</value>
+  </data>
+  <data name="Last safe outcome" xml:space="preserve">
+    <value>最後安全結果</value>
+  </data>
+  <data name="Last used" xml:space="preserve">
+    <value>上次使用</value>
+  </data>
+  <data name="Latest runs" xml:space="preserve">
+    <value>最新執行</value>
+  </data>
+  <data name="Left input" xml:space="preserve">
+    <value>左輸入</value>
+  </data>
+  <data name="Limits, access, and handoff" xml:space="preserve">
+    <value>限制、存取和切換</value>
+  </data>
+  <data name="List tables and views" xml:space="preserve">
+    <value>列出表格和檢視</value>
+  </data>
+  <data name="Live metadata" xml:space="preserve">
+    <value>即時元資料</value>
+  </data>
+  <data name="Load source + target" xml:space="preserve">
+    <value>載入來源+目標</value>
+  </data>
+  <data name="Loading audit events…" xml:space="preserve">
+    <value>正在載入審核事件...</value>
+  </data>
+  <data name="Loading connections…" xml:space="preserve">
+    <value>正在載入連線...</value>
+  </data>
+  <data name="Loading Email alert policy…" xml:space="preserve">
+    <value>正在載入電子郵件警報策略...</value>
+  </data>
+  <data name="Loading operational state…" xml:space="preserve">
+    <value>正在載入執行狀態...</value>
+  </data>
+  <data name="Loading publications…" xml:space="preserve">
+    <value>正在載入發佈項目...</value>
+  </data>
+  <data name="Loading runs…" xml:space="preserve">
+    <value>正在載入執行...</value>
+  </data>
+  <data name="Loading schedules…" xml:space="preserve">
+    <value>正在載入排程…</value>
+  </data>
+  <data name="Loading the workflow…" xml:space="preserve">
+    <value>正在載入工作流程...</value>
+  </data>
+  <data name="Loading workflows…" xml:space="preserve">
+    <value>正在載入工作流程...</value>
+  </data>
+  <data name="Loading…" xml:space="preserve">
+    <value>載入中…</value>
+  </data>
+  <data name="Lookup mode" xml:space="preserve">
+    <value>查閱模式</value>
+  </data>
+  <data name="Manage" xml:space="preserve">
+    <value>管理</value>
+  </data>
+  <data name="Manage connection →" xml:space="preserve">
+    <value>管理連線 →</value>
+  </data>
+  <data name="Manage publication" xml:space="preserve">
+    <value>管理出版</value>
+  </data>
+  <data name="Management permission does not imply data access. Every load, lookup, stage, review, and apply is checked server-side." xml:space="preserve">
+    <value>管理權限不代表資料存取權。每次載入、查閱、暫存、審查及套用都會在伺服器端檢查。</value>
+  </data>
+  <data name="Match names" xml:space="preserve">
+    <value>匹配名稱</value>
+  </data>
+  <data name="Maximum batch rows" xml:space="preserve">
+    <value>每批資料列上限</value>
+  </data>
+  <data name="Maximum body characters" xml:space="preserve">
+    <value>最大本文字元數</value>
+  </data>
+  <data name="Maximum columns" xml:space="preserve">
+    <value>欄位數上限</value>
+  </data>
+  <data name="Maximum concurrent sends" xml:space="preserve">
+    <value>最大並發發送數</value>
+  </data>
+  <data name="Maximum file size (MiB)" xml:space="preserve">
+    <value>檔案大小上限（MiB）</value>
+  </data>
+  <data name="Maximum page rows" xml:space="preserve">
+    <value>每頁資料列上限</value>
+  </data>
+  <data name="Maximum recipients" xml:space="preserve">
+    <value>最大收件者數</value>
+  </data>
+  <data name="Maximum response MiB" xml:space="preserve">
+    <value>最大響應 MiB</value>
+  </data>
+  <data name="Maximum rows" xml:space="preserve">
+    <value>資料列數上限</value>
+  </data>
+  <data name="Maximum subject characters" xml:space="preserve">
+    <value>最大主題字元數</value>
+  </data>
+  <data name="Metadata only" xml:space="preserve">
+    <value>僅元資料</value>
+  </data>
+  <data name="Mode" xml:space="preserve">
+    <value>模式</value>
+  </data>
+  <data name="morning" xml:space="preserve">
+    <value>早安</value>
+  </data>
+  <data name="Move data between your systems, automate the work, and see what happened." xml:space="preserve">
+    <value>在系統之間移動資料，自動化工作，然後看看發生了什麼。</value>
+  </data>
+  <data name="MySQL" xml:space="preserve">
+    <value>MySQL</value>
+  </data>
+  <data name="MySQL table output" xml:space="preserve">
+    <value>MySQL表輸出</value>
+  </data>
+  <data name="MySQL target" xml:space="preserve">
+    <value>MySQL 目標</value>
+  </data>
+  <data name="Name" xml:space="preserve">
+    <value>姓名</value>
+  </data>
+  <data name="Needs attention" xml:space="preserve">
+    <value>需要注意</value>
+  </data>
+  <data name="New connection" xml:space="preserve">
+    <value>新連線</value>
+  </data>
+  <data name="New custom role" xml:space="preserve">
+    <value>新的自訂角色</value>
+  </data>
+  <data name="New delivery profile" xml:space="preserve">
+    <value>新的交付設定檔案</value>
+  </data>
+  <data name="New executable" xml:space="preserve">
+    <value>新的可執行檔</value>
+  </data>
+  <data name="New profile" xml:space="preserve">
+    <value>新的個人資料</value>
+  </data>
+  <data name="New publication" xml:space="preserve">
+    <value>新發佈項目</value>
+  </data>
+  <data name="New rule" xml:space="preserve">
+    <value>新規則</value>
+  </data>
+  <data name="New token" xml:space="preserve">
+    <value>新權杖</value>
+  </data>
+  <data name="New webhook" xml:space="preserve">
+    <value>新的網路鉤子</value>
+  </data>
+  <data name="New workflow" xml:space="preserve">
+    <value>新的工作流程</value>
+  </data>
+  <data name="New workflow rule" xml:space="preserve">
+    <value>新的工作流程規則</value>
+  </data>
+  <data name="Next" xml:space="preserve">
+    <value>下一個</value>
+  </data>
+  <data name="Next occurrence" xml:space="preserve">
+    <value>下次出現</value>
+  </data>
+  <data name="Next run" xml:space="preserve">
+    <value>下次執行</value>
+  </data>
+  <data name="Next window" xml:space="preserve">
+    <value>下一個視窗</value>
+  </data>
+  <data name="No approved values in this bounded result" xml:space="preserve">
+    <value>此有限結果中沒有核准的值</value>
+  </data>
+  <data name="No bearer tokens exist for this REST publication." xml:space="preserve">
+    <value>此 REST 發佈不存在不記名權杖。</value>
+  </data>
+  <data name="No change sets have been staged for this publication." xml:space="preserve">
+    <value>尚未為此發佈項目進行任何變更集。</value>
+  </data>
+  <data name="No completed runs" xml:space="preserve">
+    <value>沒有完成的執行</value>
+  </data>
+  <data name="No connections yet" xml:space="preserve">
+    <value>還沒有連線</value>
+  </data>
+  <data name="No data tables are assigned" xml:space="preserve">
+    <value>沒有分配資料表</value>
+  </data>
+  <data name="No Email delivery profiles" xml:space="preserve">
+    <value>無電子郵件傳送設定檔</value>
+  </data>
+  <data name="No matching audit events" xml:space="preserve">
+    <value>沒有匹配的審核事件</value>
+  </data>
+  <data name="No matching deliveries" xml:space="preserve">
+    <value>沒有匹配的交貨</value>
+  </data>
+  <data name="No next occurrence" xml:space="preserve">
+    <value>沒有下一次出現</value>
+  </data>
+  <data name="No publications yet" xml:space="preserve">
+    <value>還沒有發佈項目</value>
+  </data>
+  <data name="No published version" xml:space="preserve">
+    <value>沒有發佈版本</value>
+  </data>
+  <data name="No rules for this workflow" xml:space="preserve">
+    <value>此工作流程沒有規則</value>
+  </data>
+  <data name="No runs have been queued." xml:space="preserve">
+    <value>尚未有執行排入佇列。</value>
+  </data>
+  <data name="No runs yet" xml:space="preserve">
+    <value>尚無執行紀錄</value>
+  </data>
+  <data name="No schedules yet" xml:space="preserve">
+    <value>尚無排程</value>
+  </data>
+  <data name="No source version exists. Discover an approved database table or view to continue." xml:space="preserve">
+    <value>不存在來源版本。發現已核准的資料庫表或檢視以繼續。</value>
+  </data>
+  <data name="No stable identifier" xml:space="preserve">
+    <value>沒有穩定的標識符</value>
+  </data>
+  <data name="No step attempts have been recorded." xml:space="preserve">
+    <value>沒有記錄任何步驟嘗試。</value>
+  </data>
+  <data name="No workflows yet" xml:space="preserve">
+    <value>尚無工作流程</value>
+  </data>
+  <data name="Not authorized" xml:space="preserve">
+    <value>未授權</value>
+  </data>
+  <data name="Not connected" xml:space="preserve">
+    <value>未連線</value>
+  </data>
+  <data name="Not Found" xml:space="preserve">
+    <value>未找到</value>
+  </data>
+  <data name="Not mapped" xml:space="preserve">
+    <value>未映射</value>
+  </data>
+  <data name="Not scheduled" xml:space="preserve">
+    <value>未安排</value>
+  </data>
+  <data name="Nothing selected" xml:space="preserve">
+    <value>未選擇任何內容</value>
+  </data>
+  <data name="Occurred" xml:space="preserve">
+    <value>發生過</value>
+  </data>
+  <data name="One address per line. The selected profile checks recipient count and approved domains." xml:space="preserve">
+    <value>每行一個位址。所選設定檔會檢查收件者計數和核准的網域。</value>
+  </data>
+  <data name="One domain per line. Up to 20 domains; every recipient is checked before SMTP." xml:space="preserve">
+    <value>每行一個網域，最多 20 個；SMTP 傳送前會檢查每位收件者。</value>
+  </data>
+  <data name="One or more numeric profile bounds are outside the supported range." xml:space="preserve">
+    <value>一個或多個數值設定檔邊界超出支援的範圍。</value>
+  </data>
+  <data name="Open" xml:space="preserve">
+    <value>打開</value>
+  </data>
+  <data name="Open a workflow, add an optional schedule in its settings, then publish it." xml:space="preserve">
+    <value>打開工作流程，在其設定中新增選用排程，然後發佈它。</value>
+  </data>
+  <data name="Open editor" xml:space="preserve">
+    <value>開啟編輯器</value>
+  </data>
+  <data name="Open lookup schema" xml:space="preserve">
+    <value>打開查閱架構</value>
+  </data>
+  <data name="Open published data" xml:space="preserve">
+    <value>開啟已發佈的資料</value>
+  </data>
+  <data name="Open schema" xml:space="preserve">
+    <value>開放模式</value>
+  </data>
+  <data name="Open Swagger" xml:space="preserve">
+    <value>開放招搖</value>
+  </data>
+  <data name="Open the shared tables you can view or edit." xml:space="preserve">
+    <value>開啟您可以檢視或編輯的共用資料表。</value>
+  </data>
+  <data name="Open workflows" xml:space="preserve">
+    <value>開放的工作流程</value>
+  </data>
+  <data name="OpenAPI document" xml:space="preserve">
+    <value>開放API文檔</value>
+  </data>
+  <data name="Operation" xml:space="preserve">
+    <value>手術</value>
+  </data>
+  <data name="Operational data could not be loaded." xml:space="preserve">
+    <value>無法載入操作資料。</value>
+  </data>
+  <data name="Operational data is temporarily unavailable." xml:space="preserve">
+    <value>暫時無法取得營運資料。</value>
+  </data>
+  <data name="Operator" xml:space="preserve">
+    <value>操作員</value>
+  </data>
+  <data name="Optional reference only. Username/password are resolved by the Worker from the approved secret provider at send time." xml:space="preserve">
+    <value>僅供選擇性參考。使用者名稱/密碼由Worker在發送時從核准的秘密提供者解析。</value>
+  </data>
+  <data name="or" xml:space="preserve">
+    <value>或者</value>
+  </data>
+  <data name="or a UPN for executable impersonation." xml:space="preserve">
+    <value>或用於可執行模擬的 UPN。</value>
+  </data>
+  <data name="Oracle" xml:space="preserve">
+    <value>Oracle</value>
+  </data>
+  <data name="Oracle Database" xml:space="preserve">
+    <value>Oracle Database</value>
+  </data>
+  <data name="Oracle table output" xml:space="preserve">
+    <value>Oracle 表輸出</value>
+  </data>
+  <data name="Oracle target" xml:space="preserve">
+    <value>Oracle目標</value>
+  </data>
+  <data name="Outcome" xml:space="preserve">
+    <value>結果</value>
+  </data>
+  <data name="Overview · THub" xml:space="preserve">
+    <value>總覽 · THub</value>
+  </data>
+  <data name="Owner" xml:space="preserve">
+    <value>擁有者</value>
+  </data>
+  <data name="Page {0} of {1}" xml:space="preserve">
+    <value>第 {0} 頁，共 {1} 頁</value>
+  </data>
+  <data name="Parameters" xml:space="preserve">
+    <value>參數</value>
+  </data>
+  <data name="Pause" xml:space="preserve">
+    <value>暫停</value>
+  </data>
+  <data name="Permission" xml:space="preserve">
+    <value>允許</value>
+  </data>
+  <data name="Persistent events" xml:space="preserve">
+    <value>持續事件</value>
+  </data>
+  <data name="Plain FTP (unencrypted)" xml:space="preserve">
+    <value>純 FTP（未加密）</value>
+  </data>
+  <data name="Plain FTP is unencrypted. The username, password, and file contents are exposed in transit." xml:space="preserve">
+    <value>普通 FTP 未加密。使用者名稱、密碼和檔案內容在傳輸過程中會暴露。</value>
+  </data>
+  <data name="Plain-text body template" xml:space="preserve">
+    <value>純文字本文範本</value>
+  </data>
+  <data name="Please retry or reload the page." xml:space="preserve">
+    <value>請重試或重新載入頁面。</value>
+  </data>
+  <data name="Policy" xml:space="preserve">
+    <value>政策</value>
+  </data>
+  <data name="Port" xml:space="preserve">
+    <value>港口</value>
+  </data>
+  <data name="PostgreSQL" xml:space="preserve">
+    <value>PostgreSQL</value>
+  </data>
+  <data name="PostgreSQL table output" xml:space="preserve">
+    <value>PostgreSQL 表輸出</value>
+  </data>
+  <data name="PostgreSQL target" xml:space="preserve">
+    <value>PostgreSQL 目標</value>
+  </data>
+  <data name="Prefix" xml:space="preserve">
+    <value>前綴</value>
+  </data>
+  <data name="Previous" xml:space="preserve">
+    <value>以前的</value>
+  </data>
+  <data name="Previous window" xml:space="preserve">
+    <value>上一個視窗</value>
+  </data>
+  <data name="Primary navigation" xml:space="preserve">
+    <value>主要導覽</value>
+  </data>
+  <data name="Principal name" xml:space="preserve">
+    <value>校長姓名</value>
+  </data>
+  <data name="Principals" xml:space="preserve">
+    <value>校長</value>
+  </data>
+  <data name="Profile" xml:space="preserve">
+    <value>輪廓</value>
+  </data>
+  <data name="Profile name" xml:space="preserve">
+    <value>個人資料名稱</value>
+  </data>
+  <data name="Profile name, SMTP host, and sender are required." xml:space="preserve">
+    <value>設定檔名稱、SMTP 主機和寄件者是必要的。</value>
+  </data>
+  <data name="Provide between 1 and 20 approved recipient domains." xml:space="preserve">
+    <value>提供 1 到 20 個核准的收件者網域。</value>
+  </data>
+  <data name="Public alias" xml:space="preserve">
+    <value>公有別名</value>
+  </data>
+  <data name="Public route" xml:space="preserve">
+    <value>公共路線</value>
+  </data>
+  <data name="Publication created. Discover and activate its first source version." xml:space="preserve">
+    <value>發佈項目已建立。發現並啟動其第一個來源版本。</value>
+  </data>
+  <data name="Publication data spreadsheet" xml:space="preserve">
+    <value>發佈資料試算表</value>
+  </data>
+  <data name="Publication disabled." xml:space="preserve">
+    <value>已禁用發佈。</value>
+  </data>
+  <data name="Publication editor" xml:space="preserve">
+    <value>刊物編輯</value>
+  </data>
+  <data name="Publication operation failed" xml:space="preserve">
+    <value>發佈操作失敗</value>
+  </data>
+  <data name="Publication setup progress" xml:space="preserve">
+    <value>發佈項目設定進度</value>
+  </data>
+  <data name="Publication unavailable" xml:space="preserve">
+    <value>無法出版</value>
+  </data>
+  <data name="Publication updated" xml:space="preserve">
+    <value>發佈項目已更新</value>
+  </data>
+  <data name="Publication version activated." xml:space="preserve">
+    <value>發佈版本已啟用。</value>
+  </data>
+  <data name="PublicationApi:PublicBaseUrl" xml:space="preserve">
+    <value>PublicationApi:PublicBaseUrl</value>
+  </data>
+  <data name="Publications are temporarily unavailable." xml:space="preserve">
+    <value>發佈項目暫時無法提供。</value>
+  </data>
+  <data name="Publications could not be loaded." xml:space="preserve">
+    <value>無法載入發佈項目。</value>
+  </data>
+  <data name="Publish" xml:space="preserve">
+    <value>發佈</value>
+  </data>
+  <data name="Publish a workflow, then choose Run now or add a schedule." xml:space="preserve">
+    <value>發佈工作流程，然後選擇立即執行或新增排程。</value>
+  </data>
+  <data name="Publish when it is ready, then run it now or on a schedule." xml:space="preserve">
+    <value>準備好後發佈，然後立即執行或按排程執行。</value>
+  </data>
+  <data name="Published data" xml:space="preserve">
+    <value>已發佈資料</value>
+  </data>
+  <data name="Published editors are temporarily unavailable." xml:space="preserve">
+    <value>已發佈的編輯器暫時無法使用。</value>
+  </data>
+  <data name="Published editors could not be loaded." xml:space="preserve">
+    <value>無法載入已發佈的編輯器。</value>
+  </data>
+  <data name="Published rows" xml:space="preserve">
+    <value>已發佈的資料列</value>
+  </data>
+  <data name="Published surfaces" xml:space="preserve">
+    <value>已發佈的曲面</value>
+  </data>
+  <data name="Queued" xml:space="preserve">
+    <value>排入佇列</value>
+  </data>
+  <data name="Queued or currently running" xml:space="preserve">
+    <value>已排入佇列或目前執行中</value>
+  </data>
+  <data name="Read" xml:space="preserve">
+    <value>讀</value>
+  </data>
+  <data name="Read a bounded local CSV" xml:space="preserve">
+    <value>讀取有界本地 CSV</value>
+  </data>
+  <data name="Read an approved table" xml:space="preserve">
+    <value>閱讀已核准的表格</value>
+  </data>
+  <data name="Read an approved table or view" xml:space="preserve">
+    <value>閱讀已核准的表格或檢視</value>
+  </data>
+  <data name="Read CSV, tab text, or Excel" xml:space="preserve">
+    <value>讀取 CSV、選項卡文字或 Excel</value>
+  </data>
+  <data name="Read only" xml:space="preserve">
+    <value>只讀</value>
+  </data>
+  <data name="Read XLSX or XLSM" xml:space="preserve">
+    <value>讀取 XLSX 或 XLSM</value>
+  </data>
+  <data name="Ready" xml:space="preserve">
+    <value>準備好</value>
+  </data>
+  <data name="Ready workflows" xml:space="preserve">
+    <value>準備好的工作流程</value>
+  </data>
+  <data name="Recent runs" xml:space="preserve">
+    <value>最近的跑步</value>
+  </data>
+  <data name="Recipient and message bounds" xml:space="preserve">
+    <value>收件者與訊息限制</value>
+  </data>
+  <data name="Recipients" xml:space="preserve">
+    <value>收件者</value>
+  </data>
+  <data name="Refresh" xml:space="preserve">
+    <value>重新整理</value>
+  </data>
+  <data name="Refresh details" xml:space="preserve">
+    <value>重新整理詳細資料</value>
+  </data>
+  <data name="Refresh status" xml:space="preserve">
+    <value>重新整理狀態</value>
+  </data>
+  <data name="Reject inspected changes" xml:space="preserve">
+    <value>拒絕檢查的變更</value>
+  </data>
+  <data name="Rejoin failed... trying again in" xml:space="preserve">
+    <value>重新連線失敗…將在</value>
+  </data>
+  <data name="Rejoining the server..." xml:space="preserve">
+    <value>正在重新連線至伺服器…</value>
+  </data>
+  <data name="Relay" xml:space="preserve">
+    <value>中繼</value>
+  </data>
+  <data name="Relay and sender" xml:space="preserve">
+    <value>中繼器和發送器</value>
+  </data>
+  <data name="Reload" xml:space="preserve">
+    <value>重新載入</value>
+  </data>
+  <data name="Reload current" xml:space="preserve">
+    <value>重載電流</value>
+  </data>
+  <data name="Remove" xml:space="preserve">
+    <value>消除</value>
+  </data>
+  <data name="Remove filter" xml:space="preserve">
+    <value>移除篩選條件</value>
+  </data>
+  <data name="Rename and cast columns" xml:space="preserve">
+    <value>重新命名欄位並轉換型別</value>
+  </data>
+  <data name="Repair the JSON object before changing the target mode." xml:space="preserve">
+    <value>在變更目標模式之前修復 JSON 物件。</value>
+  </data>
+  <data name="Repair the JSON object before using a governed selector." xml:space="preserve">
+    <value>在使用受控選擇器之前修復 JSON 物件。</value>
+  </data>
+  <data name="Replacement password" xml:space="preserve">
+    <value>更換密碼</value>
+  </data>
+  <data name="Replacement username" xml:space="preserve">
+    <value>更換使用者名</value>
+  </data>
+  <data name="Request ID:" xml:space="preserve">
+    <value>請求ID：</value>
+  </data>
+  <data name="Request timeout seconds" xml:space="preserve">
+    <value>請求超時秒數</value>
+  </data>
+  <data name="Requests / window" xml:space="preserve">
+    <value>請求/視窗</value>
+  </data>
+  <data name="Require transport encryption" xml:space="preserve">
+    <value>需要傳輸加密</value>
+  </data>
+  <data name="Required for authenticated webhooks; optional run-as identity for executables." xml:space="preserve">
+    <value>經過身分驗證的 webhook 是必要的；可執行檔的選用執行身分。</value>
+  </data>
+  <data name="Resource" xml:space="preserve">
+    <value>資源</value>
+  </data>
+  <data name="Resource grants" xml:space="preserve">
+    <value>資源補助</value>
+  </data>
+  <data name="Resource ID" xml:space="preserve">
+    <value>資源ID</value>
+  </data>
+  <data name="Resource identifier" xml:space="preserve">
+    <value>資源標識符</value>
+  </data>
+  <data name="Resource type" xml:space="preserve">
+    <value>資源類型</value>
+  </data>
+  <data name="REST · read only" xml:space="preserve">
+    <value>休息·只讀</value>
+  </data>
+  <data name="REST API · read only" xml:space="preserve">
+    <value>REST API · 唯讀</value>
+  </data>
+  <data name="Resume" xml:space="preserve">
+    <value>恢復</value>
+  </data>
+  <data name="Retry" xml:space="preserve">
+    <value>重試</value>
+  </data>
+  <data name="Retry exact version" xml:space="preserve">
+    <value>重試確切版本</value>
+  </data>
+  <data name="Return expression" xml:space="preserve">
+    <value>回傳運算式</value>
+  </data>
+  <data name="Return to workflows" xml:space="preserve">
+    <value>回到工作流程</value>
+  </data>
+  <data name="Review / outcome" xml:space="preserve">
+    <value>審查/結果</value>
+  </data>
+  <data name="Review &amp; publish" xml:space="preserve">
+    <value>審核並發佈</value>
+  </data>
+  <data name="Review automatic schedules" xml:space="preserve">
+    <value>檢查自動排程</value>
+  </data>
+  <data name="Review columns and relationships" xml:space="preserve">
+    <value>檢查欄位和關係</value>
+  </data>
+  <data name="Review comment" xml:space="preserve">
+    <value>審核評論</value>
+  </data>
+  <data name="ReviewComments[InspectedChangeSet.Id]" xml:space="preserve">
+    <value>評論評論[InspectedChangeSet.Id]</value>
+  </data>
+  <data name="Revoke" xml:space="preserve">
+    <value>撤銷</value>
+  </data>
+  <data name="Right input" xml:space="preserve">
+    <value>右邊輸入</value>
+  </data>
+  <data name="Role" xml:space="preserve">
+    <value>角色</value>
+  </data>
+  <data name="Role data could not be loaded." xml:space="preserve">
+    <value>無法載入角色資料。</value>
+  </data>
+  <data name="Role grants" xml:space="preserve">
+    <value>角色補助金</value>
+  </data>
+  <data name="Role grants could not be loaded." xml:space="preserve">
+    <value>無法載入角色授予。</value>
+  </data>
+  <data name="Role grants could not be saved." xml:space="preserve">
+    <value>無法儲存角色授予。</value>
+  </data>
+  <data name="Roles and access" xml:space="preserve">
+    <value>角色和存取權限</value>
+  </data>
+  <data name="Route" xml:space="preserve">
+    <value>路線</value>
+  </data>
+  <data name="Route slug" xml:space="preserve">
+    <value>路線段塞</value>
+  </data>
+  <data name="Rows read" xml:space="preserve">
+    <value>讀取的資料列數</value>
+  </data>
+  <data name="Rows written" xml:space="preserve">
+    <value>寫入的資料列數</value>
+  </data>
+  <data name="Rule" xml:space="preserve">
+    <value>規則</value>
+  </data>
+  <data name="Rule name" xml:space="preserve">
+    <value>規則名稱</value>
+  </data>
+  <data name="Rule name and subject template are required." xml:space="preserve">
+    <value>規則名稱和主題範本是必要的。</value>
+  </data>
+  <data name="Rules subscribe to terminal run events and queue through the same durable Email outbox." xml:space="preserve">
+    <value>規則會訂閱執行結束事件，並透過同一個持久性電子郵件寄件匣排入佇列。</value>
+  </data>
+  <data name="Run access is not permitted." xml:space="preserve">
+    <value>不允許執行存取。</value>
+  </data>
+  <data name="Run an authorized trusted executable" xml:space="preserve">
+    <value>執行授權的可信任可執行檔案</value>
+  </data>
+  <data name="Run automatically (optional)" xml:space="preserve">
+    <value>自動執行（選用）</value>
+  </data>
+  <data name="Run cancelled" xml:space="preserve">
+    <value>執行已取消</value>
+  </data>
+  <data name="Run could not be queued" xml:space="preserve">
+    <value>無法將執行排入佇列</value>
+  </data>
+  <data name="Run details" xml:space="preserve">
+    <value>執行詳細資料</value>
+  </data>
+  <data name="Run details could not be loaded." xml:space="preserve">
+    <value>無法載入執行詳細資訊。</value>
+  </data>
+  <data name="Run failed" xml:space="preserve">
+    <value>執行失敗</value>
+  </data>
+  <data name="Run history" xml:space="preserve">
+    <value>執行歷程</value>
+  </data>
+  <data name="Run history could not be loaded." xml:space="preserve">
+    <value>無法載入執行歷程。</value>
+  </data>
+  <data name="Run history is temporarily unavailable." xml:space="preserve">
+    <value>執行歷程暫時無法使用。</value>
+  </data>
+  <data name="Run it" xml:space="preserve">
+    <value>執行</value>
+  </data>
+  <data name="Run now" xml:space="preserve">
+    <value>立即執行</value>
+  </data>
+  <data name="Run operation failed" xml:space="preserve">
+    <value>執行作業失敗</value>
+  </data>
+  <data name="Run queued" xml:space="preserve">
+    <value>執行已排入佇列</value>
+  </data>
+  <data name="Run succeeded" xml:space="preserve">
+    <value>執行成功</value>
+  </data>
+  <data name="Run updated" xml:space="preserve">
+    <value>執行已更新</value>
+  </data>
+  <data name="Run values" xml:space="preserve">
+    <value>執行值</value>
+  </data>
+  <data name="runId" xml:space="preserve">
+    <value>runId</value>
+  </data>
+  <data name="Runs" xml:space="preserve">
+    <value>執行紀錄</value>
+  </data>
+  <data name="Runs · THub" xml:space="preserve">
+    <value>執行紀錄 · THub</value>
+  </data>
+  <data name="Runs in progress" xml:space="preserve">
+    <value>執行中</value>
+  </data>
+  <data name="Runs today" xml:space="preserve">
+    <value>今日執行次數</value>
+  </data>
+  <data name="runStartedAtUtc" xml:space="preserve">
+    <value>runStartedAtUtc</value>
+  </data>
+  <data name="Safe outbox state and retry outcomes. Message recipients, subjects, and bodies are intentionally not displayed." xml:space="preserve">
+    <value>安全的寄件匣狀態與重試結果。系統刻意不顯示訊息收件者、主旨及本文。</value>
+  </data>
+  <data name="Safely share approved database data as an API or editable table." xml:space="preserve">
+    <value>將核准的資料庫資料安全地共用為 API 或可編輯表。</value>
+  </data>
+  <data name="Save" xml:space="preserve">
+    <value>儲存</value>
+  </data>
+  <data name="Save connection" xml:space="preserve">
+    <value>儲存連線</value>
+  </data>
+  <data name="Save profile" xml:space="preserve">
+    <value>儲存個人資料</value>
+  </data>
+  <data name="Save role grants" xml:space="preserve">
+    <value>儲存角色授予</value>
+  </data>
+  <data name="Save rule" xml:space="preserve">
+    <value>儲存規則</value>
+  </data>
+  <data name="Saved usernames and passwords are encrypted and are never shown again." xml:space="preserve">
+    <value>儲存的使用者名稱和密碼已加密並且不會再次顯示。</value>
+  </data>
+  <data name="Schedule" xml:space="preserve">
+    <value>排程</value>
+  </data>
+  <data name="Schedule management permission is required." xml:space="preserve">
+    <value>需要排程管理權限。</value>
+  </data>
+  <data name="Schedule operation failed" xml:space="preserve">
+    <value>排程操作失敗</value>
+  </data>
+  <data name="Schedule updated" xml:space="preserve">
+    <value>排程已更新</value>
+  </data>
+  <data name="Schedules" xml:space="preserve">
+    <value>排程</value>
+  </data>
+  <data name="Schedules · THub" xml:space="preserve">
+    <value>排程 · THub</value>
+  </data>
+  <data name="Schedules are temporarily unavailable." xml:space="preserve">
+    <value>排程暫時無法使用。</value>
+  </data>
+  <data name="Schedules could not be loaded." xml:space="preserve">
+    <value>無法載入排程。</value>
+  </data>
+  <data name="Schema" xml:space="preserve">
+    <value>模式</value>
+  </data>
+  <data name="Schema and column policy are rediscovered and reviewed for every version." xml:space="preserve">
+    <value>每個版本都會重新探索並審查結構描述及欄位原則。</value>
+  </data>
+  <data name="Schema contract" xml:space="preserve">
+    <value>模式合約</value>
+  </data>
+  <data name="Search" xml:space="preserve">
+    <value>搜尋</value>
+  </data>
+  <data name="Search approved values…" xml:space="preserve">
+    <value>搜尋核准的值...</value>
+  </data>
+  <data name="Search by workflow name" xml:space="preserve">
+    <value>按工作流程名稱搜尋</value>
+  </data>
+  <data name="Search foreign-key values" xml:space="preserve">
+    <value>搜尋外鍵值</value>
+  </data>
+  <data name="seconds." xml:space="preserve">
+    <value>秒後再試一次。</value>
+  </data>
+  <data name="See what ran, whether it worked, and where to look when something needs attention." xml:space="preserve">
+    <value>查看執行的內容、是否有效，以及在需要注意某些情況時應查看何處。</value>
+  </data>
+  <data name="See which workflows run automatically and when each one is due next." xml:space="preserve">
+    <value>查看哪些工作流程自動運作以及每個工作流程下次到期的時間。</value>
+  </data>
+  <data name="Select &amp; map" xml:space="preserve">
+    <value>選擇並映射</value>
+  </data>
+  <data name="Select a column…" xml:space="preserve">
+    <value>選擇欄位…</value>
+  </data>
+  <data name="Select a data row before toggling deletion." xml:space="preserve">
+    <value>切換刪除狀態前，請先選擇資料列。</value>
+  </data>
+  <data name="Select a relational connection…" xml:space="preserve">
+    <value>選擇關係連結...</value>
+  </data>
+  <data name="Select a separate, write-capable connection to the same database. It is used only by the Worker when approved changes are applied." xml:space="preserve">
+    <value>選擇與相同資料庫的單獨的、可寫入的連線。它僅在應用核准的變更時由Worker使用。</value>
+  </data>
+  <data name="Select a step to configure its data operation and incoming links." xml:space="preserve">
+    <value>選擇一個步驟來設定其資料操作和傳入連結。</value>
+  </data>
+  <data name="Select a workflow and an Email delivery profile." xml:space="preserve">
+    <value>選擇工作流程和電子郵件傳送設定檔。</value>
+  </data>
+  <data name="Select a workflow to manage its Email rules." xml:space="preserve">
+    <value>選擇一個工作流程來管理其電子郵件規則。</value>
+  </data>
+  <data name="Select an approved filter column." xml:space="preserve">
+    <value>選擇核准的篩選欄位。</value>
+  </data>
+  <data name="Select an authorized action…" xml:space="preserve">
+    <value>選擇授權的操作...</value>
+  </data>
+  <data name="Select an enabled profile…" xml:space="preserve">
+    <value>選擇啟用的設定檔...</value>
+  </data>
+  <data name="Select an enabled relational connection first." xml:space="preserve">
+    <value>首先選擇已啟用的關係連線。</value>
+  </data>
+  <data name="Select at least one terminal workflow event." xml:space="preserve">
+    <value>選擇至少一個終端工作流程事件。</value>
+  </data>
+  <data name="Select column…" xml:space="preserve">
+    <value>選擇欄位…</value>
+  </data>
+  <data name="Select connection…" xml:space="preserve">
+    <value>選擇連線...</value>
+  </data>
+  <data name="Select explicitly…" xml:space="preserve">
+    <value>明確選擇...</value>
+  </data>
+  <data name="Select object…" xml:space="preserve">
+    <value>選擇物件…</value>
+  </data>
+  <data name="Select one approved value before committing the cell." xml:space="preserve">
+    <value>在送出儲存格之前選擇一個已核准的值。</value>
+  </data>
+  <data name="Select upstream step…" xml:space="preserve">
+    <value>選擇上游步驟...</value>
+  </data>
+  <data name="Select variable…" xml:space="preserve">
+    <value>選擇變數...</value>
+  </data>
+  <data name="Selected workflow" xml:space="preserve">
+    <value>選定的工作流程</value>
+  </data>
+  <data name="Send an email when something happens" xml:space="preserve">
+    <value>發生事情時發送電子郵件</value>
+  </data>
+  <data name="Sender" xml:space="preserve">
+    <value>寄件人</value>
+  </data>
+  <data name="Separate Worker apply" xml:space="preserve">
+    <value>單獨工人申請</value>
+  </data>
+  <data name="Server filtered" xml:space="preserve">
+    <value>伺服器篩選</value>
+  </data>
+  <data name="Server-side data search and sort" xml:space="preserve">
+    <value>伺服器端資料搜尋和排序</value>
+  </data>
+  <data name="Service name" xml:space="preserve">
+    <value>服務名稱</value>
+  </data>
+  <data name="Settings" xml:space="preserve">
+    <value>設定</value>
+  </data>
+  <data name="Settings are validated again at publication and execution boundaries. Connections and database objects must reference approved metadata." xml:space="preserve">
+    <value>設定在發佈和執行邊界再次驗證。連線和資料庫物件必須引用已核准的元資料。</value>
+  </data>
+  <data name="Settings JSON" xml:space="preserve">
+    <value>設定 JSON</value>
+  </data>
+  <data name="Settings JSON is invalid" xml:space="preserve">
+    <value>設定 JSON 無效</value>
+  </data>
+  <data name="Settings must be an object." xml:space="preserve">
+    <value>設定必須是一個物件。</value>
+  </data>
+  <data name="Share and monitor" xml:space="preserve">
+    <value>分享與監控</value>
+  </data>
+  <data name="Showing up to 100 matches. Search narrows larger catalogs without loading unbounded workflow metadata." xml:space="preserve">
+    <value>最多顯示 100 場比賽。搜尋可以縮小較大的目錄範圍，而無需載入無限的工作流程元資料。</value>
+  </data>
+  <data name="Signed in" xml:space="preserve">
+    <value>已登入</value>
+  </data>
+  <data name="SMTP host" xml:space="preserve">
+    <value>SMTP主機</value>
+  </data>
+  <data name="smtp.example.com" xml:space="preserve">
+    <value>smtp.example.com</value>
+  </data>
+  <data name="Sorry, the content you are looking for does not exist." xml:space="preserve">
+    <value>抱歉，您要找的內容不存在。</value>
+  </data>
+  <data name="Sort" xml:space="preserve">
+    <value>種類</value>
+  </data>
+  <data name="Sort column" xml:space="preserve">
+    <value>排序欄位</value>
+  </data>
+  <data name="Source" xml:space="preserve">
+    <value>來源</value>
+  </data>
+  <data name="Source &amp; versions" xml:space="preserve">
+    <value>來源及版本</value>
+  </data>
+  <data name="Source column" xml:space="preserve">
+    <value>來源專欄</value>
+  </data>
+  <data name="Source columns" xml:space="preserve">
+    <value>來源專欄</value>
+  </data>
+  <data name="Source host" xml:space="preserve">
+    <value>來源主機</value>
+  </data>
+  <data name="Source object" xml:space="preserve">
+    <value>來源物件</value>
+  </data>
+  <data name="Source objects could not be discovered." xml:space="preserve">
+    <value>無法發現來源物件。</value>
+  </data>
+  <data name="Spreadsheet · staged writes" xml:space="preserve">
+    <value>試算表 · 暫存寫入</value>
+  </data>
+  <data name="Spreadsheet editor · staged" xml:space="preserve">
+    <value>試算表編輯器 · 暫存寫入</value>
+  </data>
+  <data name="SQL Server" xml:space="preserve">
+    <value>SQL Server</value>
+  </data>
+  <data name="SQL table output" xml:space="preserve">
+    <value>SQL表輸出</value>
+  </data>
+  <data name="SQL target" xml:space="preserve">
+    <value>SQL 目標</value>
+  </data>
+  <data name="SQL-backed roles, Windows users and groups, global capabilities, and resource-specific grants." xml:space="preserve">
+    <value>SQL 支援的角色、Windows 使用者和群組、全域功能以及特定於資源的授權。</value>
+  </data>
+  <data name="Stable identifier used by workflows and connection metadata." xml:space="preserve">
+    <value>工作流程和連線元資料使用的穩定識別碼。</value>
+  </data>
+  <data name="Stable key order" xml:space="preserve">
+    <value>穩定的按鍵順序</value>
+  </data>
+  <data name="Stage changes" xml:space="preserve">
+    <value>階段變化</value>
+  </data>
+  <data name="Stage or discard this window's changes before paging." xml:space="preserve">
+    <value>在分頁之前暫存或放棄此視窗的變更。</value>
+  </data>
+  <data name="Staged change sets" xml:space="preserve">
+    <value>分階段變更集</value>
+  </data>
+  <data name="Start here" xml:space="preserve">
+    <value>從這裡開始</value>
+  </data>
+  <data name="Start with a source" xml:space="preserve">
+    <value>從來源開始</value>
+  </data>
+  <data name="Started" xml:space="preserve">
+    <value>開始</value>
+  </data>
+  <data name="STARTTLS required" xml:space="preserve">
+    <value>需要 STARTTLS</value>
+  </data>
+  <data name="State" xml:space="preserve">
+    <value>狀態</value>
+  </data>
+  <data name="Status" xml:space="preserve">
+    <value>地位</value>
+  </data>
+  <data name="Step" xml:space="preserve">
+    <value>步</value>
+  </data>
+  <data name="Step name" xml:space="preserve">
+    <value>步驟名稱</value>
+  </data>
+  <data name="Stored encrypted" xml:space="preserve">
+    <value>加密儲存</value>
+  </data>
+  <data name="Stored key" xml:space="preserve">
+    <value>儲存的索引鍵</value>
+  </data>
+  <data name="String(value).trim()" xml:space="preserve">
+    <value>String(value).trim()</value>
+  </data>
+  <data name="Subject template" xml:space="preserve">
+    <value>主題範本</value>
+  </data>
+  <data name="Submitted" xml:space="preserve">
+    <value>已送出</value>
+  </data>
+  <data name="Subscription" xml:space="preserve">
+    <value>訂閱</value>
+  </data>
+  <data name="successful" xml:space="preserve">
+    <value>成功的</value>
+  </data>
+  <data name="Surface" xml:space="preserve">
+    <value>表面</value>
+  </data>
+  <data name="System Administrator always has every capability and resource. Developer can create, edit, publish, and execute workflows." xml:space="preserve">
+    <value>系統管理員一律擁有所有功能與資源。開發者可以建立、編輯、發佈及執行工作流程。</value>
+  </data>
+  <data name="System status" xml:space="preserve">
+    <value>系統狀態</value>
+  </data>
+  <data name="System-role permissions are fixed. Principal assignments remain editable." xml:space="preserve">
+    <value>系統角色權限是固定的。主要作業仍然可以編輯。</value>
+  </data>
+  <data name="Table or view" xml:space="preserve">
+    <value>表或檢視</value>
+  </data>
+  <data name="Target columns" xml:space="preserve">
+    <value>目標欄位</value>
+  </data>
+  <data name="Tell THub where it may safely read or write data." xml:space="preserve">
+    <value>告訴 THub 在哪裡可以安全地讀取或寫入資料。</value>
+  </data>
+  <data name="Templates accept only the documented run metadata variables—never source rows or secrets." xml:space="preserve">
+    <value>範本只接受說明文件中列出的執行中繼資料變數，絕不接受來源資料列或機密。</value>
+  </data>
+  <data name="Terminal events" xml:space="preserve">
+    <value>終端事件</value>
+  </data>
+  <data name="Terminal-event rules" xml:space="preserve">
+    <value>終端事件規則</value>
+  </data>
+  <data name="Test connection" xml:space="preserve">
+    <value>測試連線</value>
+  </data>
+  <data name="The active schema version is unavailable." xml:space="preserve">
+    <value>活動架構版本不可用。</value>
+  </data>
+  <data name="The approved lookup context is unavailable." xml:space="preserve">
+    <value>核准的查閱上下文不可用。</value>
+  </data>
+  <data name="The audit event could not be loaded." xml:space="preserve">
+    <value>無法載入審核事件。</value>
+  </data>
+  <data name="The change-set details could not be loaded." xml:space="preserve">
+    <value>無法載入變更集詳細資訊。</value>
+  </data>
+  <data name="The changes could not be staged." xml:space="preserve">
+    <value>這些改變無法上演。</value>
+  </data>
+  <data name="The configured file size is outside the supported range." xml:space="preserve">
+    <value>設定的檔案大小超出了支援的範圍。</value>
+  </data>
+  <data name="The connection could not be saved." xml:space="preserve">
+    <value>無法儲存連線。</value>
+  </data>
+  <data name="The connection no longer exists." xml:space="preserve">
+    <value>連線不再存在。</value>
+  </data>
+  <data name="The connection state could not be changed." xml:space="preserve">
+    <value>連線狀態無法變更。</value>
+  </data>
+  <data name="The data window could not be loaded." xml:space="preserve">
+    <value>無法載入資料視窗。</value>
+  </data>
+  <data name="The Development environment displays more detailed information about the error." xml:space="preserve">
+    <value>開發環境會顯示更詳細的錯誤資訊。</value>
+  </data>
+  <data name="The Development environment shouldn't be enabled for deployed applications." xml:space="preserve">
+    <value>不應為已部署的應用程式啟用開發環境。</value>
+  </data>
+  <data name="The Email delivery profile could not be saved because the service is temporarily unavailable." xml:space="preserve">
+    <value>由於該服務暫時無法使用，因此無法儲存電子郵件傳送設定檔。</value>
+  </data>
+  <data name="The Email delivery profile could not be saved." xml:space="preserve">
+    <value>無法儲存電子郵件傳送設定檔。</value>
+  </data>
+  <data name="The exact-version retry could not be confirmed. Reload before retrying." xml:space="preserve">
+    <value>無法確認確切的版本重試。重試之前重新載入。</value>
+  </data>
+  <data name="The generic Swagger contract documents authentication, filters, sorts, and paging. The token-protected schema endpoint describes this publication's active columns." xml:space="preserve">
+    <value>通用 Swagger 合約說明驗證、篩選、排序及分頁；受權杖保護的結構描述端點則說明此發佈項目的啟用中欄位。</value>
+  </data>
+  <data name="The governed editor is temporarily unavailable." xml:space="preserve">
+    <value>受治理的編輯器暫時無法使用。</value>
+  </data>
+  <data name="The latest workflow activity you can access" xml:space="preserve">
+    <value>您可以造訪的最新工作流程活動</value>
+  </data>
+  <data name="The lookup must return exactly one scalar row. Object names are quoted and the filter value is parameterized." xml:space="preserve">
+    <value>查閱必須恰好回傳一個純量資料列。物件名稱會加上引號，篩選值則會參數化。</value>
+  </data>
+  <data name="The operation failed." xml:space="preserve">
+    <value>操作失敗。</value>
+  </data>
+  <data name="The profile could not be reloaded because the service is temporarily unavailable." xml:space="preserve">
+    <value>由於服務暫時無法使用，因此無法重新載入設定檔。</value>
+  </data>
+  <data name="The profile could not be reloaded." xml:space="preserve">
+    <value>無法重新載入設定檔。</value>
+  </data>
+  <data name="The profile state could not be changed because the service is temporarily unavailable." xml:space="preserve">
+    <value>由於服務暫時無法使用，因此無法變更設定檔狀態。</value>
+  </data>
+  <data name="The profile state could not be changed." xml:space="preserve">
+    <value>無法變更設定檔狀態。</value>
+  </data>
+  <data name="The publication could not be created." xml:space="preserve">
+    <value>無法建立該發佈項目。</value>
+  </data>
+  <data name="The publication could not be loaded." xml:space="preserve">
+    <value>無法載入該發佈項目。</value>
+  </data>
+  <data name="The publication was not found." xml:space="preserve">
+    <value>未找到該發佈項目。</value>
+  </data>
+  <data name="The request failed." xml:space="preserve">
+    <value>請求失敗。</value>
+  </data>
+  <data name="The retry could not be queued." xml:space="preserve">
+    <value>重試無法排入佇列。</value>
+  </data>
+  <data name="The route follows the active immutable version. Users still need View and any separate edit or approval capabilities below." xml:space="preserve">
+    <value>此路由會跟隨啟用中的不可變版本。使用者仍需要下方的「檢視」及個別編輯或核准權限。</value>
+  </data>
+  <data name="The route kind cannot change after creation." xml:space="preserve">
+    <value>路線類型建立後不能變更。</value>
+  </data>
+  <data name="The rule state could not be changed because the service is temporarily unavailable." xml:space="preserve">
+    <value>由於服務暫時無法使用，因此無法變更規則狀態。</value>
+  </data>
+  <data name="The rule state could not be changed." xml:space="preserve">
+    <value>規則狀態無法變更。</value>
+  </data>
+  <data name="The run could not be cancelled." xml:space="preserve">
+    <value>無法取消執行。</value>
+  </data>
+  <data name="The schedule was paused." xml:space="preserve">
+    <value>日程被暫停了。</value>
+  </data>
+  <data name="The schedule was resumed." xml:space="preserve">
+    <value>日程又恢復了。</value>
+  </data>
+  <data name="The selected database connection is no longer available." xml:space="preserve">
+    <value>選定的資料庫連線不再可用。</value>
+  </data>
+  <data name="The session has been paused by the server." xml:space="preserve">
+    <value>伺服器已暫停此工作階段。</value>
+  </data>
+  <data name="The source schema could not be inspected." xml:space="preserve">
+    <value>無法檢查來源架構。</value>
+  </data>
+  <data name="The source version could not be created." xml:space="preserve">
+    <value>無法建立來源版本。</value>
+  </data>
+  <data name="The token could not be created." xml:space="preserve">
+    <value>無法建立權杖。</value>
+  </data>
+  <data name="The trusted action no longer exists." xml:space="preserve">
+    <value>可信操作不再存在。</value>
+  </data>
+  <data name="The unused draft was permanently removed." xml:space="preserve">
+    <value>未使用的草稿已永久刪除。</value>
+  </data>
+  <data name="The version was created but could not be activated." xml:space="preserve">
+    <value>版本已建立但無法啟動。</value>
+  </data>
+  <data name="The workflow alert rule could not be reloaded because the service is temporarily unavailable." xml:space="preserve">
+    <value>由於服務暫時無法使用，因此無法重新載入工作流程警報規則。</value>
+  </data>
+  <data name="The workflow alert rule could not be saved because the service is temporarily unavailable." xml:space="preserve">
+    <value>由於服務暫時無法使用，無法儲存工作流程警報規則。</value>
+  </data>
+  <data name="The workflow alert rule could not be saved." xml:space="preserve">
+    <value>無法儲存工作流程警報規則。</value>
+  </data>
+  <data name="The workflow alert rule no longer exists." xml:space="preserve">
+    <value>工作流程警報規則不再存在。</value>
+  </data>
+  <data name="The workflow catalog is temporarily unavailable." xml:space="preserve">
+    <value>工作流程目錄暫時無法使用。</value>
+  </data>
+  <data name="The workflow could not be archived." xml:space="preserve">
+    <value>無法存檔工作流程。</value>
+  </data>
+  <data name="The workflow could not be deleted." xml:space="preserve">
+    <value>無法刪除工作流程。</value>
+  </data>
+  <data name="The workflow could not be exported." xml:space="preserve">
+    <value>無法導出工作流程。</value>
+  </data>
+  <data name="The workflow package could not be imported." xml:space="preserve">
+    <value>無法匯入工作流程包。</value>
+  </data>
+  <data name="This route requires an active spreadsheet-editor publication." xml:space="preserve">
+    <value>此路由需要一個啟用中的試算表編輯器發佈項目。</value>
+  </data>
+  <data name="This version will remain read-only until a separate Worker apply connection is selected and writable columns are explicitly enabled." xml:space="preserve">
+    <value>選取個別的 Worker 套用連線並明確啟用可寫入欄位之前，此版本會維持唯讀。</value>
+  </data>
+  <data name="This window has no changes to stage." xml:space="preserve">
+    <value>此視窗對舞台沒有任何變更。</value>
+  </data>
+  <data name="This workspace is outside your role." xml:space="preserve">
+    <value>此工作空間不屬於您的角色。</value>
+  </data>
+  <data name="THub" xml:space="preserve">
+    <value>THub</value>
+  </data>
+  <data name="THub could not load this workflow. Try again or return to the workflow list." xml:space="preserve">
+    <value>THub 無法載入此工作流程。請再試一次，或回到工作流程清單。</value>
+  </data>
+  <data name="THub could not load workflows. Try again in a moment." xml:space="preserve">
+    <value>THub 無法載入工作流程。稍後再試一次。</value>
+  </data>
+  <data name="THub guides you from a data source to a result you can check." xml:space="preserve">
+    <value>THub 引導您從資料來源到可以檢查的結果。</value>
+  </data>
+  <data name="THub hit an unexpected error." xml:space="preserve">
+    <value>THub 發生未預期的錯誤。</value>
+  </data>
+  <data name="THub home" xml:space="preserve">
+    <value>THub 首頁</value>
+  </data>
+  <data name="THub is temporarily unavailable. No run was started." xml:space="preserve">
+    <value>THub 暫時無法使用。沒有開始執行。</value>
+  </data>
+  <data name="Time zone" xml:space="preserve">
+    <value>時區</value>
+  </data>
+  <data name="Timing" xml:space="preserve">
+    <value>定時</value>
+  </data>
+  <data name="Tip: start with a source, add the steps in order, then use Check workflow before publishing." xml:space="preserve">
+    <value>提示：從來源開始，依序新增步驟，然後使用發佈前檢查工作流程。</value>
+  </data>
+  <data name="to a role." xml:space="preserve">
+    <value>到一個角色。</value>
+  </data>
+  <data name="to show deployable consumer links." xml:space="preserve">
+    <value>顯示可部署的消費者連結。</value>
+  </data>
+  <data name="Toggle selected-row delete" xml:space="preserve">
+    <value>切換所選資料列的刪除狀態</value>
+  </data>
+  <data name="Token name" xml:space="preserve">
+    <value>權杖名稱</value>
+  </data>
+  <data name="Token revoked." xml:space="preserve">
+    <value>權杖被撤銷。</value>
+  </data>
+  <data name="Tokens could not be loaded." xml:space="preserve">
+    <value>無法載入權杖。</value>
+  </data>
+  <data name="Trace persistent management, execution, delivery, and publication activity without exposing payloads or secrets." xml:space="preserve">
+    <value>追蹤持久性管理、執行、傳遞及發佈活動，而不暴露承載資料或機密。</value>
+  </data>
+  <data name="Transport security" xml:space="preserve">
+    <value>運輸安全</value>
+  </data>
+  <data name="Trigger" xml:space="preserve">
+    <value>扳機</value>
+  </data>
+  <data name="Triggered" xml:space="preserve">
+    <value>已觸發</value>
+  </data>
+  <data name="Trust server certificate (development only)" xml:space="preserve">
+    <value>信任伺服器憑證（僅限開發環境）</value>
+  </data>
+  <data name="Trusted action update failed" xml:space="preserve">
+    <value>可信操作更新失敗</value>
+  </data>
+  <data name="Trusted action updated" xml:space="preserve">
+    <value>可信任操作已更新</value>
+  </data>
+  <data name="Trusted actions" xml:space="preserve">
+    <value>受信任的動作</value>
+  </data>
+  <data name="Trusted actions · THub" xml:space="preserve">
+    <value>受信任的動作 · THub</value>
+  </data>
+  <data name="Trusted actions could not be loaded." xml:space="preserve">
+    <value>無法載入可信任操作。</value>
+  </data>
+  <data name="Trusted executable" xml:space="preserve">
+    <value>受信任的可執行檔</value>
+  </data>
+  <data name="Trusted webhook" xml:space="preserve">
+    <value>可信網路鉤子</value>
+  </data>
+  <data name="trusted-action.use" xml:space="preserve">
+    <value>可信任操作.use</value>
+  </data>
+  <data name="Try again" xml:space="preserve">
+    <value>再試一次</value>
+  </data>
+  <data name="Two-input join" xml:space="preserve">
+    <value>兩個輸入連線</value>
+  </data>
+  <data name="Type" xml:space="preserve">
+    <value>類型</value>
+  </data>
+  <data name="Typed conditions" xml:space="preserve">
+    <value>輸入條件</value>
+  </data>
+  <data name="Unavailable profile" xml:space="preserve">
+    <value>不可用的個人資料</value>
+  </data>
+  <data name="Unknown transport" xml:space="preserve">
+    <value>未知運輸</value>
+  </data>
+  <data name="Unsaved draft" xml:space="preserve">
+    <value>未儲存的草稿</value>
+  </data>
+  <data name="Untitled workflow" xml:space="preserve">
+    <value>無標題工作流程</value>
+  </data>
+  <data name="Update" xml:space="preserve">
+    <value>更新</value>
+  </data>
+  <data name="Updated" xml:space="preserve">
+    <value>已更新</value>
+  </data>
+  <data name="Upsert by primary key" xml:space="preserve">
+    <value>按主鍵新增或更新</value>
+  </data>
+  <data name="Use" xml:space="preserve">
+    <value>使用</value>
+  </data>
+  <data name="Use canonical names such as" xml:space="preserve">
+    <value>使用規範名稱，例如</value>
+  </data>
+  <data name="Use each resource ID when assigning" xml:space="preserve">
+    <value>分配時使用每個資源 ID</value>
+  </data>
+  <data name="Use the returned opaque cursor for the next deterministic page." xml:space="preserve">
+    <value>將傳回的不透明遊標用於下一個確定性頁面。</value>
+  </data>
+  <data name="Use value" xml:space="preserve">
+    <value>使用價值</value>
+  </data>
+  <data name="User" xml:space="preserve">
+    <value>使用者</value>
+  </data>
+  <data name="Uses a five-part cron schedule. Leave empty to run only when you choose Run now." xml:space="preserve">
+    <value>使用由五個部分組成的 cron 排程。留空以僅在選擇“立即執行”時執行。</value>
+  </data>
+  <data name="Uses target default" xml:space="preserve">
+    <value>使用目標預設值</value>
+  </data>
+  <data name="utcToday" xml:space="preserve">
+    <value>utcToday</value>
+  </data>
+  <data name="Validation needs attention" xml:space="preserve">
+    <value>驗證需要注意</value>
+  </data>
+  <data name="Value" xml:space="preserve">
+    <value>價值</value>
+  </data>
+  <data name="Value column" xml:space="preserve">
+    <value>數值欄</value>
+  </data>
+  <data name="Value source" xml:space="preserve">
+    <value>價值來源</value>
+  </data>
+  <data name="value, prefix" xml:space="preserve">
+    <value>value, prefix</value>
+  </data>
+  <data name="Variable" xml:space="preserve">
+    <value>多變的</value>
+  </data>
+  <data name="Variables &amp; functions" xml:space="preserve">
+    <value>變數和函數</value>
+  </data>
+  <data name="Version" xml:space="preserve">
+    <value>版本</value>
+  </data>
+  <data name="Versions" xml:space="preserve">
+    <value>版本</value>
+  </data>
+  <data name="Versions and run history were preserved." xml:space="preserve">
+    <value>版本和執行歷史記錄均保留。</value>
+  </data>
+  <data name="View" xml:space="preserve">
+    <value>看法</value>
+  </data>
+  <data name="View all runs →" xml:space="preserve">
+    <value>查看所有執行 →</value>
+  </data>
+  <data name="View runs" xml:space="preserve">
+    <value>檢視執行紀錄</value>
+  </data>
+  <data name="Warehouse" xml:space="preserve">
+    <value>Warehouse</value>
+  </data>
+  <data name="warehouse_writer" xml:space="preserve">
+    <value>倉庫作家</value>
+  </data>
+  <data name="What does this workflow do?" xml:space="preserve">
+    <value>這個工作流程有什麼作用？</value>
+  </data>
+  <data name="When" xml:space="preserve">
+    <value>什麼時候</value>
+  </data>
+  <data name="Window" xml:space="preserve">
+    <value>窗戶</value>
+  </data>
+  <data name="Window {0} · deterministic keyset paging" xml:space="preserve">
+    <value>視窗 {0} · 確定性索引鍵集分頁</value>
+  </data>
+  <data name="Window seconds" xml:space="preserve">
+    <value>視窗秒數</value>
+  </data>
+  <data name="Windows group" xml:space="preserve">
+    <value>視窗組</value>
+  </data>
+  <data name="Windows integrated" xml:space="preserve">
+    <value>整合Windows</value>
+  </data>
+  <data name="Windows principals" xml:space="preserve">
+    <value>Windows 原則</value>
+  </data>
+  <data name="Windows user" xml:space="preserve">
+    <value>Windows使用者</value>
+  </data>
+  <data name="Worker apply connection" xml:space="preserve">
+    <value>Worker 套用連線</value>
+  </data>
+  <data name="Worker identity / none" xml:space="preserve">
+    <value>Worker 身分 / 無</value>
+  </data>
+  <data name="Worker lease" xml:space="preserve">
+    <value>Worker 租用鎖定</value>
+  </data>
+  <data name="Workflow" xml:space="preserve">
+    <value>工作流程</value>
+  </data>
+  <data name="Workflow alert rules" xml:space="preserve">
+    <value>工作流程警報規則</value>
+  </data>
+  <data name="Workflow alert rules are temporarily unavailable." xml:space="preserve">
+    <value>工作流程警報規則暫時無法使用。</value>
+  </data>
+  <data name="Workflow alert rules could not be loaded." xml:space="preserve">
+    <value>無法載入工作流程警報規則。</value>
+  </data>
+  <data name="Workflow archived" xml:space="preserve">
+    <value>工作流程已存檔</value>
+  </data>
+  <data name="Workflow create permission is required." xml:space="preserve">
+    <value>需要工作流程建立權限。</value>
+  </data>
+  <data name="Workflow delete permission is required." xml:space="preserve">
+    <value>需要工作流程刪除權限。</value>
+  </data>
+  <data name="Workflow edit permission is required." xml:space="preserve">
+    <value>需要工作流程編輯權限。</value>
+  </data>
+  <data name="Workflow Email rule saved." xml:space="preserve">
+    <value>工作流程電子郵件規則已儲存。</value>
+  </data>
+  <data name="Workflow execution permission is required." xml:space="preserve">
+    <value>需要工作流程執行權限。</value>
+  </data>
+  <data name="Workflow imported as a draft" xml:space="preserve">
+    <value>作為草稿導入的工作流程</value>
+  </data>
+  <data name="Workflow is valid" xml:space="preserve">
+    <value>工作流程有效</value>
+  </data>
+  <data name="Workflow name" xml:space="preserve">
+    <value>工作流程名稱</value>
+  </data>
+  <data name="Workflow publish permission is required." xml:space="preserve">
+    <value>需要工作流程發佈權限。</value>
+  </data>
+  <data name="Workflow published" xml:space="preserve">
+    <value>工作流程已發佈</value>
+  </data>
+  <data name="Workflow resumed" xml:space="preserve">
+    <value>工作流程已恢復</value>
+  </data>
+  <data name="Workflow rules" xml:space="preserve">
+    <value>工作流程規則</value>
+  </data>
+  <data name="Workflow schedules" xml:space="preserve">
+    <value>工作流程安排</value>
+  </data>
+  <data name="Workflow scope" xml:space="preserve">
+    <value>工作流程範圍</value>
+  </data>
+  <data name="Workflow settings" xml:space="preserve">
+    <value>工作流程設定</value>
+  </data>
+  <data name="Workflow target delete permission is required." xml:space="preserve">
+    <value>需要工作流程目標刪除權限。</value>
+  </data>
+  <data name="Workflow target upsert permission is required." xml:space="preserve">
+    <value>需要工作流程目標 upsert 權限。</value>
+  </data>
+  <data name="Workflow unavailable" xml:space="preserve">
+    <value>工作流程不可用</value>
+  </data>
+  <data name="Workflow view permission is required." xml:space="preserve">
+    <value>需要工作流程查看權限。</value>
+  </data>
+  <data name="Workflow was not published" xml:space="preserve">
+    <value>工作流程未發佈</value>
+  </data>
+  <data name="WorkflowRunStatus?" xml:space="preserve">
+    <value>工作流程運作狀態？</value>
+  </data>
+  <data name="Workflows" xml:space="preserve">
+    <value>工作流程</value>
+  </data>
+  <data name="Workflows · THub" xml:space="preserve">
+    <value>工作流程·THub</value>
+  </data>
+  <data name="Workflows and runs loaded normally" xml:space="preserve">
+    <value>工作流程和執行正常載入</value>
+  </data>
+  <data name="Workflows could not be loaded." xml:space="preserve">
+    <value>無法載入工作流程。</value>
+  </data>
+  <data name="Workflows set to run automatically" xml:space="preserve">
+    <value>工作流程設定為自動執行</value>
+  </data>
+  <data name="Workspace data" xml:space="preserve">
+    <value>工作區資料</value>
+  </data>
+  <data name="Workspace summary" xml:space="preserve">
+    <value>工作區摘要</value>
+  </data>
+  <data name="Write" xml:space="preserve">
+    <value>寫</value>
+  </data>
+  <data name="Write an XLSX workbook" xml:space="preserve">
+    <value>編寫 XLSX 工作簿</value>
+  </data>
+  <data name="Write beneath an approved root" xml:space="preserve">
+    <value>在核准的根下寫入</value>
+  </data>
+  <data name="You do not have permission to edit this workflow." xml:space="preserve">
+    <value>您無權編輯此工作流程。</value>
+  </data>
+  <data name="You do not have permission to manage this connection." xml:space="preserve">
+    <value>您無權管理此連線。</value>
+  </data>
+  <data name="You do not have permission to save this connection." xml:space="preserve">
+    <value>您無權儲存此連線。</value>
+  </data>
+  <data name="Your roles do not grant access to this publication." xml:space="preserve">
+    <value>您的角色不授予對此發佈項目的存取權限。</value>
+  </data>
+</root>

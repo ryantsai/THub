@@ -9,32 +9,32 @@
 @inject NotificationService Notifications
 @inject AccessControlEvaluator AccessControl
 
-<PageTitle>Schedules · THub</PageTitle>
+<PageTitle>@Localizer["Schedules · THub"]</PageTitle>
 
 <div class="page-heading">
-    <div><div class="eyebrow">Build and run</div><h1>Schedules</h1><p>See which workflows run automatically and when each one is due next.</p></div>
-    <div class="heading-actions"><RadzenButton Text="Refresh" Icon="refresh" ButtonStyle="ButtonStyle.Light" Click="@LoadAsync" Disabled="@Busy" /></div>
+    <div><div class="eyebrow">@Localizer["Build and run"]</div><h1>@Localizer["Schedules"]</h1><p>@Localizer["See which workflows run automatically and when each one is due next."]</p></div>
+    <div class="heading-actions"><RadzenButton Text='@Localizer["Refresh"]' Icon="refresh" ButtonStyle="ButtonStyle.Light" Click="@LoadAsync" Disabled="@Busy" /></div>
 </div>
 
 <section class="panel">
-    <div class="panel-head"><div><h2>Workflow schedules</h2><p>@Summary</p></div><a href="/designer">Create workflow →</a></div>
+    <div class="panel-head"><div><h2>@Localizer["Workflow schedules"]</h2><p>@Summary</p></div><a href="/designer">@Localizer["Create workflow →"]</a></div>
     @if (Busy && ScheduledWorkflows.Count == 0)
     {
-        <div class="page-state"><RadzenProgressBar Mode="ProgressBarMode.Indeterminate" /><p>Loading schedules…</p></div>
+        <div class="page-state"><RadzenProgressBar Mode="ProgressBarMode.Indeterminate" /><p>@Localizer["Loading schedules…"]</p></div>
     }
     else if (Error is not null)
     {
-        <div class="page-state error"><RadzenIcon Icon="error_outline" /><p>@Error</p><button type="button" @onclick="LoadAsync">Try again</button></div>
+        <div class="page-state error"><RadzenIcon Icon="error_outline" /><p>@Error</p><button type="button" @onclick="LoadAsync">@Localizer["Try again"]</button></div>
     }
     else if (ScheduledWorkflows.Count == 0)
     {
-        <div class="page-state"><RadzenIcon Icon="event_busy" /><h3>No schedules yet</h3><p>Open a workflow, add an optional schedule in its settings, then publish it.</p></div>
+        <div class="page-state"><RadzenIcon Icon="event_busy" /><h3>@Localizer["No schedules yet"]</h3><p>@Localizer["Open a workflow, add an optional schedule in its settings, then publish it."]</p></div>
     }
     else
     {
         <div class="table-scroll">
             <table class="activity-table">
-                <thead><tr><th>Workflow</th><th>Cron</th><th>Time zone</th><th>State</th><th>Next occurrence</th><th></th></tr></thead>
+                <thead><tr><th>@Localizer["Workflow"]</th><th>@Localizer["Cron"]</th><th>@Localizer["Time zone"]</th><th>@Localizer["State"]</th><th>@Localizer["Next occurrence"]</th><th></th></tr></thead>
                 <tbody>
                     @foreach (var workflow in ScheduledWorkflows)
                     {
@@ -47,15 +47,15 @@
                             <td class="schedule-actions">
                                 @if (workflow.Status == WorkflowStatus.Published)
                                 {
-                                    <button type="button" disabled="@Busy" @onclick="() => PauseAsync(workflow)">Pause</button>
+                                    <button type="button" disabled="@Busy" @onclick="() => PauseAsync(workflow)">@Localizer["Pause"]</button>
                                 }
                                 else if (workflow.Status == WorkflowStatus.Paused)
                                 {
-                                    <button type="button" disabled="@Busy" @onclick="() => ResumeAsync(workflow)">Resume</button>
+                                    <button type="button" disabled="@Busy" @onclick="() => ResumeAsync(workflow)">@Localizer["Resume"]</button>
                                 }
                                 else
                                 {
-                                    <a href="@($"/designer/{workflow.Id}")">Review & publish</a>
+                                    <a href="@($"/designer/{workflow.Id}")">@Localizer["Review & publish"]</a>
                                 }
                             </td>
                         </tr>
@@ -66,14 +66,18 @@
     }
 </section>
 
-<div class="schedule-note"><RadzenIcon Icon="info" /><p>A schedule always runs the exact workflow version you published. Editing a draft will not change active runs until you publish again.</p></div>
+<div class="schedule-note"><RadzenIcon Icon="info" /><p>@Localizer["A schedule always runs the exact workflow version you published. Editing a draft will not change active runs until you publish again."]</p></div>
 
 @code {
     private readonly CancellationTokenSource cancellation = new();
     private IReadOnlyList<WorkflowListItemDto> ScheduledWorkflows { get; set; } = [];
     private bool Busy { get; set; }
     private string? Error { get; set; }
-    private string Summary => $"{ScheduledWorkflows.Count} configured · {ScheduledWorkflows.Count(item => item.Status == WorkflowStatus.Published)} active · {ScheduledWorkflows.Count(item => item.Status == WorkflowStatus.Paused)} paused";
+    private string Summary => Localizer[
+        "{0} configured · {1} active · {2} paused",
+        ScheduledWorkflows.Count,
+        ScheduledWorkflows.Count(item => item.Status == WorkflowStatus.Published),
+        ScheduledWorkflows.Count(item => item.Status == WorkflowStatus.Paused)];
 
     protected override Task OnInitializedAsync() => LoadAsync();
 

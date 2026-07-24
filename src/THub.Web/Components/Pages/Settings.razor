@@ -6,17 +6,17 @@
 @inject AuthenticationStateProvider AuthenticationStateProvider
 @inject NotificationService Notifications
 
-<PageTitle>Access control · THub</PageTitle>
+<PageTitle>@Localizer["Access control · THub"]</PageTitle>
 
 <div class="page-heading">
     <div>
-        <div class="eyebrow">Administration</div>
-        <h1>Roles and access</h1>
-        <p>SQL-backed roles, Windows users and groups, global capabilities, and resource-specific grants.</p>
+        <div class="eyebrow">@Localizer["Administration"]</div>
+        <h1>@Localizer["Roles and access"]</h1>
+        <p>@Localizer["SQL-backed roles, Windows users and groups, global capabilities, and resource-specific grants."]</p>
     </div>
     <div class="heading-actions">
-        <RadzenButton Text="New custom role" Icon="group_add" ButtonStyle="ButtonStyle.Primary" Click="@StartCreate" Disabled="@Busy" />
-        <RadzenButton Text="Refresh" Icon="refresh" ButtonStyle="ButtonStyle.Light" Click="@LoadAsync" Disabled="@Busy" />
+        <RadzenButton Text='@Localizer["New custom role"]' Icon="group_add" ButtonStyle="ButtonStyle.Primary" Click="@StartCreate" Disabled="@Busy" />
+        <RadzenButton Text='@Localizer["Refresh"]' Icon="refresh" ButtonStyle="ButtonStyle.Light" Click="@LoadAsync" Disabled="@Busy" />
     </div>
 </div>
 
@@ -28,12 +28,12 @@
 <section class="panel">
     <div class="panel-head">
         <div>
-            <h2>Effective roles</h2>
-            <p>System Administrator always has every capability and resource. Developer can create, edit, publish, and execute workflows.</p>
+            <h2>@Localizer["Effective roles"]</h2>
+            <p>@Localizer["System Administrator always has every capability and resource. Developer can create, edit, publish, and execute workflows."]</p>
         </div>
     </div>
     <table class="activity-table">
-        <thead><tr><th>Role</th><th>Type</th><th>Principals</th><th>Global permissions</th><th>Resource grants</th><th></th></tr></thead>
+        <thead><tr><th>@Localizer["Role"]</th><th>@Localizer["Type"]</th><th>@Localizer["Principals"]</th><th>@Localizer["Global permissions"]</th><th>@Localizer["Resource grants"]</th><th></th></tr></thead>
         <tbody>
             @foreach (var role in Roles)
             {
@@ -43,7 +43,7 @@
                     <td>@role.Assignments.Count</td>
                     <td>@(role.SystemRole == SystemRoleKind.SystemAdministrator ? "All" : role.Permissions.Count.ToString())</td>
                     <td>@role.ResourceGrants.Count</td>
-                    <td><button type="button" @onclick="() => Edit(role)">Manage</button></td>
+                    <td><button type="button" @onclick="() => Edit(role)">@Localizer["Manage"]</button></td>
                 </tr>
             }
         </tbody>
@@ -56,7 +56,7 @@
         <div class="panel-head">
             <div>
                 <h2>@(Editor.RoleId is null ? "Create custom role" : Editor.Name)</h2>
-                <p>Assignments match the authenticated Windows user name or Windows/AD group membership.</p>
+                <p>@Localizer["Assignments match the authenticated Windows user name or Windows/AD group membership."]</p>
             </div>
             <button class="icon-close" type="button" @onclick="CloseEditor">×</button>
         </div>
@@ -64,11 +64,11 @@
         @if (!Editor.IsSystem)
         {
             <div class="inline-form">
-                <label><span>Name</span><input maxlength="100" @bind="Editor.Name" /></label>
-                <label><span>Description</span><input maxlength="500" @bind="Editor.Description" /></label>
+                <label><span>@Localizer["Name"]</span><input maxlength="100" @bind="Editor.Name" /></label>
+                <label><span>@Localizer["Description"]</span><input maxlength="500" @bind="Editor.Description" /></label>
             </div>
 
-            <h3>Global permissions</h3>
+            <h3>@Localizer["Global permissions"]</h3>
             <div class="permission-grid">
                 @foreach (var permission in PermissionOptions)
                 {
@@ -78,35 +78,35 @@
         }
         else
         {
-            <div class="inline-alert"><RadzenIcon Icon="verified_user" /><span>System-role permissions are fixed. Principal assignments remain editable.</span></div>
+            <div class="inline-alert"><RadzenIcon Icon="verified_user" /><span>@Localizer["System-role permissions are fixed. Principal assignments remain editable."]</span></div>
         }
 
         <div class="section-heading">
-            <div><h3>Windows principals</h3><p>Use canonical names such as <code>DOMAIN\alice</code> or <code>DOMAIN\THub Developers</code>.</p></div>
-            <button type="button" @onclick="AddAssignment">Add principal</button>
+            <div><h3>@Localizer["Windows principals"]</h3><p>@Localizer["Use canonical names such as"] <code>@Localizer["DOMAIN\\alice"]</code> @Localizer["or"] <code>@Localizer["DOMAIN\\THub Developers"]</code>.</p></div>
+            <button type="button" @onclick="AddAssignment">@Localizer["Add principal"]</button>
         </div>
         @foreach (var assignment in Editor.Assignments)
         {
             <div class="inline-form three">
-                <label><span>Kind</span><select @bind="assignment.Kind"><option value="@AccessPrincipalKind.User">User</option><option value="@AccessPrincipalKind.WindowsGroup">Windows group</option></select></label>
-                <label><span>Principal name</span><input maxlength="256" @bind="assignment.Name" /></label>
-                <div class="field-button"><button type="button" @onclick="() => Editor.Assignments.Remove(assignment)">Remove</button></div>
+                <label><span>@Localizer["Kind"]</span><select @bind="assignment.Kind"><option value="@AccessPrincipalKind.User">@Localizer["User"]</option><option value="@AccessPrincipalKind.WindowsGroup">@Localizer["Windows group"]</option></select></label>
+                <label><span>@Localizer["Principal name"]</span><input maxlength="256" @bind="assignment.Name" /></label>
+                <div class="field-button"><button type="button" @onclick="() => Editor.Assignments.Remove(assignment)">@Localizer["Remove"]</button></div>
             </div>
         }
 
         @if (!Editor.IsSystem)
         {
             <div class="section-heading">
-                <div><h3>Resource grants</h3><p>Grant a capability only on one workflow, publication, or connection identifier.</p></div>
-                <button type="button" @onclick="AddGrant">Add resource grant</button>
+                <div><h3>@Localizer["Resource grants"]</h3><p>@Localizer["Grant a capability only on one workflow, publication, or connection identifier."]</p></div>
+                <button type="button" @onclick="AddGrant">@Localizer["Add resource grant"]</button>
             </div>
             @foreach (var grant in Editor.Grants)
             {
                 <div class="inline-form four">
-                    <label><span>Resource</span><select value="@grant.Kind" @onchange="eventArgs => ChangeGrantKind(grant, eventArgs)">@foreach (var kind in Enum.GetValues<AccessResourceKind>()){<option value="@kind">@kind</option>}</select></label>
-                    <label><span>Resource ID</span><input @bind="grant.ResourceId" /></label>
-                    <label><span>Permission</span><select @bind="grant.Permission">@foreach (var permission in ResourcePermissionOptions(grant.Kind)){<option value="@permission">@permission</option>}</select></label>
-                    <div class="field-button"><button type="button" @onclick="() => Editor.Grants.Remove(grant)">Remove</button></div>
+                    <label><span>@Localizer["Resource"]</span><select value="@grant.Kind" @onchange="eventArgs => ChangeGrantKind(grant, eventArgs)">@foreach (var kind in Enum.GetValues<AccessResourceKind>()){<option value="@kind">@kind</option>}</select></label>
+                    <label><span>@Localizer["Resource ID"]</span><input @bind="grant.ResourceId" /></label>
+                    <label><span>@Localizer["Permission"]</span><select @bind="grant.Permission">@foreach (var permission in ResourcePermissionOptions(grant.Kind)){<option value="@permission">@permission</option>}</select></label>
+                    <div class="field-button"><button type="button" @onclick="() => Editor.Grants.Remove(grant)">@Localizer["Remove"]</button></div>
                 </div>
             }
         }
@@ -114,9 +114,9 @@
         <div class="form-actions">
             @if (Editor.RoleId is not null && !Editor.IsSystem)
             {
-                <RadzenButton Text="Delete role" Icon="delete" ButtonStyle="ButtonStyle.Danger" Click="@DeleteAsync" Disabled="@Busy" />
+                <RadzenButton Text='@Localizer["Delete role"]' Icon="delete" ButtonStyle="ButtonStyle.Danger" Click="@DeleteAsync" Disabled="@Busy" />
             }
-            <RadzenButton Text="Save" Icon="save" ButtonStyle="ButtonStyle.Primary" Click="@SaveAsync" Disabled="@Busy" />
+            <RadzenButton Text='@Localizer["Save"]' Icon="save" ButtonStyle="ButtonStyle.Primary" Click="@SaveAsync" Disabled="@Busy" />
         </div>
     </section>
 }

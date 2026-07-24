@@ -24,6 +24,7 @@ Quartz owns schedule timing, persistence, misfire handling, and scheduler cluste
 | SQL-backed RBAC | Implemented | Windows users/groups map to System Administrator, Developer, or custom roles with global and resource-specific grants |
 | Persistent audit trail | Implemented; validation pending | Metadata-only append records cover completed EF control-plane changes plus direct run-claim, token-use, and editor-apply paths; `audit.view` protects the paged viewer |
 | Blazor/Radzen application shell | Implemented | Dashboard and management views are present |
+| UI localization | Implemented; validation pending | English and Taiwan Traditional Chinese (`zh-TW`) resources, browser-language default, and cookie-persisted main-navigation switcher are present; authorized build/browser validation has not been run |
 | Visual workflow designer | Implemented | Create/load/save/publish/pause/archive persisted workflows, configure/connect nodes, and detect optimistic draft-revision conflicts |
 | Workflow graph validation | Implemented | Explicit schema version, size bounds, IDs, endpoints, cardinality, cycles, typed per-node settings, and operational-policy checks |
 | SQL Server metadata schema | Implemented | The migration chain includes workflows, runs, connections, durable alerts, and governed publication versions/tokens/grants/change sets |
@@ -46,6 +47,7 @@ Quartz owns schedule timing, persistence, misfire handling, and scheduler cluste
 - .NET 10 / ASP.NET Core 10
 - Blazor Web App with global Interactive Server rendering
 - Radzen Blazor 11
+- ASP.NET Core request localization with shared English and `zh-TW` UI resources
 - Separate ASP.NET Core publication host for the internal read-only REST boundary
 - .NET Worker hosted as a Windows Service
 - EF Core 10 with Microsoft SQL Server
@@ -233,6 +235,7 @@ The migration creates both THub metadata in the `thub` schema and Quartz operati
 - [Security architecture](docs/security.md)
 - [Data model](docs/data-model.md)
 - [Deployment and operations](docs/deployment.md)
+- [UI localization](docs/localization.md)
 - [Architecture decision records](docs/adr/README.md)
 - [Open product decisions](docs/product-decisions.md)
 - [AI agent instructions](AGENTS.md)

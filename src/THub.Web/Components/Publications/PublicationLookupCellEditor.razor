@@ -4,12 +4,12 @@
 
 <div class="publication-lookup-editor">
     <div class="lookup-search">
-        <input aria-label="Search foreign-key values" maxlength="256" placeholder="Search approved values…" @bind="SearchText" />
-        <button type="button" @onclick="SearchAsync" disabled="@Loading">Search</button>
+        <input aria-label='@Localizer["Search foreign-key values"]' maxlength="256" placeholder='@Localizer["Search approved values…"]' @bind="SearchText" />
+        <button type="button" @onclick="SearchAsync" disabled="@Loading">@Localizer["Search"]</button>
     </div>
     @if (Loading)
     {
-        <span class="lookup-message">Loading…</span>
+        <span class="lookup-message">@Localizer["Loading…"]</span>
     }
     else if (Error is not null)
     {
@@ -31,22 +31,22 @@
                                 AllowColumnResize="false"
                                 AllowColumnReorder="false"
                                 ShowSearch="true"
-                                SearchTextPlaceholder="Filter loaded approved values…"
-                                EmptyText="No approved values in this bounded result"
+                                SearchTextPlaceholder='@Localizer["Filter loaded approved values…"]'
+                                EmptyText='@Localizer["No approved values in this bounded result"]'
                                 InputAttributes="@(new Dictionary<string, object> { ["aria-label"] = "Approved foreign-key value" })"
                                 Style="width: 100%;">
             <Columns>
-                <RadzenDropDownDataGridColumn Property="DisplayText" Title="Display value" />
-                <RadzenDropDownDataGridColumn Property="KeyText" Title="Stored key" />
+                <RadzenDropDownDataGridColumn Property="DisplayText" Title='@Localizer["Display value"]' />
+                <RadzenDropDownDataGridColumn Property="KeyText" Title='@Localizer["Stored key"]' />
             </Columns>
         </RadzenDropDownDataGrid>
         <div class="lookup-actions">
             @if (Column?.IsNullable == true)
             {
-                <button type="button" @onclick="ClearAsync">Clear</button>
+                <button type="button" @onclick="ClearAsync">@Localizer["Clear"]</button>
             }
-            <button class="primary" type="button" @onclick="CommitAsync" disabled="@(string.IsNullOrEmpty(SelectedId))">Use value</button>
-            <button type="button" @onclick="Context.Cancel">Cancel</button>
+            <button class="primary" type="button" @onclick="CommitAsync" disabled="@(string.IsNullOrEmpty(SelectedId))">@Localizer["Use value"]</button>
+            <button type="button" @onclick="Context.Cancel">@Localizer["Cancel"]</button>
         </div>
     }
 </div>

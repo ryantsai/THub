@@ -8,25 +8,25 @@
 @inject PublicationRoleResolver RoleResolver
 @inject AuthenticationStateProvider AuthenticationStateProvider
 
-<PageTitle>Data tables · THub</PageTitle>
+<PageTitle>@Localizer["Data tables · THub"]</PageTitle>
 
 <div class="page-heading">
-    <div><div class="eyebrow">Share and monitor</div><h1>Data tables</h1><p>Open the shared tables you can view or edit.</p></div>
-    <RadzenButton Text="Refresh" Icon="refresh" ButtonStyle="ButtonStyle.Light" Click="@LoadAsync" Disabled="@Loading" />
+    <div><div class="eyebrow">@Localizer["Share and monitor"]</div><h1>@Localizer["Data tables"]</h1><p>@Localizer["Open the shared tables you can view or edit."]</p></div>
+    <RadzenButton Text='@Localizer["Refresh"]' Icon="refresh" ButtonStyle="ButtonStyle.Light" Click="@LoadAsync" Disabled="@Loading" />
 </div>
 
 <section class="panel">
     @if (Loading)
     {
-        <div class="page-state"><RadzenProgressBar Mode="ProgressBarMode.Indeterminate" /><p>Checking which tables you can access…</p></div>
+        <div class="page-state"><RadzenProgressBar Mode="ProgressBarMode.Indeterminate" /><p>@Localizer["Checking which tables you can access…"]</p></div>
     }
     else if (Error is not null)
     {
-        <div class="page-state error" role="alert"><RadzenIcon Icon="error_outline" /><p>@Error</p><button type="button" @onclick="LoadAsync">Try again</button></div>
+        <div class="page-state error" role="alert"><RadzenIcon Icon="error_outline" /><p>@Error</p><button type="button" @onclick="LoadAsync">@Localizer["Try again"]</button></div>
     }
     else if (Items.Count == 0)
     {
-        <div class="page-state"><RadzenIcon Icon="table_view" /><h2>No data tables are assigned</h2><p>Ask an administrator to share a table with your role.</p></div>
+        <div class="page-state"><RadzenIcon Icon="table_view" /><h2>@Localizer["No data tables are assigned"]</h2><p>@Localizer["Ask an administrator to share a table with your role."]</p></div>
     }
     else
     {
@@ -35,8 +35,8 @@
             {
                 <article>
                     <div class="published-editor-icon"><RadzenIcon Icon="table_view" /></div>
-                    <div><h2>@item.Name</h2><p><code>@item.Slug</code> · active governed spreadsheet</p></div>
-                    <a href="@($"/data/{item.Slug}")">Open editor <RadzenIcon Icon="arrow_forward" /></a>
+                    <div><h2>@item.Name</h2><p><code>@item.Slug</code> @Localizer["· active governed spreadsheet"]</p></div>
+                    <a href="@($"/data/{item.Slug}")">@Localizer["Open editor"] <RadzenIcon Icon="arrow_forward" /></a>
                 </article>
             }
         </div>

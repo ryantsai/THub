@@ -10,35 +10,35 @@
 @inject TimeProvider TimeProvider
 @inject AccessControlEvaluator AccessControl
 
-<PageTitle>Connections · THub</PageTitle>
+<PageTitle>@Localizer["Connections · THub"]</PageTitle>
 
 <div class="page-heading">
     <div>
-        <div class="eyebrow">Build and run</div>
-        <h1>Data connections</h1>
-        <p>Tell THub where it may safely read or write data.</p>
+        <div class="eyebrow">@Localizer["Build and run"]</div>
+        <h1>@Localizer["Data connections"]</h1>
+        <p>@Localizer["Tell THub where it may safely read or write data."]</p>
     </div>
     <div class="heading-actions">
-        <RadzenButton Text="New connection" Icon="add" ButtonStyle="ButtonStyle.Primary" Click="@NewConnection" Disabled="@(Busy || !CanCreate)" />
-        <RadzenButton Text="Refresh" Icon="refresh" ButtonStyle="ButtonStyle.Light" Click="@LoadAsync" Disabled="@Busy" />
+        <RadzenButton Text='@Localizer["New connection"]' Icon="add" ButtonStyle="ButtonStyle.Primary" Click="@NewConnection" Disabled="@(Busy || !CanCreate)" />
+        <RadzenButton Text='@Localizer["Refresh"]' Icon="refresh" ButtonStyle="ButtonStyle.Light" Click="@LoadAsync" Disabled="@Busy" />
     </div>
 </div>
 
 @if (Loading)
 {
-    <div class="page-state"><RadzenProgressBar Mode="ProgressBarMode.Indeterminate" /><p>Loading connections…</p></div>
+    <div class="page-state"><RadzenProgressBar Mode="ProgressBarMode.Indeterminate" /><p>@Localizer["Loading connections…"]</p></div>
 }
 else if (LoadError is not null)
 {
-    <div class="page-state error"><RadzenIcon Icon="error_outline" /><p>@LoadError</p><button type="button" @onclick="LoadAsync">Try again</button></div>
+    <div class="page-state error"><RadzenIcon Icon="error_outline" /><p>@LoadError</p><button type="button" @onclick="LoadAsync">@Localizer["Try again"]</button></div>
 }
 else
 {
     <div class="connections-layout">
-        <section class="resource-grid" aria-label="Configured connections">
+        <section class="resource-grid" aria-label='@Localizer["Configured connections"]'>
             @if (Items.Count == 0)
             {
-                <div class="page-state empty-card"><RadzenIcon Icon="cable" /><h3>No connections yet</h3><p>Add the first database, file folder, or FTP location you want to use in a workflow.</p></div>
+                <div class="page-state empty-card"><RadzenIcon Icon="cable" /><h3>@Localizer["No connections yet"]</h3><p>@Localizer["Add the first database, file folder, or FTP location you want to use in a workflow."]</p></div>
             }
             @foreach (var item in Items)
             {
@@ -46,10 +46,10 @@ else
                     <span class="resource-logo @(item.Kind == ConnectionKind.SqlServer ? "sql" : "files")"><RadzenIcon Icon="@KindIcon(item.Kind)" /></span>
                     <div><h2>@item.Name</h2><p>@KindLabel(item.Kind)</p></div>
                     <span class="status-chip @(item.IsEnabled ? null : "draft")">@(item.IsEnabled ? "Enabled" : "Disabled")</span>
-                    <dl><dt>Connector</dt><dd>@item.Kind</dd><dt>Updated</dt><dd>@item.UpdatedAtUtc.ToLocalTime().ToString("g")</dd></dl>
+                    <dl><dt>@Localizer["Connector"]</dt><dd>@item.Kind</dd><dt>@Localizer["Updated"]</dt><dd>@item.UpdatedAtUtc.ToLocalTime().ToString("g")</dd></dl>
                     @if (CanManage.Contains(item.Id))
                     {
-                        <button type="button" @onclick="() => EditConnectionAsync(item.Id)">Manage connection →</button>
+                        <button type="button" @onclick="() => EditConnectionAsync(item.Id)">@Localizer["Manage connection →"]</button>
                     }
                 </article>
             }
@@ -57,79 +57,79 @@ else
 
         @if (ShowEditor)
         {
-            <section class="panel connection-editor" aria-label="Connection editor">
-                <div class="panel-head"><div><h2>@(Edit.Id is null ? "New connection" : "Edit connection")</h2><p>Saved usernames and passwords are encrypted and are never shown again.</p></div><button class="close-editor" type="button" title="Close" @onclick="CloseEditor">×</button></div>
+            <section class="panel connection-editor" aria-label='@Localizer["Connection editor"]'>
+                <div class="panel-head"><div><h2>@(Edit.Id is null ? "New connection" : "Edit connection")</h2><p>@Localizer["Saved usernames and passwords are encrypted and are never shown again."]</p></div><button class="close-editor" type="button" title='@Localizer["Close"]' @onclick="CloseEditor">×</button></div>
                 <div class="connection-form">
-                    <label><span>Name</span><input maxlength="200" @bind="Edit.Name" disabled="@Busy" /></label>
-                    <label><span>Connector</span>
+                    <label><span>@Localizer["Name"]</span><input maxlength="200" @bind="Edit.Name" disabled="@Busy" /></label>
+                    <label><span>@Localizer["Connector"]</span>
                         <select @bind="Edit.Kind" disabled="@(Busy || Edit.Id is not null)">
-                            <option value="@ConnectionKind.SqlServer">SQL Server</option>
-                            <option value="@ConnectionKind.MySql">MySQL</option>
-                            <option value="@ConnectionKind.PostgreSql">PostgreSQL</option>
-                            <option value="@ConnectionKind.Oracle">Oracle</option>
-                            <option value="@ConnectionKind.Ftp">FTP / FTPS</option>
-                            <option value="@ConnectionKind.CsvFile">CSV files</option>
-                            <option value="@ConnectionKind.ExcelFile">Excel workbooks</option>
+                            <option value="@ConnectionKind.SqlServer">@Localizer["SQL Server"]</option>
+                            <option value="@ConnectionKind.MySql">@Localizer["MySQL"]</option>
+                            <option value="@ConnectionKind.PostgreSql">@Localizer["PostgreSQL"]</option>
+                            <option value="@ConnectionKind.Oracle">@Localizer["Oracle"]</option>
+                            <option value="@ConnectionKind.Ftp">@Localizer["FTP / FTPS"]</option>
+                            <option value="@ConnectionKind.CsvFile">@Localizer["CSV files"]</option>
+                            <option value="@ConnectionKind.ExcelFile">@Localizer["Excel workbooks"]</option>
                         </select>
                     </label>
 
                     @if (IsDatabase(Edit.Kind))
                     {
-                        <label><span>Host / server</span><input placeholder="db01.contoso.local" maxlength="253" @bind="Edit.Server" disabled="@Busy" /></label>
+                        <label><span>@Localizer["Host / server"]</span><input placeholder='@Localizer["db01.contoso.local"]' maxlength="253" @bind="Edit.Server" disabled="@Busy" /></label>
                         @if (Edit.Kind != ConnectionKind.SqlServer)
                         {
-                            <label><span>Port</span><input type="number" min="1" max="65535" @bind="Edit.Port" disabled="@Busy" /></label>
+                            <label><span>@Localizer["Port"]</span><input type="number" min="1" max="65535" @bind="Edit.Port" disabled="@Busy" /></label>
                         }
-                        <label><span>@(Edit.Kind == ConnectionKind.Oracle ? "Service name" : "Database")</span><input placeholder="Warehouse" maxlength="128" @bind="Edit.Database" disabled="@Busy" /></label>
-                        <label><span>Authentication</span>
+                        <label><span>@(Edit.Kind == ConnectionKind.Oracle ? "Service name" : "Database")</span><input placeholder='@Localizer["Warehouse"]' maxlength="128" @bind="Edit.Database" disabled="@Busy" /></label>
+                        <label><span>@Localizer["Authentication"]</span>
                             <select @bind="Edit.AuthenticationKind" disabled="@(Busy || Edit.Kind != ConnectionKind.SqlServer)">
-                                <option value="@DatabaseAuthenticationKind.Integrated">Windows integrated</option>
-                                <option value="@DatabaseAuthenticationKind.UserPassword">Database username/password</option>
+                                <option value="@DatabaseAuthenticationKind.Integrated">@Localizer["Windows integrated"]</option>
+                                <option value="@DatabaseAuthenticationKind.UserPassword">@Localizer["Database username/password"]</option>
                             </select>
                         </label>
                         @if (Edit.AuthenticationKind == DatabaseAuthenticationKind.UserPassword)
                         {
-                            <label><span>Credential reference</span><input placeholder="warehouse_writer" maxlength="200" autocomplete="off" spellcheck="false" @bind="Edit.CredentialSecretReference" disabled="@Busy" /><small>Stable identifier used by workflows and connection metadata.</small></label>
-                            <label><span>Database username</span><input maxlength="256" autocomplete="off" spellcheck="false" @bind="Edit.CredentialUserName" disabled="@Busy" /><small>@CredentialInputHint(Edit)</small></label>
-                            <label><span>Database password</span><input type="password" maxlength="4096" autocomplete="new-password" @bind="Edit.CredentialPassword" disabled="@Busy" /></label>
+                            <label><span>@Localizer["Credential reference"]</span><input placeholder='@Localizer["warehouse_writer"]' maxlength="200" autocomplete="off" spellcheck="false" @bind="Edit.CredentialSecretReference" disabled="@Busy" /><small>@Localizer["Stable identifier used by workflows and connection metadata."]</small></label>
+                            <label><span>@Localizer["Database username"]</span><input maxlength="256" autocomplete="off" spellcheck="false" @bind="Edit.CredentialUserName" disabled="@Busy" /><small>@CredentialInputHint(Edit)</small></label>
+                            <label><span>@Localizer["Database password"]</span><input type="password" maxlength="4096" autocomplete="new-password" @bind="Edit.CredentialPassword" disabled="@Busy" /></label>
                         }
-                        <label class="check"><input type="checkbox" @bind="Edit.Encrypt" disabled="@Busy" /><span>Require transport encryption</span></label>
-                        <label class="check"><input type="checkbox" @bind="Edit.TrustServerCertificate" disabled="@Busy" /><span>Trust server certificate (development only)</span></label>
-                        <label><span>Connect timeout (seconds)</span><input type="number" min="1" max="60" @bind="Edit.ConnectTimeoutSeconds" disabled="@Busy" /></label>
-                        <label><span>Command timeout (seconds)</span><input type="number" min="1" max="300" @bind="Edit.CommandTimeoutSeconds" disabled="@Busy" /></label>
-                        <label><span>Maximum batch rows</span><input type="number" min="1" max="10000" @bind="Edit.MaximumBatchRows" disabled="@Busy" /></label>
+                        <label class="check"><input type="checkbox" @bind="Edit.Encrypt" disabled="@Busy" /><span>@Localizer["Require transport encryption"]</span></label>
+                        <label class="check"><input type="checkbox" @bind="Edit.TrustServerCertificate" disabled="@Busy" /><span>@Localizer["Trust server certificate (development only)"]</span></label>
+                        <label><span>@Localizer["Connect timeout (seconds)"]</span><input type="number" min="1" max="60" @bind="Edit.ConnectTimeoutSeconds" disabled="@Busy" /></label>
+                        <label><span>@Localizer["Command timeout (seconds)"]</span><input type="number" min="1" max="300" @bind="Edit.CommandTimeoutSeconds" disabled="@Busy" /></label>
+                        <label><span>@Localizer["Maximum batch rows"]</span><input type="number" min="1" max="10000" @bind="Edit.MaximumBatchRows" disabled="@Busy" /></label>
                     }
                     else if (Edit.Kind == ConnectionKind.Ftp)
                     {
-                        <label><span>FTP host</span><input placeholder="ftp.contoso.local" maxlength="253" @bind="Edit.Server" disabled="@Busy" /></label>
-                        <label><span>Port</span><input type="number" min="1" max="65535" @bind="Edit.Port" disabled="@Busy" /></label>
-                        <label><span>Transport security</span>
+                        <label><span>@Localizer["FTP host"]</span><input placeholder='@Localizer["ftp.contoso.local"]' maxlength="253" @bind="Edit.Server" disabled="@Busy" /></label>
+                        <label><span>@Localizer["Port"]</span><input type="number" min="1" max="65535" @bind="Edit.Port" disabled="@Busy" /></label>
+                        <label><span>@Localizer["Transport security"]</span>
                             <select @bind="Edit.FtpEncryptionMode" disabled="@Busy">
-                                <option value="@FtpEncryptionMode.None">Plain FTP (unencrypted)</option>
-                                <option value="@FtpEncryptionMode.Explicit">Explicit FTPS</option>
-                                <option value="@FtpEncryptionMode.Implicit">Implicit FTPS</option>
+                                <option value="@FtpEncryptionMode.None">@Localizer["Plain FTP (unencrypted)"]</option>
+                                <option value="@FtpEncryptionMode.Explicit">@Localizer["Explicit FTPS"]</option>
+                                <option value="@FtpEncryptionMode.Implicit">@Localizer["Implicit FTPS"]</option>
                             </select>
                         </label>
                         @if (Edit.FtpEncryptionMode == FtpEncryptionMode.None)
                         {
-                            <div class="transport-warning" role="alert"><RadzenIcon Icon="warning_amber" /><span>Plain FTP is unencrypted. The username, password, and file contents are exposed in transit.</span></div>
+                            <div class="transport-warning" role="alert"><RadzenIcon Icon="warning_amber" /><span>@Localizer["Plain FTP is unencrypted. The username, password, and file contents are exposed in transit."]</span></div>
                         }
-                        <label><span>Credential reference</span><input placeholder="ftp_partner" maxlength="200" autocomplete="off" spellcheck="false" @bind="Edit.CredentialSecretReference" disabled="@Busy" /></label>
-                        <label><span>FTP username</span><input maxlength="256" autocomplete="off" spellcheck="false" @bind="Edit.CredentialUserName" disabled="@Busy" /><small>@CredentialInputHint(Edit)</small></label>
-                        <label><span>FTP password</span><input type="password" maxlength="4096" autocomplete="new-password" @bind="Edit.CredentialPassword" disabled="@Busy" /></label>
-                        <label class="check"><input type="checkbox" @bind="Edit.TrustServerCertificate" disabled="@(Busy || Edit.FtpEncryptionMode == FtpEncryptionMode.None)" /><span>Trust server certificate (development only)</span></label>
-                        <label><span>Connect timeout (seconds)</span><input type="number" min="1" max="60" @bind="Edit.ConnectTimeoutSeconds" disabled="@Busy" /></label>
-                        <label><span>Maximum file size (MiB)</span><input type="number" min="1" max="4096" @bind="Edit.MaximumFileMiB" disabled="@Busy" /></label>
-                        <label><span>Maximum rows</span><input type="number" min="1" max="10000000" @bind="Edit.MaximumRows" disabled="@Busy" /></label>
-                        <label><span>Maximum columns</span><input type="number" min="1" max="16384" @bind="Edit.MaximumColumns" disabled="@Busy" /></label>
+                        <label><span>@Localizer["Credential reference"]</span><input placeholder='@Localizer["ftp_partner"]' maxlength="200" autocomplete="off" spellcheck="false" @bind="Edit.CredentialSecretReference" disabled="@Busy" /></label>
+                        <label><span>@Localizer["FTP username"]</span><input maxlength="256" autocomplete="off" spellcheck="false" @bind="Edit.CredentialUserName" disabled="@Busy" /><small>@CredentialInputHint(Edit)</small></label>
+                        <label><span>@Localizer["FTP password"]</span><input type="password" maxlength="4096" autocomplete="new-password" @bind="Edit.CredentialPassword" disabled="@Busy" /></label>
+                        <label class="check"><input type="checkbox" @bind="Edit.TrustServerCertificate" disabled="@(Busy || Edit.FtpEncryptionMode == FtpEncryptionMode.None)" /><span>@Localizer["Trust server certificate (development only)"]</span></label>
+                        <label><span>@Localizer["Connect timeout (seconds)"]</span><input type="number" min="1" max="60" @bind="Edit.ConnectTimeoutSeconds" disabled="@Busy" /></label>
+                        <label><span>@Localizer["Maximum file size (MiB)"]</span><input type="number" min="1" max="4096" @bind="Edit.MaximumFileMiB" disabled="@Busy" /></label>
+                        <label><span>@Localizer["Maximum rows"]</span><input type="number" min="1" max="10000000" @bind="Edit.MaximumRows" disabled="@Busy" /></label>
+                        <label><span>@Localizer["Maximum columns"]</span><input type="number" min="1" max="16384" @bind="Edit.MaximumColumns" disabled="@Busy" /></label>
                     }
                     else
                     {
-                        <label class="wide"><span>Approved root</span><input placeholder="D:\Data\Inbound" maxlength="1024" @bind="Edit.ApprovedRoot" disabled="@Busy" /></label>
-                        <label class="check wide"><input type="checkbox" @bind="Edit.AllowUncRoot" disabled="@Busy" /><span>Administrator approved this UNC root</span></label>
-                        <label><span>Maximum file size (MiB)</span><input type="number" min="1" max="4096" @bind="Edit.MaximumFileMiB" disabled="@Busy" /></label>
-                        <label><span>Maximum rows</span><input type="number" min="1" max="10000000" @bind="Edit.MaximumRows" disabled="@Busy" /></label>
-                        <label><span>Maximum columns</span><input type="number" min="1" max="16384" @bind="Edit.MaximumColumns" disabled="@Busy" /></label>
+                        <label class="wide"><span>@Localizer["Approved root"]</span><input placeholder="D:\Data\Inbound" maxlength="1024" @bind="Edit.ApprovedRoot" disabled="@Busy" /></label>
+                        <label class="check wide"><input type="checkbox" @bind="Edit.AllowUncRoot" disabled="@Busy" /><span>@Localizer["Administrator approved this UNC root"]</span></label>
+                        <label><span>@Localizer["Maximum file size (MiB)"]</span><input type="number" min="1" max="4096" @bind="Edit.MaximumFileMiB" disabled="@Busy" /></label>
+                        <label><span>@Localizer["Maximum rows"]</span><input type="number" min="1" max="10000000" @bind="Edit.MaximumRows" disabled="@Busy" /></label>
+                        <label><span>@Localizer["Maximum columns"]</span><input type="number" min="1" max="16384" @bind="Edit.MaximumColumns" disabled="@Busy" /></label>
                     }
                 </div>
                 @if (FormError is not null)
@@ -143,12 +143,12 @@ else
                 <div class="editor-actions">
                     @if (Edit.Id is not null)
                     {
-                        <RadzenButton Text="Test connection" Icon="network_check" ButtonStyle="ButtonStyle.Light" Click="@ProbeAsync" Disabled="@Busy" />
+                        <RadzenButton Text='@Localizer["Test connection"]' Icon="network_check" ButtonStyle="ButtonStyle.Light" Click="@ProbeAsync" Disabled="@Busy" />
                         <RadzenButton Text="@(Edit.IsEnabled ? "Disable" : "Enable")" Icon="power_settings_new" ButtonStyle="@(Edit.IsEnabled ? ButtonStyle.Danger : ButtonStyle.Success)" Click="@ToggleAsync" Disabled="@Busy" />
                     }
                     <span></span>
-                    <RadzenButton Text="Cancel" ButtonStyle="ButtonStyle.Light" Click="@CloseEditor" Disabled="@Busy" />
-                    <RadzenButton Text="Save connection" Icon="save" ButtonStyle="ButtonStyle.Primary" Click="@SaveAsync" Disabled="@Busy" />
+                    <RadzenButton Text='@Localizer["Cancel"]' ButtonStyle="ButtonStyle.Light" Click="@CloseEditor" Disabled="@Busy" />
+                    <RadzenButton Text='@Localizer["Save connection"]' Icon="save" ButtonStyle="ButtonStyle.Primary" Click="@SaveAsync" Disabled="@Busy" />
                 </div>
             </section>
         }
