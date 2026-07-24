@@ -56,6 +56,25 @@ on THub. It applies below the repository root unless a deeper `AGENTS.md` overri
 - Keep the neutral resource, `SharedResource.zh-TW.resx`, and the post-render JSON mirror
   synchronized as described in [docs/localization.md](docs/localization.md).
 
+## UI/UX golden rule: streamline the primary task
+
+- Favor the shortest clear path to the user's primary task over exposing every available
+  option at once.
+- Start each operational page with the working surface itself. Remove explanatory
+  headers, status facts, history, and secondary controls when they do not help the
+  immediate task.
+- Keep one obvious primary action. Reveal advanced, administrative, historical, and
+  governance controls progressively through contextual panels, drawers, or an
+  explicitly labeled advanced section.
+- Prefer familiar interaction models for familiar work: spreadsheet editing should feel
+  like a spreadsheet, and workflow design should be canvas-first with configuration
+  shown for the selected step.
+- Prompt for validation, saving, or discarding only when the user has made changes or is
+  about to leave the current context.
+- Do not use streamlined UI as a reason to weaken server-side authorization, validation,
+  staging, approval, audit, or immutable-version boundaries. See
+  [docs/ui-design.md](docs/ui-design.md).
+
 ## Validation requires explicit user authorization
 
 - Never initiate a build, compile, restore, test run, browser/UI test, package audit, or

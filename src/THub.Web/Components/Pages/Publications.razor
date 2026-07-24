@@ -107,12 +107,10 @@
                 @if (VersionVisible)
                 {
                     <div class="version-wizard">
-                        <ol class="builder-steps" aria-label='@Localizer["Publication setup progress"]'>
-                            <li class="complete"><span>1</span><div><strong>@Localizer["Surface"]</strong><small>@Selected.Kind · @Selected.Slug</small></div></li>
-                            <li class="@(Inspection is null ? "current" : "complete")"><span>2</span><div><strong>@Localizer["Source"]</strong><small>@Localizer["Choose a provider and object"]</small></div></li>
-                            <li class="@(Inspection is not null ? "current" : null)"><span>3</span><div><strong>@Localizer["Contract"]</strong><small>@Localizer["Review columns and relationships"]</small></div></li>
-                            <li><span>4</span><div><strong>@Localizer["Activate"]</strong><small>@Localizer["Limits, access, and handoff"]</small></div></li>
-                        </ol>
+                        <div class="builder-head">
+                            <div><span>@Localizer["New version"]</span><h4>@Localizer["Choose the data to publish"]</h4><p>@Localizer["Pick a table, review its visible columns, then publish."]</p></div>
+                            <button type="button" aria-label='@Localizer["Close"]' @onclick="() => VersionVisible = false"><RadzenIcon Icon="close" /></button>
+                        </div>
                         <div class="inline-form source-select">
                             <label><span>@Localizer["Approved database connection"]</span><select @bind="VersionConnectionId" @bind:after="VersionConnectionChanged"><option value="@Guid.Empty">@Localizer["Select connection…"]</option>@foreach (var connection in DatabaseConnections){<option value="@connection.Id">@connection.Name · @connection.Kind</option>}</select></label>
                             <div class="field-button"><RadzenButton Text='@Localizer["List tables and views"]' Icon="search" ButtonStyle="ButtonStyle.Light" Click="@DiscoverObjectsAsync" Disabled="@(Busy || VersionConnectionId == Guid.Empty)" /></div>
@@ -151,8 +149,12 @@
                                     <div class="form-warning" role="status"><RadzenIcon Icon="info" />@Localizer["This version will remain read-only until a separate Worker apply connection is selected and writable columns are explicitly enabled."]</div>
                                 }
                             }
-                            <div class="table-scroll policy-table-wrap">
-                                <table class="policy-table"><thead><tr><th>@Localizer["Include"]</th><th>@Localizer["Source column"]</th><th>@Localizer["Public alias"]</th><th>@Localizer["Type"]</th><th>@Localizer["Read"]</th><th>@Localizer["Filter"]</th><th>@Localizer["Sort"]</th><th>@Localizer["Write"]</th><th>@Localizer["Detected policy"]</th></tr></thead><tbody>
+                            <div class="column-review-head">
+                                <div><h4>@Localizer["Columns"]</h4><p>@Localizer["Choose what users see. Safe defaults are selected from the inspected schema."]</p></div>
+                                <span>@ColumnPolicies.Count(column => column.Include) @Localizer["selected"]</span>
+                            </div>
+                            <div class="table-scroll policy-table-wrap primary-policy-table">
+                                <table class="policy-table"><thead><tr><th>@Localizer["Show"]</th><th>@Localizer["Source column"]</th><th>@Localizer["Display name"]</th><th>@Localizer["Type"]</th>@if (Selected.Kind == PublicationKind.Editor){<th>@Localizer["Editable"]</th>}</tr></thead><tbody>
                                 @foreach (var column in ColumnPolicies)
                                 {
                                     <tr class="@(!column.IsSupported ? "unsupported" : null)">
@@ -160,15 +162,31 @@
                                         <td><strong>@column.SourceName</strong></td>
                                         <td><input class="alias-input" maxlength="100" @bind="column.PublicAlias" disabled="@(!column.Include)" /></td>
                                         <td>@column.SourceTypeName</td>
-                                        <td><input type="checkbox" @bind="column.IsReadable" disabled="@(!column.Include || column.IsKey)" /></td>
-                                        <td><input type="checkbox" @bind="column.IsFilterable" disabled="@(!column.Include || !column.IsReadable)" /></td>
-                                        <td><input type="checkbox" @bind="column.IsSortable" disabled="@(!column.Include || !column.IsReadable || column.IsKey)" /></td>
-                                        <td><input type="checkbox" @bind="column.IsWritable" disabled="@(!CanWriteColumn(column))" /></td>
-                                        <td><span class="policy-flags">@(column.IsKey ? $"Key {column.KeyOrdinal}" : null) @(column.IsRowVersion ? "RowVersion" : null) @(column.IsGenerated ? "Generated" : null) @(column.ForeignKey is null ? null : $"FK → {column.ForeignKey.ReferencedSchema}.{column.ForeignKey.ReferencedObject}") @(!column.IsSupported ? "Unsupported" : null)</span></td>
+                                        @if (Selected.Kind == PublicationKind.Editor)
+                                        {
+                                            <td><input type="checkbox" @bind="column.IsWritable" disabled="@(!CanWriteColumn(column))" /></td>
+                                        }
                                     </tr>
                                 }
                                 </tbody></table>
                             </div>
+                            <details class="advanced-publication">
+                                <summary><RadzenIcon Icon="tune" /><span><strong>@Localizer["Advanced settings"]</strong><small>@Localizer["Filtering, sorting, lookups, and limits"]</small></span><RadzenIcon Icon="expand_more" /></summary>
+                                <div class="advanced-publication-body">
+                                    <div class="table-scroll policy-table-wrap advanced-policy-table">
+                                        <table class="policy-table"><thead><tr><th>@Localizer["Column"]</th><th>@Localizer["Read"]</th><th>@Localizer["Filter"]</th><th>@Localizer["Sort"]</th><th>@Localizer["Detected policy"]</th></tr></thead><tbody>
+                                        @foreach (var column in ColumnPolicies.Where(column => column.Include))
+                                        {
+                                            <tr>
+                                                <td><strong>@column.PublicAlias</strong></td>
+                                                <td><input type="checkbox" @bind="column.IsReadable" disabled="@column.IsKey" /></td>
+                                                <td><input type="checkbox" @bind="column.IsFilterable" disabled="@(!column.IsReadable)" /></td>
+                                                <td><input type="checkbox" @bind="column.IsSortable" disabled="@(!column.IsReadable || column.IsKey)" /></td>
+                                                <td><span class="policy-flags">@(column.IsKey ? $"Key {column.KeyOrdinal}" : null) @(column.IsRowVersion ? "RowVersion" : null) @(column.IsGenerated ? "Generated" : null) @(column.ForeignKey is null ? null : $"FK → {column.ForeignKey.ReferencedSchema}.{column.ForeignKey.ReferencedObject}")</span></td>
+                                            </tr>
+                                        }
+                                        </tbody></table>
+                                    </div>
                             @if (ForeignKeyPolicies.Count > 0)
                             {
                                 <section class="foreign-key-policy" aria-label='@Localizer["Foreign-key lookup approvals"]'>
@@ -210,7 +228,12 @@
                                 <label><span>@Localizer["Database timeout seconds"]</span><input type="number" min="1" max="300" @bind="VersionSettings.CommandTimeoutSeconds" /></label>
                                 <label><span>@Localizer["Maximum response MiB"]</span><input type="number" min="1" max="100" @bind="VersionSettings.MaximumResponseMiB" /></label>
                             </div>
-                            <div class="form-actions"><RadzenButton Text='@Localizer["Cancel"]' ButtonStyle="ButtonStyle.Light" Click="@(() => VersionVisible = false)" /><RadzenButton Text='@Localizer["Create and activate version"]' Icon="publish" ButtonStyle="ButtonStyle.Success" Click="@CreateVersionAsync" Disabled="@Busy" /></div>
+                                </div>
+                            </details>
+                            <div class="publish-bar">
+                                <div><strong>@Localizer["Ready to publish"]</strong><span>@Localizer["The schema will be validated before this version becomes active."]</span></div>
+                                <RadzenButton Text='@(Selected.Kind == PublicationKind.Editor ? Localizer["Publish table"] : Localizer["Publish API"])' Icon="publish" ButtonStyle="ButtonStyle.Success" Click="@CreateVersionAsync" Disabled="@Busy" />
+                            </div>
                         }
                     </div>
                 }

@@ -2722,4 +2722,124 @@ subsidiary.example.com</value>
   <data name="Your roles do not grant access to this publication." xml:space="preserve">
     <value>Your roles do not grant access to this publication.</value>
   </data>
+  <data name="Add step" xml:space="preserve">
+    <value>Add step</value>
+  </data>
+  <data name="Step library" xml:space="preserve">
+    <value>Step library</value>
+  </data>
+  <data name="Close step library" xml:space="preserve">
+    <value>Close step library</value>
+  </data>
+  <data name="Add a database, local file, or FTP source." xml:space="preserve">
+    <value>Add a database, local file, or FTP source.</value>
+  </data>
+  <data name="Add first step" xml:space="preserve">
+    <value>Add first step</value>
+  </data>
+  <data name="Unsaved changes" xml:space="preserve">
+    <value>Unsaved changes</value>
+  </data>
+  <data name="Up to date" xml:space="preserve">
+    <value>Up to date</value>
+  </data>
+  <data name="Spreadsheet tools" xml:space="preserve">
+    <value>Spreadsheet tools</value>
+  </data>
+  <data name="Undo" xml:space="preserve">
+    <value>Undo</value>
+  </data>
+  <data name="Redo" xml:space="preserve">
+    <value>Redo</value>
+  </data>
+  <data name="New row" xml:space="preserve">
+    <value>New row</value>
+  </data>
+  <data name="Delete row" xml:space="preserve">
+    <value>Delete row</value>
+  </data>
+  <data name="Filter &amp; sort" xml:space="preserve">
+    <value>Filter &amp; sort</value>
+  </data>
+  <data name="Change history" xml:space="preserve">
+    <value>Change history</value>
+  </data>
+  <data name="Table details" xml:space="preserve">
+    <value>Table details</value>
+  </data>
+  <data name="Rows" xml:space="preserve">
+    <value>Rows</value>
+  </data>
+  <data name="Page {0}" xml:space="preserve">
+    <value>Page {0}</value>
+  </data>
+  <data name="Close change history" xml:space="preserve">
+    <value>Close change history</value>
+  </data>
+  <data name="Saved edits wait for review before they are applied." xml:space="preserve">
+    <value>Saved edits wait for review before they are applied.</value>
+  </data>
+  <data name="You have unsaved changes" xml:space="preserve">
+    <value>You have unsaved changes</value>
+  </data>
+  <data name="Save to validate these edits and send them for review." xml:space="preserve">
+    <value>Save to validate these edits and send them for review.</value>
+  </data>
+  <data name="Discard" xml:space="preserve">
+    <value>Discard</value>
+  </data>
+  <data name="Save changes" xml:space="preserve">
+    <value>Save changes</value>
+  </data>
+  <data name="New version" xml:space="preserve">
+    <value>New version</value>
+  </data>
+  <data name="Choose the data to publish" xml:space="preserve">
+    <value>Choose the data to publish</value>
+  </data>
+  <data name="Pick a table, review its visible columns, then publish." xml:space="preserve">
+    <value>Pick a table, review its visible columns, then publish.</value>
+  </data>
+  <data name="Columns" xml:space="preserve">
+    <value>Columns</value>
+  </data>
+  <data name="Choose what users see. Safe defaults are selected from the inspected schema." xml:space="preserve">
+    <value>Choose what users see. Safe defaults are selected from the inspected schema.</value>
+  </data>
+  <data name="selected" xml:space="preserve">
+    <value>selected</value>
+  </data>
+  <data name="Show" xml:space="preserve">
+    <value>Show</value>
+  </data>
+  <data name="Display name" xml:space="preserve">
+    <value>Display name</value>
+  </data>
+  <data name="Editable" xml:space="preserve">
+    <value>Editable</value>
+  </data>
+  <data name="Advanced settings" xml:space="preserve">
+    <value>Advanced settings</value>
+  </data>
+  <data name="Filtering, sorting, lookups, and limits" xml:space="preserve">
+    <value>Filtering, sorting, lookups, and limits</value>
+  </data>
+  <data name="Column" xml:space="preserve">
+    <value>Column</value>
+  </data>
+  <data name="Ready to publish" xml:space="preserve">
+    <value>Ready to publish</value>
+  </data>
+  <data name="The schema will be validated before this version becomes active." xml:space="preserve">
+    <value>The schema will be validated before this version becomes active.</value>
+  </data>
+  <data name="Publish table" xml:space="preserve">
+    <value>Publish table</value>
+  </data>
+  <data name="Publish API" xml:space="preserve">
+    <value>Publish API</value>
+  </data>
+  <data name="Save or discard changes first" xml:space="preserve">
+    <value>Save or discard changes first</value>
+  </data>
 </root>

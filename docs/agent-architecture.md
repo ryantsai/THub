@@ -176,6 +176,9 @@ dotnet tool run dotnet-ef migrations add MeaningfulName `
 ## UI expectations
 
 - Keep the interface dense, calm, accessible, and suitable for an operations control room.
+- Follow [the UI design principles](ui-design.md): the working surface comes first, one
+  primary action should dominate, and secondary or advanced controls use contextual
+  progressive disclosure.
 - Reuse existing design tokens and layout styles before creating a new visual system.
 - Use semantic buttons/labels/headings and preserve keyboard/focus behavior.
 - Keep responsive behavior usable; the designer may scroll, but controls must not become unreachable.

@@ -36,6 +36,8 @@
     </div>
     <div class="designer-actions">
         <span class="draft-state"><i></i>@StatusText</span>
+        <RadzenButton Text='@Localizer["Add step"]' Icon="add" ButtonStyle="ButtonStyle.Light" Size="ButtonSize.Small" Click="@ToggleNodeLibrary" Disabled="@Busy" />
+        <RadzenButton Text='@Localizer["Workflow settings"]' Icon="tune" ButtonStyle="ButtonStyle.Light" Size="ButtonSize.Small" Click="@OpenWorkflowSettings" Disabled="@Busy" />
         <RadzenButton Text='@Localizer["Check workflow"]' Icon="fact_check" ButtonStyle="ButtonStyle.Light" Size="ButtonSize.Small" Click="@Validate" Disabled="@Busy" />
         <RadzenButton Text='@Localizer["Save"]' Icon="save" ButtonStyle="ButtonStyle.Primary" Size="ButtonSize.Small" Click="@SaveDraftAsync" Disabled="@(Busy || !CanEdit)" />
         <RadzenButton Text='@Localizer["Publish"]' Icon="rocket_launch" ButtonStyle="ButtonStyle.Success" Size="ButtonSize.Small" Click="@PublishAsync" Disabled="@(Busy || !CanPublish)" />
@@ -52,9 +54,14 @@ else if (LoadError is not null)
 }
 else
 {
-    <div class="designer-shell">
-        <aside class="node-palette">
-            <div class="palette-head"><strong>@Localizer["Add a step"]</strong><small>@Localizer["Choose what should happen next"]</small></div>
+    <div class="designer-shell @(NodeLibraryOpen ? "library-open" : null) @((SelectedNode is not null || WorkflowSettingsOpen || ValidationIssues.Count > 0) ? "inspector-open" : null)">
+        @if (NodeLibraryOpen)
+        {
+        <aside class="node-palette" aria-label='@Localizer["Step library"]'>
+            <div class="palette-head">
+                <div><strong>@Localizer["Add a step"]</strong><small>@Localizer["Choose what should happen next"]</small></div>
+                <button type="button" aria-label='@Localizer["Close step library"]' @onclick="ToggleNodeLibrary"><RadzenIcon Icon="close" /></button>
+            </div>
             <div class="palette-search"><RadzenIcon Icon="search" /><input aria-label='@Localizer["Find a step"]' placeholder='@Localizer["Find a step…"]' @bind="Search" /></div>
             @foreach (var group in FilteredGroups)
             {
@@ -71,6 +78,7 @@ else
                 </section>
             }
         </aside>
+        }
 
         <section class="workflow-canvas" @onclick="ClearSelection">
             <div class="canvas-toolbar">
@@ -100,12 +108,20 @@ else
 
             @if (Nodes.Count == 0)
             {
-                <div class="canvas-empty"><RadzenIcon Icon="account_tree" /><strong>@Localizer["Start with a source"]</strong><span>@Localizer["Add a database, local file, or FTP source from the left panel."]</span></div>
+                <div class="canvas-empty">
+                    <RadzenIcon Icon="account_tree" />
+                    <strong>@Localizer["Start with a source"]</strong>
+                    <span>@Localizer["Add a database, local file, or FTP source."]</span>
+                    <button type="button" @onclick:stopPropagation @onclick="ToggleNodeLibrary"><RadzenIcon Icon="add" /> @Localizer["Add first step"]</button>
+                </div>
             }
-            <div class="canvas-hint"><RadzenIcon Icon="lightbulb" /><span>@Localizer["Tip: start with a source, add the steps in order, then use Check workflow before publishing."]</span></div>
         </section>
 
+        @if (SelectedNode is not null || WorkflowSettingsOpen || ValidationIssues.Count > 0)
+        {
         <aside class="properties-panel">
+            @if (SelectedNode is null && WorkflowSettingsOpen)
+            {
             <div class="properties-head"><div><strong>@Localizer["Workflow settings"]</strong><small>@StatusText</small></div></div>
             <div class="properties-body workflow-properties">
                 <label>@Localizer["What does this workflow do?"]<textarea rows="2" @bind="Description" disabled="@Busy"></textarea></label>
@@ -224,16 +240,9 @@ else
                     }
                 </details>
             </div>
-
-            @if (SelectedNode is null)
-            {
-                <div class="empty-properties">
-                    <span><RadzenIcon Icon="tune" /></span>
-                    <h3>@Localizer["Nothing selected"]</h3>
-                                <p>@Localizer["Select a step to configure its data operation and incoming links."]</p>
-                </div>
             }
-            else
+
+            @if (SelectedNode is not null)
             {
                 <div class="properties-head"><div><strong>@SelectedNode.Name</strong><small>@SelectedNode.Kind</small></div><button type="button" @onclick="DeleteSelected" aria-label='@Localizer["Delete node"]'><RadzenIcon Icon="delete_outline" /></button></div>
                 <div class="properties-body">
@@ -464,6 +473,7 @@ else
                 </div>
             }
         </aside>
+        }
     </div>
 }
 
@@ -481,6 +491,8 @@ else
     private string Search { get; set; } = string.Empty;
     private string ConnectFromNodeId { get; set; } = string.Empty;
     private DesignerNode? SelectedNode { get; set; }
+    private bool NodeLibraryOpen { get; set; }
+    private bool WorkflowSettingsOpen { get; set; }
     private bool Busy { get; set; }
     private bool Loading { get; set; }
     private string? LoadError { get; set; }
@@ -892,17 +904,28 @@ else
             Edges.Add(new(previous.Id, node.Id));
         }
         SelectedNode = node;
+        NodeLibraryOpen = false;
+        WorkflowSettingsOpen = false;
         ValidationIssues = [];
     }
 
     private void SelectNode(DesignerNode node)
     {
         SelectedNode = node;
+        WorkflowSettingsOpen = false;
         ConnectFromNodeId = string.Empty;
         SchemaError = null;
     }
 
     private void ClearSelection() => SelectedNode = null;
+
+    private void ToggleNodeLibrary() => NodeLibraryOpen = !NodeLibraryOpen;
+
+    private void OpenWorkflowSettings()
+    {
+        SelectedNode = null;
+        WorkflowSettingsOpen = true;
+    }
 
     private void DeleteSelected()
     {

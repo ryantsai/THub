@@ -20,15 +20,28 @@
 
 <PageTitle>@Localizer["{0} · THub", Publication?.Name ?? Localizer["Publication editor"]]</PageTitle>
 
-<div class="page-heading editor-heading">
-    <div>
-        <div class="eyebrow">@Localizer["Governed editing"]</div>
-        <h1>@(Publication?.Name ?? "Publication editor")</h1>
-        <p>@Localizer["Edits are validated and staged against the active immutable schema. They are never written directly from this browser."]</p>
+<div class="sheet-heading">
+    <div class="sheet-title">
+        <RadzenIcon Icon="table_view" />
+        <div>
+            <h1>@(Publication?.Name ?? Localizer["Publication editor"])</h1>
+            @if (Version is not null)
+            {
+                <span>@Version.SourceSchema.@Version.SourceObject</span>
+            }
+        </div>
     </div>
-    <div class="heading-actions">
-        <AuthorizeView Policy="@Permissions.PublicationManage"><a class="button-link secondary" href="/publications">@Localizer["Manage publication"]</a></AuthorizeView>
-        <RadzenButton Text='@Localizer["Refresh status"]' Icon="refresh" ButtonStyle="ButtonStyle.Light" Click="@RefreshAsync" Disabled="@Busy" />
+    <div class="sheet-heading-actions">
+        @if (HasUnsavedChanges)
+        {
+            <span class="save-state unsaved"><i></i>@Localizer["Unsaved changes"]</span>
+        }
+        else if (!Loading && Error is null)
+        {
+            <span class="save-state"><RadzenIcon Icon="check" />@Localizer["Up to date"]</span>
+        }
+        <AuthorizeView Policy="@Permissions.PublicationManage"><a class="icon-action" href="@(HasUnsavedChanges ? null : "/publications")" aria-disabled="@(HasUnsavedChanges ? "true" : "false")" title='@(HasUnsavedChanges ? Localizer["Save or discard changes first"] : Localizer["Manage publication"])' aria-label='@Localizer["Manage publication"]'><RadzenIcon Icon="settings" /></a></AuthorizeView>
+        <button class="icon-action" type="button" title='@(HasUnsavedChanges ? Localizer["Save or discard changes first"] : Localizer["Refresh"])' aria-label='@Localizer["Refresh"]' @onclick="RefreshAsync" disabled="@(Busy || HasUnsavedChanges)"><RadzenIcon Icon="refresh" /></button>
     </div>
 </div>
 
@@ -42,34 +55,42 @@ else if (Error is not null)
 }
 else if (Publication is not null && Version is not null && Workbook is not null && SpreadsheetContext is not null)
 {
-    <section class="editor-control-strip" aria-label='@Localizer["Editor permissions and controls"]'>
-        <div class="editor-facts">
-            <span><small>@Localizer["Source"]</small><strong>@Version.SourceSchema.@Version.SourceObject</strong></span>
-            <span><small>@Localizer["Schema"]</small><strong>v@(Version.VersionNumber) · @Version.ConcurrencyMode</strong></span>
-            <span><small>@Localizer["Window"]</small><strong>@Rows.Count rows</strong></span>
-            <span><small>@Localizer["Access"]</small><strong>@PermissionSummary</strong></span>
+    <section class="sheet-toolbar" aria-label='@Localizer["Spreadsheet tools"]'>
+        <div class="toolbar-group">
+            <button type="button" title='@Localizer["Undo"]' aria-label='@Localizer["Undo"]' @onclick="Undo" disabled="@(Busy || Spreadsheet?.CanUndo != true)"><RadzenIcon Icon="undo" /></button>
+            <button type="button" title='@Localizer["Redo"]' aria-label='@Localizer["Redo"]' @onclick="Redo" disabled="@(Busy || Spreadsheet?.CanRedo != true)"><RadzenIcon Icon="redo" /></button>
         </div>
-        <div class="editor-actions">
+        <div class="toolbar-divider"></div>
+        <div class="toolbar-group">
             @if (CanInsert && Columns.Any(PublicationSpreadsheetChangeMapper.CanSupplyOnInsert))
             {
-                <RadzenButton Text='@Localizer["Add staged row"]' Icon="add_row" Size="ButtonSize.Small" ButtonStyle="ButtonStyle.Light" Click="@AddRowAsync" Disabled="@Busy" />
+                <button type="button" @onclick="AddRowAsync" disabled="@Busy"><RadzenIcon Icon="add" />@Localizer["New row"]</button>
             }
             @if (CanDelete)
             {
-                <RadzenButton Text='@Localizer["Toggle selected-row delete"]' Icon="delete_outline" Size="ButtonSize.Small" ButtonStyle="ButtonStyle.Light" Click="@ToggleDeleteAsync" Disabled="@Busy" />
+                <button type="button" @onclick="ToggleDeleteAsync" disabled="@Busy"><RadzenIcon Icon="delete_outline" />@Localizer["Delete row"]</button>
             }
-            @if (CanUpdate || CanInsert || CanDelete)
-            {
-                <RadzenButton Text='@Localizer["Stage changes"]' Icon="save" Size="ButtonSize.Small" ButtonStyle="ButtonStyle.Primary" Click="@StageAsync" Disabled="@Busy" />
-            }
+        </div>
+        <div class="toolbar-divider"></div>
+        <div class="toolbar-group">
+            <button class="@(QueryOpen ? "active" : null)" type="button" @onclick="() => QueryOpen = !QueryOpen" disabled="@Busy"><RadzenIcon Icon="filter_alt" />@Localizer["Filter & sort"]@if (ActiveFilters.Count > 0){<span class="toolbar-count">@ActiveFilters.Count</span>}</button>
+        </div>
+        <div class="toolbar-spacer"></div>
+        <div class="toolbar-group">
+            <button class="@(ChangePanelOpen ? "active" : null)" type="button" @onclick="() => ChangePanelOpen = !ChangePanelOpen"><RadzenIcon Icon="history" />@Localizer["Change history"]@if (ChangeSets.Count > 0){<span class="toolbar-count">@ChangeSets.Count</span>}</button>
+            <details class="sheet-info">
+                <summary title='@Localizer["Table details"]' aria-label='@Localizer["Table details"]'><RadzenIcon Icon="info_outline" /></summary>
+                <div>
+                    <span><small>@Localizer["Schema"]</small><strong>v@(Version.VersionNumber) · @Version.ConcurrencyMode</strong></span>
+                    <span><small>@Localizer["Rows"]</small><strong>@Rows.Count</strong></span>
+                    <span><small>@Localizer["Access"]</small><strong>@PermissionSummary</strong></span>
+                </div>
+            </details>
         </div>
     </section>
 
-    @if (Rows.Any(row => row.IsNew || row.IsDeleted))
+    @if (QueryOpen)
     {
-        <div class="editor-notice"><RadzenIcon Icon="pending_actions" /><span>@Localizer["{0} new and {1} deleted rows are marked in this window. Stage them to create a reviewable change set.", Rows.Count(row => row.IsNew), Rows.Count(row => row.IsDeleted && !row.IsNew)]</span></div>
-    }
-
     <section class="editor-query-strip" aria-label='@Localizer["Server-side data search and sort"]'>
         <div class="editor-query-controls">
             <label>
@@ -127,12 +148,14 @@ else if (Publication is not null && Version is not null && Workbook is not null 
             </div>
         }
     </section>
+    }
 
     <section class="spreadsheet-shell" aria-label='@Localizer["Publication data spreadsheet"]'>
         <CascadingValue Value="SpreadsheetContext">
             <RadzenSpreadsheet @ref="Spreadsheet"
                                Workbook="Workbook"
                                CellTypes="CellTypes"
+                               CommandExecuting="OnSpreadsheetCommandExecuting"
                                ReadOnly="@(!(CanUpdate || CanInsert))"
                                ShowToolbar="false"
                                ShowFormulaBar="false"
@@ -157,18 +180,20 @@ else if (Publication is not null && Version is not null && Workbook is not null 
     </section>
 
     <div class="editor-window-nav">
-        <span>@Localizer["Window {0} · deterministic keyset paging", CursorHistory.Count]</span>
+        <span>@Localizer["Page {0}", CursorHistory.Count]</span>
         <div>
             <RadzenButton Text='@Localizer["Previous window"]' Icon="chevron_left" Size="ButtonSize.Small" ButtonStyle="ButtonStyle.Light" Click="@PreviousWindowAsync" Disabled="@(Busy || CursorHistory.Count <= 1)" />
             <RadzenButton Text='@Localizer["Next window"]' Icon="chevron_right" IconPosition="IconPosition.Right" Size="ButtonSize.Small" ButtonStyle="ButtonStyle.Light" Click="@NextWindowAsync" Disabled="@(Busy || NextCursor is null)" />
-            <RadzenButton Text='@Localizer["Discard and reload"]' Icon="restart_alt" Size="ButtonSize.Small" ButtonStyle="ButtonStyle.Light" Click="@ReloadWindowAsync" Disabled="@Busy" />
         </div>
     </div>
 
-    <section class="panel change-set-panel">
+    @if (ChangePanelOpen)
+    {
+    <button class="drawer-scrim" type="button" aria-label='@Localizer["Close change history"]' @onclick="() => ChangePanelOpen = false"></button>
+    <section class="change-set-panel" aria-label='@Localizer["Change history"]'>
         <div class="panel-head">
-            <div><h2>@Localizer["Staged change sets"]</h2><p>@Localizer["Approval and durable application are separate operations. Conflicts do not overwrite newer source data."]</p></div>
-            <span class="status-chip draft">@ChangeSets.Count recent</span>
+            <div><h2>@Localizer["Change history"]</h2><p>@Localizer["Saved edits wait for review before they are applied."]</p></div>
+            <button class="drawer-close" type="button" aria-label='@Localizer["Close change history"]' @onclick="() => ChangePanelOpen = false"><RadzenIcon Icon="close" /></button>
         </div>
         @if (ChangeSets.Count == 0)
         {
@@ -235,6 +260,18 @@ else if (Publication is not null && Version is not null && Workbook is not null 
             }
         }
     </section>
+    }
+
+    @if (HasUnsavedChanges)
+    {
+        <div class="save-prompt" role="status">
+            <div><RadzenIcon Icon="edit_note" /><span><strong>@Localizer["You have unsaved changes"]</strong><small>@Localizer["Save to validate these edits and send them for review."]</small></span></div>
+            <div>
+                <button type="button" @onclick="ReloadWindowAsync" disabled="@Busy">@Localizer["Discard"]</button>
+                <button class="primary" type="button" @onclick="StageAsync" disabled="@Busy"><RadzenIcon Icon="save" />@Localizer["Save changes"]</button>
+            </div>
+        </div>
+    }
 }
 
 @code {
@@ -291,6 +328,9 @@ else if (Publication is not null && Version is not null && Workbook is not null 
     private string FilterValue { get; set; } = string.Empty;
     private string? SortColumnAlias { get; set; }
     private bool SortDescending { get; set; }
+    private bool QueryOpen { get; set; }
+    private bool ChangePanelOpen { get; set; }
+    private bool HasUnsavedChanges { get; set; }
 
     private IReadOnlyList<PublicationFilterOperator> AvailableFilterOperators
     {
@@ -304,6 +344,26 @@ else if (Publication is not null && Version is not null && Workbook is not null 
                 ? AllFilterOperators
                 : AllFilterOperators.Where(operation => operation is not PublicationFilterOperator.StartsWith and not PublicationFilterOperator.Contains).ToArray();
         }
+    }
+
+    private void OnSpreadsheetCommandExecuting(SpreadsheetCommandEventArgs args)
+    {
+        if (args.Command.Feature is SpreadsheetFeature.Editing or SpreadsheetFeature.UndoRedo)
+        {
+            HasUnsavedChanges = true;
+        }
+    }
+
+    private void Undo()
+    {
+        Spreadsheet?.Undo();
+        HasUnsavedChanges = true;
+    }
+
+    private void Redo()
+    {
+        Spreadsheet?.Redo();
+        HasUnsavedChanges = true;
     }
 
     private string PermissionSummary => string.Join(
@@ -455,6 +515,7 @@ else if (Publication is not null && Version is not null && Workbook is not null 
             }
         }
         await BuildWorkbookAsync();
+        HasUnsavedChanges = false;
     }
 
     private async Task BuildWorkbookAsync()
@@ -492,8 +553,8 @@ else if (Publication is not null && Version is not null && Workbook is not null 
             {
                 Bold = true,
                 Locked = true,
-                BackgroundColor = "#E8EEF8",
-                Color = "#172033",
+                    BackgroundColor = "#E7F1ED",
+                    Color = "#203A32",
             };
         }
 
@@ -550,6 +611,7 @@ else if (Publication is not null && Version is not null && Workbook is not null 
         Rows.Add(new EditorRowModel(null, values, true));
         await BuildWorkbookAsync();
         Workbook?.Sheets[0].Selection.Select(new CellRef(Rows.Count, 0));
+        HasUnsavedChanges = true;
     }
 
     private async Task ToggleDeleteAsync()
@@ -585,6 +647,7 @@ else if (Publication is not null && Version is not null && Workbook is not null 
         }
 
         await BuildWorkbookAsync();
+        HasUnsavedChanges = true;
     }
 
     private async Task StageAsync()

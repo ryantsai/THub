@@ -2722,4 +2722,124 @@
   <data name="Your roles do not grant access to this publication." xml:space="preserve">
     <value>您的角色不授予對此發佈項目的存取權限。</value>
   </data>
+  <data name="Add step" xml:space="preserve">
+    <value>新增步驟</value>
+  </data>
+  <data name="Step library" xml:space="preserve">
+    <value>步驟庫</value>
+  </data>
+  <data name="Close step library" xml:space="preserve">
+    <value>關閉步驟庫</value>
+  </data>
+  <data name="Add a database, local file, or FTP source." xml:space="preserve">
+    <value>新增資料庫、本機檔案或 FTP 來源。</value>
+  </data>
+  <data name="Add first step" xml:space="preserve">
+    <value>新增第一個步驟</value>
+  </data>
+  <data name="Unsaved changes" xml:space="preserve">
+    <value>未儲存的變更</value>
+  </data>
+  <data name="Up to date" xml:space="preserve">
+    <value>已是最新狀態</value>
+  </data>
+  <data name="Spreadsheet tools" xml:space="preserve">
+    <value>試算表工具</value>
+  </data>
+  <data name="Undo" xml:space="preserve">
+    <value>復原</value>
+  </data>
+  <data name="Redo" xml:space="preserve">
+    <value>重做</value>
+  </data>
+  <data name="New row" xml:space="preserve">
+    <value>新增資料列</value>
+  </data>
+  <data name="Delete row" xml:space="preserve">
+    <value>刪除資料列</value>
+  </data>
+  <data name="Filter &amp; sort" xml:space="preserve">
+    <value>篩選與排序</value>
+  </data>
+  <data name="Change history" xml:space="preserve">
+    <value>變更記錄</value>
+  </data>
+  <data name="Table details" xml:space="preserve">
+    <value>資料表詳細資料</value>
+  </data>
+  <data name="Rows" xml:space="preserve">
+    <value>資料列</value>
+  </data>
+  <data name="Page {0}" xml:space="preserve">
+    <value>第 {0} 頁</value>
+  </data>
+  <data name="Close change history" xml:space="preserve">
+    <value>關閉變更記錄</value>
+  </data>
+  <data name="Saved edits wait for review before they are applied." xml:space="preserve">
+    <value>已儲存的編輯內容會等待審核後再套用。</value>
+  </data>
+  <data name="You have unsaved changes" xml:space="preserve">
+    <value>您有未儲存的變更</value>
+  </data>
+  <data name="Save to validate these edits and send them for review." xml:space="preserve">
+    <value>儲存以驗證這些編輯內容，並送交審核。</value>
+  </data>
+  <data name="Discard" xml:space="preserve">
+    <value>捨棄</value>
+  </data>
+  <data name="Save changes" xml:space="preserve">
+    <value>儲存變更</value>
+  </data>
+  <data name="New version" xml:space="preserve">
+    <value>新版本</value>
+  </data>
+  <data name="Choose the data to publish" xml:space="preserve">
+    <value>選擇要發佈的資料</value>
+  </data>
+  <data name="Pick a table, review its visible columns, then publish." xml:space="preserve">
+    <value>選擇資料表、檢視其可見欄位，然後發佈。</value>
+  </data>
+  <data name="Columns" xml:space="preserve">
+    <value>欄位</value>
+  </data>
+  <data name="Choose what users see. Safe defaults are selected from the inspected schema." xml:space="preserve">
+    <value>選擇使用者可看到的內容。系統已根據檢查過的結構套用安全預設值。</value>
+  </data>
+  <data name="selected" xml:space="preserve">
+    <value>已選取</value>
+  </data>
+  <data name="Show" xml:space="preserve">
+    <value>顯示</value>
+  </data>
+  <data name="Display name" xml:space="preserve">
+    <value>顯示名稱</value>
+  </data>
+  <data name="Editable" xml:space="preserve">
+    <value>可編輯</value>
+  </data>
+  <data name="Advanced settings" xml:space="preserve">
+    <value>進階設定</value>
+  </data>
+  <data name="Filtering, sorting, lookups, and limits" xml:space="preserve">
+    <value>篩選、排序、查閱與限制</value>
+  </data>
+  <data name="Column" xml:space="preserve">
+    <value>欄位</value>
+  </data>
+  <data name="Ready to publish" xml:space="preserve">
+    <value>準備發佈</value>
+  </data>
+  <data name="The schema will be validated before this version becomes active." xml:space="preserve">
+    <value>發佈此版本前，系統會先驗證結構。</value>
+  </data>
+  <data name="Publish table" xml:space="preserve">
+    <value>發佈資料表</value>
+  </data>
+  <data name="Publish API" xml:space="preserve">
+    <value>發佈 API</value>
+  </data>
+  <data name="Save or discard changes first" xml:space="preserve">
+    <value>請先儲存或捨棄變更</value>
+  </data>
 </root>
