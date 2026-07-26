@@ -1,0 +1,43 @@
+trigger: none
+pr: none
+
+# Preliminary CI for an on-premises Azure DevOps Server Windows agent.
+# Environment configuration belongs in the classic release pipeline.
+pool:
+  name: THub-Windows
+
+variables:
+  BuildConfiguration: Release
+  RuntimeIdentifier: win-x64
+
+steps:
+- checkout: self
+  clean: true
+
+- task: PowerShell@2
+  displayName: Build, test, and package THub test artifacts
+  inputs:
+    filePath: scripts/ci/New-THubCiArtifact.ps1
+    arguments: >
+      -Lane Test
+      -Configuration "$(BuildConfiguration)"
+      -RuntimeIdentifier "$(RuntimeIdentifier)"
+      -OutputDirectory "$(Build.ArtifactStagingDirectory)\thub-test"
+      -WorkDirectory "$(Agent.TempDirectory)\thub-ci-test-$(Build.BuildId)"
+    pwsh: false
+
+- task: PublishTestResults@2
+  displayName: Publish test results
+  condition: succeededOrFailed()
+  inputs:
+    testResultsFormat: VSTest
+    testResultsFiles: '$(Agent.TempDirectory)\thub-ci-test-$(Build.BuildId)\test-results\**\*.trx'
+    failTaskOnFailedTests: true
+    testRunTitle: 'THub test CI $(Build.BuildNumber)'
+
+- task: PublishBuildArtifacts@1
+  displayName: Publish THub test artifact
+  inputs:
+    PathtoPublish: '$(Build.ArtifactStagingDirectory)\thub-test'
+    ArtifactName: thub-test
+    publishLocation: Container

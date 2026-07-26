@@ -28,6 +28,35 @@ THub.Publications --------------------- approved read-only relational objects
 
 Web, publication, and worker processes may initially share a Windows machine, but they are independently deployable and require separate least-privilege identities. The publication API remains one process instance until rate limiting is made distributed or moved to a gateway.
 
+## Azure DevOps Server CI and classic release artifacts
+
+Preliminary on-premises Azure DevOps Server CI definitions are checked in as
+`azure-pipelines-ci-test.yml` and `azure-pipelines-ci-prod.yml`. Both are intentionally
+manual until the repository's test and production branch policy is decided. They expect
+a self-hosted Windows agent pool named `THub-Windows`, the .NET SDK pinned by
+`global.json`, PowerShell 5.1, and access to the organization's configured NuGet feeds.
+
+Each definition restores, builds, runs the automated tests, publishes framework-dependent
+`win-x64` Web, Publications, and Worker hosts, verifies that Development settings were
+not published, and emits separate ZIP packages with a SHA-256 manifest. The definitions
+use the Azure DevOps Server-compatible `PublishBuildArtifacts` task so a classic release
+pipeline can consume either `thub-test` or `thub-production`.
+
+Test and production configuration is deliberately not compiled into either artifact.
+Provision connection strings, encryption keys, host names, authorization bootstrap
+values, and other secrets through classic-release variables backed by the approved
+secret/configuration system. Ideally, production promotes the exact artifact already
+accepted in test; the separate production CI definition exists as preliminary scaffolding
+for organizations whose branch controls require a distinct build.
+
+The artifact includes `release/Update-THubHosts.ps1` for a single-server classic release.
+It validates all packages before shutdown, drains and stops the two IIS application
+pools, normally stops the Worker service, backs up current files, replaces all three
+hosts, and restarts only hosts that were previously running. It does not force-kill a
+Worker that exceeds the stop timeout and it does not apply database migrations. Review
+and run migrations under the deployment identity as a separate controlled release step;
+schema-changing releases currently require all three hosts to be stopped.
+
 ## Environment assumptions to confirm
 
 - Whether IIS, worker, SQL Server, and users are in one AD forest/domain.
