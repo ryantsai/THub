@@ -85,6 +85,43 @@ public sealed class ExcelTargetNodeExecutorTests
         }
     }
 
+    [Fact]
+    public async Task AppendRejectsHeaderThatDoesNotMatchIncomingSchema()
+    {
+        var root = CreateTemporaryRoot();
+        try
+        {
+            var target = Path.Combine(root, "export.xlsx");
+            using (var workbook = new XLWorkbook())
+            {
+                var worksheet = workbook.AddWorksheet("Results");
+                worksheet.Cell(1, 1).Value = "Identifier";
+                worksheet.Cell(1, 2).Value = "Name";
+                worksheet.Cell(2, 1).Value = 1;
+                worksheet.Cell(2, 2).Value = "One";
+                workbook.SaveAs(target);
+            }
+
+            var exception = await Assert.ThrowsAsync<WorkflowNodeExecutionException>(() =>
+                ExcelTargetNodeExecutor.WriteExcelAsync(
+                    target,
+                    DataSet(2, "Two"),
+                    Settings("append"),
+                    Connection(root),
+                    Context(),
+                    CancellationToken.None));
+
+            Assert.Equal("execution.excel.target.header.mismatch", exception.Error.Code);
+            using var unchanged = new XLWorkbook(target);
+            Assert.Equal("Identifier", unchanged.Worksheet("Results").Cell(1, 1).GetString());
+            Assert.True(unchanged.Worksheet("Results").Cell(3, 1).IsEmpty());
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
     private static ExcelTargetNodeSettings Settings(string mode) => new(
         Guid.NewGuid(),
         "export.xlsx",

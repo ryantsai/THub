@@ -63,6 +63,88 @@ public sealed class CsvTargetNodeExecutorTests
         }
     }
 
+    [Fact]
+    public async Task AppendRejectsCombinedRowsAboveConfiguredLimit()
+    {
+        var root = CreateTemporaryRoot();
+        try
+        {
+            var target = Path.Combine(root, "export.csv");
+            const string existing = "Id,Name\r\n1,One\r\n";
+            await File.WriteAllTextAsync(target, existing);
+
+            var exception = await Assert.ThrowsAsync<TabularLimitExceededException>(() =>
+                CsvTargetNodeExecutor.WriteCsvAsync(
+                    target,
+                    DataSet(2, "Two"),
+                    Settings("append"),
+                    Connection(root, maximumRows: 1),
+                    Context(),
+                    CancellationToken.None));
+
+            Assert.Equal("execution.file.rows.limit", exception.Code);
+            Assert.Equal(existing, await File.ReadAllTextAsync(target));
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task AppendRejectsHeaderThatDoesNotMatchIncomingSchema()
+    {
+        var root = CreateTemporaryRoot();
+        try
+        {
+            var target = Path.Combine(root, "export.csv");
+            const string existing = "Identifier,Name\r\n1,One\r\n";
+            await File.WriteAllTextAsync(target, existing);
+
+            var exception = await Assert.ThrowsAsync<WorkflowNodeExecutionException>(() =>
+                CsvTargetNodeExecutor.WriteCsvAsync(
+                    target,
+                    DataSet(2, "Two"),
+                    Settings("append"),
+                    Connection(root),
+                    Context(),
+                    CancellationToken.None));
+
+            Assert.Equal("execution.csv.target.header.mismatch", exception.Error.Code);
+            Assert.Equal(existing, await File.ReadAllTextAsync(target));
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task TargetRejectsSchemaAboveConfiguredColumnLimit()
+    {
+        var root = CreateTemporaryRoot();
+        try
+        {
+            var target = Path.Combine(root, "export.csv");
+
+            var exception = await Assert.ThrowsAsync<TabularLimitExceededException>(() =>
+                CsvTargetNodeExecutor.WriteCsvAsync(
+                    target,
+                    DataSet(2, "Two"),
+                    Settings("createNew"),
+                    Connection(root, maximumColumns: 1),
+                    Context(),
+                    CancellationToken.None));
+
+            Assert.Equal("execution.file.columns.limit", exception.Code);
+            Assert.False(File.Exists(target));
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
     private static CsvTargetNodeSettings Settings(string mode) => new(
         Guid.NewGuid(),
         "export.csv",
@@ -70,12 +152,15 @@ public sealed class CsvTargetNodeExecutorTests
         Delimiter: ',',
         Mode: mode);
 
-    private static FileConnectionConfiguration Connection(string root) => new(
+    private static FileConnectionConfiguration Connection(
+        string root,
+        int maximumRows = 100,
+        int maximumColumns = 10) => new(
         ConnectionKind.CsvFile,
         root,
         maximumFileBytes: 1_048_576,
-        maximumRows: 100,
-        maximumColumns: 10);
+        maximumRows,
+        maximumColumns);
 
     private static WorkflowNodeExecutionContext Context() => new(
         Guid.NewGuid(),

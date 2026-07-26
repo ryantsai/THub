@@ -432,6 +432,9 @@ public sealed class CsvTargetNodeExecutor(
         CancellationToken cancellationToken)
     {
         FileTargetSupport.ValidateFileTarget(target, settings.Mode);
+        FileTargetSupport.EnsureColumnLimit(
+            input.Schema.Columns.Count,
+            connection.MaximumColumns);
         var temporary = FileTargetSupport.CreateTemporaryPath(target, context.WorkflowRunId, context.Node.Id, ".csv");
         try
         {
@@ -450,6 +453,15 @@ public sealed class CsvTargetNodeExecutor(
             }
             var appendNeedsNewLine = appendExisting
                 && !FileTargetSupport.EndsWithNewLine(temporary);
+            var existingDataRows = appendExisting
+                ? await FileTargetSupport.CountCsvDataRowsAsync(
+                    temporary,
+                    input.Schema,
+                    settings.Delimiter,
+                    settings.IncludeHeader,
+                    connection.MaximumRows,
+                    cancellationToken)
+                : 0;
 
             await using (var stream = new FileStream(
                 temporary,
@@ -495,7 +507,9 @@ public sealed class CsvTargetNodeExecutor(
                         }
 
                         rowsWritten += batch.Rows.Count;
-                        FileTargetSupport.EnsureRowLimit(rowsWritten, connection.MaximumRows);
+                        FileTargetSupport.EnsureRowLimit(
+                            checked(existingDataRows + rowsWritten),
+                            connection.MaximumRows);
                         await textWriter.FlushAsync(cancellationToken);
                         FileTargetSupport.EnsureFileLimit(stream.Length, connection.MaximumFileBytes);
                         var bytesWrittenDelta = checked(stream.Length - bytesWritten);
@@ -575,6 +589,9 @@ public sealed class ExcelTargetNodeExecutor(
         CancellationToken cancellationToken)
     {
         FileTargetSupport.ValidateFileTarget(target, settings.Mode);
+        FileTargetSupport.EnsureColumnLimit(
+            dataSet.Schema.Columns.Count,
+            connection.MaximumColumns);
         var temporary = FileTargetSupport.CreateTemporaryPath(
             target,
             context.WorkflowRunId,
@@ -606,6 +623,13 @@ public sealed class ExcelTargetNodeExecutor(
                     StringComparison.OrdinalIgnoreCase))
                 ?? workbook.AddWorksheet(settings.Worksheet);
             var lastUsedRow = worksheet.LastRowUsed()?.RowNumber() ?? 0;
+            if (appendExisting && lastUsedRow > 0)
+            {
+                FileTargetSupport.ValidateExcelTargetSchema(
+                    worksheet,
+                    dataSet.Schema,
+                    settings.IncludeHeader);
+            }
             var existingDataRows = Math.Max(
                 0,
                 lastUsedRow - (settings.IncludeHeader ? 1 : 0));
@@ -757,6 +781,40 @@ internal static class FileTargetSupport
         }
     }
 
+    public static void EnsureColumnLimit(int columnCount, int maximumColumns)
+    {
+        if (columnCount > maximumColumns)
+        {
+            throw new TabularLimitExceededException(
+                "execution.file.columns.limit",
+                $"The target exceeds its configured {maximumColumns}-column limit.");
+        }
+    }
+
+    public static void ValidateExcelTargetSchema(
+        IXLWorksheet worksheet,
+        TabularSchema schema,
+        bool hasHeader)
+    {
+        var usedColumns = worksheet.LastColumnUsed()?.ColumnNumber() ?? 0;
+        if (usedColumns != schema.Columns.Count)
+        {
+            throw ExecutionFailure.Data(
+                "execution.excel.target.columns.mismatch",
+                "The existing Excel target columns do not match the incoming schema.");
+        }
+
+        if (hasHeader && schema.Columns.Where((column, index) => !string.Equals(
+                worksheet.Cell(1, index + 1).GetString().Trim(),
+                column.Name,
+                StringComparison.OrdinalIgnoreCase)).Any())
+        {
+            throw ExecutionFailure.Data(
+                "execution.excel.target.header.mismatch",
+                "The existing Excel target header does not match the incoming schema.");
+        }
+    }
+
     public static void EnsureFileLimit(long fileBytes, long maximumBytes)
     {
         if (fileBytes > maximumBytes)
@@ -776,6 +834,84 @@ internal static class FileTargetSupport
             FileShare.Read);
         stream.Position = stream.Length - 1;
         return stream.ReadByte() == '\n';
+    }
+
+    public static async Task<long> CountCsvDataRowsAsync(
+        string path,
+        TabularSchema schema,
+        char delimiter,
+        bool hasHeader,
+        int maximumRows,
+        CancellationToken cancellationToken)
+    {
+        await using var stream = new FileStream(
+            path,
+            FileMode.Open,
+            FileAccess.Read,
+            FileShare.Read,
+            64 * 1024,
+            FileOptions.Asynchronous | FileOptions.SequentialScan);
+        using var textReader = new StreamReader(stream, detectEncodingFromByteOrderMarks: true);
+        using var csv = new CsvReader(
+            textReader,
+            new CsvConfiguration(CultureInfo.InvariantCulture)
+            {
+                Delimiter = delimiter.ToString(),
+                HasHeaderRecord = hasHeader,
+                DetectColumnCountChanges = true,
+                MaxFieldSize = TabularValue.AbsoluteMaximumStringCharacters
+            });
+
+        cancellationToken.ThrowIfCancellationRequested();
+        if (!await csv.ReadAsync())
+        {
+            return 0;
+        }
+
+        if (hasHeader)
+        {
+            csv.ReadHeader();
+            var header = csv.HeaderRecord;
+            if (header is null ||
+                header.Length != schema.Columns.Count ||
+                header.Where((name, index) => !string.Equals(
+                    name?.Trim(),
+                    schema.Columns[index].Name,
+                    StringComparison.OrdinalIgnoreCase)).Any())
+            {
+                throw ExecutionFailure.Data(
+                    "execution.csv.target.header.mismatch",
+                    "The existing CSV target header does not match the incoming schema.");
+            }
+        }
+
+        long rowCount = 0;
+        if (!hasHeader)
+        {
+            ValidateCsvTargetRecord(csv.Parser.Record, schema.Columns.Count);
+            rowCount = 1;
+            EnsureRowLimit(rowCount, maximumRows);
+        }
+
+        while (await csv.ReadAsync())
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            ValidateCsvTargetRecord(csv.Parser.Record, schema.Columns.Count);
+            rowCount++;
+            EnsureRowLimit(rowCount, maximumRows);
+        }
+
+        return rowCount;
+    }
+
+    private static void ValidateCsvTargetRecord(string[]? record, int expectedColumns)
+    {
+        if (record is null || record.Length != expectedColumns)
+        {
+            throw ExecutionFailure.Data(
+                "execution.csv.target.columns.mismatch",
+                "The existing CSV target rows do not match the incoming schema.");
+        }
     }
 
     public static async Task CopyFileAsync(
