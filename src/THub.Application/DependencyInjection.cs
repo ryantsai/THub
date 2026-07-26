@@ -89,5 +89,6 @@ public static class DependencyInjection
         services.AddSingleton<WorkflowGraphSerializer>();
         services.AddSingleton<ScheduleCalculator>();
         services.AddSingleton<WorkflowNodeSettingsValidator>();
+        services.AddSingleton<WorkflowTabularSchemaService>();
     }
 }

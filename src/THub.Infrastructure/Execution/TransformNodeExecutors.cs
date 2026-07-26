@@ -1,7 +1,7 @@
 using System.Runtime.CompilerServices;
-using System.Text;
 using System.Text.Json;
 using THub.Application.Execution;
+using THub.Application.Workflows;
 using THub.Domain.Workflows;
 
 namespace THub.Infrastructure.Execution;
@@ -170,10 +170,15 @@ public sealed class FilterRowsNodeExecutor(
             TabularValueKind.Int64 => ((long)left.Value!).CompareTo((long)right.Value!),
             TabularValueKind.Decimal => ((decimal)left.Value!).CompareTo((decimal)right.Value!),
             TabularValueKind.Double => ((double)left.Value!).CompareTo((double)right.Value!),
-            TabularValueKind.String => string.Compare((string)left.Value!, (string)right.Value!, StringComparison.Ordinal),
-            TabularValueKind.DateTimeOffset => ((DateTimeOffset)left.Value!).CompareTo((DateTimeOffset)right.Value!),
+            TabularValueKind.String => string.Compare(
+                (string)left.Value!,
+                (string)right.Value!,
+                StringComparison.Ordinal),
+            TabularValueKind.DateTimeOffset => ((DateTimeOffset)left.Value!).CompareTo(
+                (DateTimeOffset)right.Value!),
             TabularValueKind.Guid => ((Guid)left.Value!).CompareTo((Guid)right.Value!),
-            TabularValueKind.Binary => ((ReadOnlyMemory<byte>)left.Value!).Span.SequenceCompareTo(((ReadOnlyMemory<byte>)right.Value!).Span),
+            TabularValueKind.Binary => ((ReadOnlyMemory<byte>)left.Value!).Span.SequenceCompareTo(
+                ((ReadOnlyMemory<byte>)right.Value!).Span),
             _ => throw new ArgumentOutOfRangeException(nameof(left))
         };
     }
@@ -188,7 +193,9 @@ public sealed class FilterRowsNodeExecutor(
         {
             await using (batch.ConfigureAwait(false))
             {
-                var rows = batch.Rows.Where(row => predicates.All(predicate => predicate(row))).ToArray();
+                var rows = batch.Rows
+                    .Where(row => predicates.All(predicate => predicate(row)))
+                    .ToArray();
                 await progress.ReportAsync(
                     new WorkflowNodeProgress(
                         RowsRead: batch.Rows.Count,
@@ -216,8 +223,14 @@ public sealed class JoinNodeExecutor(
     {
         cancellationToken.ThrowIfCancellationRequested();
         var settings = (JoinNodeSettings)settingsValidator.Parse(context.Node);
-        var left = context.Inputs.SingleOrDefault(input => input.SourceNodeId == settings.LeftNodeId);
-        var right = context.Inputs.SingleOrDefault(input => input.SourceNodeId == settings.RightNodeId);
+        var left = context.Inputs.SingleOrDefault(input => string.Equals(
+            input.SourceNodeId,
+            settings.LeftNodeId,
+            StringComparison.OrdinalIgnoreCase));
+        var right = context.Inputs.SingleOrDefault(input => string.Equals(
+            input.SourceNodeId,
+            settings.RightNodeId,
+            StringComparison.OrdinalIgnoreCase));
         if (left is null || right is null || context.Inputs.Count != 2 || ReferenceEquals(left, right))
         {
             throw ExecutionFailure.Configuration(
@@ -242,7 +255,10 @@ public sealed class JoinNodeExecutor(
             }
         }
 
-        var schema = BuildSchema(left.DataSet.Schema, right.DataSet.Schema);
+        var schema = WorkflowTransformSchemaSemantics.CreateJoinSchema(
+            left.DataSet.Schema,
+            right.DataSet.Schema,
+            settings.JoinType);
         return ValueTask.FromResult(WorkflowNodeExecutionResult.WithOutput(
             schema,
             JoinAsync(
@@ -255,35 +271,6 @@ public sealed class JoinNodeExecutor(
                 cancellationToken)));
     }
 
-    private static TabularSchema BuildSchema(TabularSchema left, TabularSchema right)
-    {
-        var columns = new List<TabularColumn>(left.Columns);
-        var names = new HashSet<string>(left.Columns.Select(column => column.Name), StringComparer.OrdinalIgnoreCase);
-        foreach (var column in right.Columns)
-        {
-            var name = column.Name;
-            if (!names.Add(name))
-            {
-                var baseName = $"right.{column.Name}";
-                name = baseName.Length <= TabularColumn.MaximumNameLength
-                    ? baseName
-                    : baseName[..TabularColumn.MaximumNameLength];
-                var suffix = 2;
-                while (!names.Add(name))
-                {
-                    var suffixText = $"_{suffix++}";
-                    name = string.Concat(
-                        baseName.AsSpan(0, Math.Min(baseName.Length, TabularColumn.MaximumNameLength - suffixText.Length)),
-                        suffixText);
-                }
-            }
-
-            columns.Add(new TabularColumn(name, column.DataType, isNullable: true));
-        }
-
-        return new TabularSchema(columns);
-    }
-
     private static async IAsyncEnumerable<TabularBatch> JoinAsync(
         ITabularDataSet left,
         ITabularDataSet right,
@@ -293,7 +280,8 @@ public sealed class JoinNodeExecutor(
         WorkflowNodeExecutionContext context,
         [EnumeratorCancellation] CancellationToken cancellationToken)
     {
-        var lookup = new Dictionary<string, List<TabularRow>>(StringComparer.Ordinal);
+        var lookup = new TransformStructuralKeyMap<List<BufferedRightRow>>();
+        var rightRows = new List<BufferedRightRow>();
         var buffered = 0;
         await foreach (var batch in right.ReadBatchesAsync(cancellationToken).ConfigureAwait(false))
         {
@@ -310,16 +298,19 @@ public sealed class JoinNodeExecutor(
                             $"The join right side exceeds its {settings.MaximumBufferedRows}-row buffer limit.");
                     }
 
-                    var key = CreateKey(row, rightIndexes);
-                    if (key is not null)
+                    var bufferedRow = new BufferedRightRow(row);
+                    rightRows.Add(bufferedRow);
+                    if (!TransformValueSupport.HasNull(row, rightIndexes))
                     {
-                        if (!lookup.TryGetValue(key, out var matches))
-                        {
-                            matches = [];
-                            lookup.Add(key, matches);
-                        }
-
-                        matches.Add(row);
+                        _ = lookup.GetOrAdd(
+                            row,
+                            rightIndexes,
+                            int.MaxValue,
+                            state: 0,
+                            static (_, _) => [],
+                            cancellationToken,
+                            out var matches);
+                        matches.Add(bufferedRow);
                     }
                 }
 
@@ -339,12 +330,17 @@ public sealed class JoinNodeExecutor(
             {
                 foreach (var row in batch.Rows)
                 {
-                    var key = CreateKey(row, leftIndexes);
-                    if (key is not null && lookup.TryGetValue(key, out var matches))
+                    if (!TransformValueSupport.HasNull(row, leftIndexes)
+                        && lookup.TryGetValue(
+                            row,
+                            leftIndexes,
+                            cancellationToken,
+                            out var matches))
                     {
                         foreach (var match in matches)
                         {
-                            outputRows.Add(new TabularRow(row.Values.Concat(match.Values)));
+                            match.Matched = true;
+                            outputRows.Add(new TabularRow(row.Values.Concat(match.Row.Values)));
                             if (outputRows.Count == context.Limits.MaximumRowsPerBatch)
                             {
                                 yield return new TabularBatch(outputRows);
@@ -352,7 +348,7 @@ public sealed class JoinNodeExecutor(
                             }
                         }
                     }
-                    else if (settings.JoinType == "left")
+                    else if (settings.JoinType is "left" or "full")
                     {
                         outputRows.Add(new TabularRow(
                             row.Values.Concat(Enumerable.Repeat(
@@ -375,27 +371,32 @@ public sealed class JoinNodeExecutor(
             }
         }
 
+        if (settings.JoinType is "right" or "full")
+        {
+            foreach (var rightRow in rightRows.Where(row => !row.Matched))
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                outputRows.Add(new TabularRow(
+                    Enumerable.Repeat(TabularValue.Null, left.Schema.Columns.Count)
+                        .Concat(rightRow.Row.Values)));
+                if (outputRows.Count == context.Limits.MaximumRowsPerBatch)
+                {
+                    yield return new TabularBatch(outputRows);
+                    outputRows = new(context.Limits.MaximumRowsPerBatch);
+                }
+            }
+        }
+
         if (outputRows.Count > 0)
         {
             yield return new TabularBatch(outputRows);
         }
     }
 
-    private static string? CreateKey(TabularRow row, IReadOnlyList<int> indexes)
+    private sealed class BufferedRightRow(TabularRow row)
     {
-        var builder = new StringBuilder();
-        foreach (var index in indexes)
-        {
-            var value = row.Values[index];
-            if (value.Kind == TabularValueKind.Null)
-            {
-                return null;
-            }
+        public TabularRow Row { get; } = row;
 
-            var text = TabularExecutionSupport.ToInvariantText(value);
-            builder.Append((int)value.Kind).Append(':').Append(text.Length).Append(':').Append(text).Append('|');
-        }
-
-        return builder.ToString();
+        public bool Matched { get; set; }
     }
 }

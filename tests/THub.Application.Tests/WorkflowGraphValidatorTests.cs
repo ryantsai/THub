@@ -67,6 +67,47 @@ public sealed class WorkflowGraphValidatorTests
             issue => issue.Code == "node.input.cardinality" && issue.NodeId == "join");
     }
 
+    [Theory]
+    [InlineData(1, true)]
+    [InlineData(2, false)]
+    [InlineData(16, false)]
+    [InlineData(17, true)]
+    public void UnionRowsRequiresTwoToSixteenInputs(int inputCount, bool expectsIssue)
+    {
+        var sources = Enumerable.Range(0, inputCount)
+            .Select(index => Node($"source-{index}", WorkflowNodeKind.SqlSource))
+            .ToArray();
+        var union = Node("union", WorkflowNodeKind.UnionRows);
+        var graph = new WorkflowGraph(
+            [.. sources, union],
+            sources.Select(source => new WorkflowEdge(source.Id, union.Id)).ToArray());
+
+        var hasIssue = _validator.Validate(graph).Any(
+            issue => issue.Code == "node.input.cardinality" && issue.NodeId == "union");
+
+        Assert.Equal(expectsIssue, hasIssue);
+    }
+
+    [Theory]
+    [InlineData(WorkflowNodeKind.DeriveColumns)]
+    [InlineData(WorkflowNodeKind.AggregateRows)]
+    [InlineData(WorkflowNodeKind.DistinctRows)]
+    [InlineData(WorkflowNodeKind.SortRows)]
+    public void OtherTransformKindsRequireExactlyOneInput(WorkflowNodeKind kind)
+    {
+        var graph = new WorkflowGraph(
+            [
+                Node("source-one", WorkflowNodeKind.SqlSource),
+                Node("source-two", WorkflowNodeKind.SqlSource),
+                Node("transform", kind)
+            ],
+            [new("source-one", "transform"), new("source-two", "transform")]);
+
+        Assert.Contains(
+            _validator.Validate(graph),
+            issue => issue.Code == "node.input.cardinality" && issue.NodeId == "transform");
+    }
+
     [Fact]
     public void InvalidSettingsAreRejected()
     {

@@ -1,0 +1,666 @@
+@using System.Globalization
+@using System.Text.Json
+@using THub.Application.Execution
+@using THub.Domain.Workflows
+
+<section class="transform-editor" aria-label='@Localizer["Transform settings"]'>
+    @if (Settings is null)
+    {
+        <div class="raw-mode-message" role="alert">
+            <RadzenIcon Icon="warning_amber" />
+            <div>
+                <strong>@Localizer["Graphical editing is unavailable"]</strong>
+                <span>@Localizer["These settings cannot be edited safely. Use Advanced settings JSON to repair them without losing the original value."]</span>
+            </div>
+        </div>
+    }
+    else
+    {
+        @switch (Settings)
+        {
+            case SelectColumnsEditorSettings select:
+                <fieldset>
+                    <legend>@Localizer["Columns to keep"]</legend>
+                    <p class="editor-help">@Localizer["Columns are emitted in this order. Selection does not rename or convert values."]</p>
+                    @for (var index = 0; index < select.Columns.Count; index++)
+                    {
+                        var rowIndex = index;
+                        <div class="compact-row" @key="selectRowKeys.Get(rowIndex)">
+                            <label>
+                                <span>@Localizer["Column"]</span>
+                                @ColumnControl(select.Columns[rowIndex], value => select.Columns[rowIndex] = value, PrimarySchema)
+                            </label>
+                            @RowActions(
+                                rowIndex,
+                                select.Columns.Count,
+                                () => MoveString(select.Columns, selectRowKeys, rowIndex, -1),
+                                () => MoveString(select.Columns, selectRowKeys, rowIndex, 1),
+                                () => RemoveString(select.Columns, selectRowKeys, rowIndex),
+                                Localizer["Selected column {0}", rowIndex + 1])
+                        </div>
+                    }
+                    <button class="add-row" type="button" disabled="@(select.Columns.Count >= 512)" @onclick="async () => await AddString(select.Columns, selectRowKeys, PrimarySchema)">
+                        <RadzenIcon Icon="add" /> @Localizer["Add column"]
+                    </button>
+                </fieldset>
+                break;
+
+            case FilterRowsEditorSettings filter:
+                <fieldset>
+                    <legend>@Localizer["Filter conditions"]</legend>
+                    <p class="editor-help">@Localizer["All conditions must match (AND)."]</p>
+                    @for (var index = 0; index < filter.Conditions.Count; index++)
+                    {
+                        var rowIndex = index;
+                        var condition = filter.Conditions[rowIndex];
+                        <div class="compact-row filter-row" @key="condition.UiId">
+                            <label>
+                                <span>@Localizer["Column"]</span>
+                                @ColumnControl(condition.Column, value => SetFilterColumn(condition, value), PrimarySchema)
+                            </label>
+                            <label>
+                                <span>@Localizer["Operation"]</span>
+                                <select value="@condition.Operator" @onchange="async eventArgs => await UpdateFilterOperator(condition, eventArgs.Value?.ToString())">
+                                    @foreach (var operation in FilterOperations)
+                                    {
+                                        <option value="@operation.Value">@Localizer[operation.Label]</option>
+                                    }
+                                </select>
+                            </label>
+                            @if (!IsNullOperation(condition.Operator))
+                            {
+                                <label class="wide">
+                                    <span>@Localizer["Value"]</span>
+                                    <input value="@FilterValueText(condition)"
+                                           aria-invalid="@FilterValueAriaInvalid(condition)"
+                                           aria-describedby="@FilterValueAriaDescribedBy(condition)"
+                                           @onchange="async eventArgs => await UpdateFilterValue(condition, eventArgs.Value?.ToString() ?? string.Empty)" />
+                                    @if (FilterValueError(condition) is { } filterError)
+                                    {
+                                        <small class="field-error" id="@FilterErrorId(condition)">@filterError</small>
+                                    }
+                                </label>
+                            }
+                            @RowActions(
+                                rowIndex,
+                                filter.Conditions.Count,
+                                () => Move(filter.Conditions, rowIndex, -1),
+                                () => Move(filter.Conditions, rowIndex, 1),
+                                () => RemoveAt(filter.Conditions, rowIndex),
+                                Localizer["Filter condition {0}", rowIndex + 1])
+                        </div>
+                    }
+                    <button class="add-row" type="button" disabled="@(filter.Conditions.Count >= 32)" @onclick="async () => await AddFilter(filter)">
+                        <RadzenIcon Icon="add" /> @Localizer["Add condition"]
+                    </button>
+                </fieldset>
+                break;
+
+            case JoinEditorSettings join:
+                <fieldset>
+                    <legend>@Localizer["Join inputs"]</legend>
+                    <div class="input-order">
+                        <div><span>@Localizer["Left input"]</span><strong>@InputName(join.LeftNodeId)</strong></div>
+                        <button type="button" @onclick="async () => await SwapJoin(join)" aria-label='@Localizer["Swap left and right inputs"]'>
+                            <RadzenIcon Icon="swap_horiz" /> @Localizer["Swap"]
+                        </button>
+                        <div><span>@Localizer["Right input"]</span><strong>@InputName(join.RightNodeId)</strong></div>
+                    </div>
+                    <p class="editor-help">@Localizer["To join a third table, connect another Join step after this one."]</p>
+                </fieldset>
+                <fieldset>
+                    <legend>@Localizer["Match columns"]</legend>
+                    @for (var index = 0; index < join.KeyPairs.Count; index++)
+                    {
+                        var rowIndex = index;
+                        var pair = join.KeyPairs[rowIndex];
+                        <div class="compact-row join-row" @key="pair.UiId">
+                            <label><span>@Localizer["Left column"]</span>@ColumnControl(pair.LeftKey, value => pair.LeftKey = value, SchemaFor(join.LeftNodeId))</label>
+                            <span class="equals" aria-hidden="true">=</span>
+                            <label><span>@Localizer["Right column"]</span>@ColumnControl(pair.RightKey, value => pair.RightKey = value, SchemaFor(join.RightNodeId))</label>
+                            @RowActions(rowIndex, join.KeyPairs.Count, () => Move(join.KeyPairs, rowIndex, -1), () => Move(join.KeyPairs, rowIndex, 1), () => RemoveAt(join.KeyPairs, rowIndex), Localizer["Join key pair {0}", rowIndex + 1])
+                        </div>
+                    }
+                    <button class="add-row" type="button" disabled="@(join.KeyPairs.Count >= 16)" @onclick="async () => await AddJoinKey(join)">
+                        <RadzenIcon Icon="add" /> @Localizer["Add key pair"]
+                    </button>
+                </fieldset>
+                <div class="field-grid">
+                    <label><span>@Localizer["Join type"]</span>
+                        <select value="@join.JoinType" @onchange="async eventArgs => await SetJoinType(join, eventArgs.Value?.ToString())">
+                            <option value="inner">@Localizer["Inner"]</option>
+                            <option value="left">@Localizer["Left outer"]</option>
+                            <option value="right">@Localizer["Right outer"]</option>
+                            <option value="full">@Localizer["Full outer"]</option>
+                        </select>
+                    </label>
+                    @BoundedNumber(Localizer["Maximum buffered rows"], join.MaximumBufferedRows, value => join.MaximumBufferedRows = value)
+                </div>
+                break;
+
+            case UnionRowsEditorSettings union:
+                <fieldset>
+                    <legend>@Localizer["Union inputs"]</legend>
+                    <ol class="ordered-inputs">
+                        @for (var index = 0; index < union.Inputs.Count; index++)
+                        {
+                            var rowIndex = index;
+                            var input = union.Inputs[rowIndex];
+                            <li @key="input.UiId">
+                                <span>@InputName(input.NodeId)</span>
+                                @RowActions(rowIndex, union.Inputs.Count, () => Move(union.Inputs, rowIndex, -1), () => Move(union.Inputs, rowIndex, 1), static () => Task.CompletedTask, Localizer["Union input {0}", rowIndex + 1], canRemove: false)
+                            </li>
+                        }
+                    </ol>
+                    <p class="editor-help">@Localizer["Input order follows the links unless you reorder it here."]</p>
+                </fieldset>
+                <div class="field-grid">
+                    <label><span>@Localizer["Match columns"]</span>
+                        <select value="@union.MatchBy" @onchange="async eventArgs => await SetUnionMatch(union, eventArgs.Value?.ToString())">
+                            <option value="name">@Localizer["Match columns by name"]</option>
+                            <option value="position">@Localizer["Match columns by position"]</option>
+                        </select>
+                    </label>
+                    <label><span>@Localizer["Duplicate rows"]</span>
+                        <select value="@union.Mode" @onchange="async eventArgs => await SetUnionMode(union, eventArgs.Value?.ToString())">
+                            <option value="all">@Localizer["Keep all rows"]</option>
+                            <option value="distinct">@Localizer["Remove duplicate rows"]</option>
+                        </select>
+                    </label>
+                </div>
+                break;
+
+            case DeriveColumnsEditorSettings derive:
+                <fieldset>
+                    <legend>@Localizer["Calculated columns"]</legend>
+                    <p class="editor-help">@Localizer["Expressions can read row.ColumnName and the available workflow variables: {0}", VariableSummary]</p>
+                    @for (var index = 0; index < derive.Columns.Count; index++)
+                    {
+                        var rowIndex = index;
+                        var column = derive.Columns[rowIndex];
+                        <div class="compact-row derive-row" @key="column.UiId">
+                            <label><span>@Localizer["Name"]</span><input value="@column.Name" @onchange="async eventArgs => await SetDerivedName(column, eventArgs.Value?.ToString())" /></label>
+                            <label><span>@Localizer["Data type"]</span><select value="@column.DataType" @onchange="async eventArgs => await SetDerivedType(column, eventArgs.Value?.ToString())">@foreach (var type in DataTypes){<option value="@type.ToString()">@Localizer[type.ToString()]</option>}</select></label>
+                            <label class="checkbox-label"><input type="checkbox" checked="@column.IsNullable" @onchange="async eventArgs => await SetDerivedNullable(column, IsChecked(eventArgs))" /><span>@Localizer["Nullable"]</span></label>
+                            <label class="wide"><span>@Localizer["JavaScript expression"]</span><textarea rows="2" value="@column.Expression" @onchange="async eventArgs => await SetDerivedExpression(column, eventArgs.Value?.ToString())"></textarea></label>
+                            @RowActions(rowIndex, derive.Columns.Count, () => Move(derive.Columns, rowIndex, -1), () => Move(derive.Columns, rowIndex, 1), () => RemoveAt(derive.Columns, rowIndex), Localizer["Calculated column {0}", rowIndex + 1])
+                        </div>
+                    }
+                    <button class="add-row" type="button" disabled="@(derive.Columns.Count >= 64)" @onclick="async () => await AddDerived(derive)"><RadzenIcon Icon="add" /> @Localizer["Add calculated column"]</button>
+                </fieldset>
+                break;
+
+            case AggregateRowsEditorSettings aggregate:
+                <fieldset>
+                    <legend>@Localizer["Group by"]</legend>
+                    @for (var index = 0; index < aggregate.GroupBy.Count; index++)
+                    {
+                        var rowIndex = index;
+                        <div class="compact-row" @key="groupRowKeys.Get(rowIndex)">
+                            <label><span>@Localizer["Column"]</span>@ColumnControl(aggregate.GroupBy[rowIndex], value => aggregate.GroupBy[rowIndex] = value, PrimarySchema)</label>
+                            @RowActions(rowIndex, aggregate.GroupBy.Count, () => MoveString(aggregate.GroupBy, groupRowKeys, rowIndex, -1), () => MoveString(aggregate.GroupBy, groupRowKeys, rowIndex, 1), () => RemoveString(aggregate.GroupBy, groupRowKeys, rowIndex), Localizer["Grouping column {0}", rowIndex + 1])
+                        </div>
+                    }
+                    <button class="add-row" type="button" disabled="@(aggregate.GroupBy.Count >= 16)" @onclick="async () => await AddString(aggregate.GroupBy, groupRowKeys, PrimarySchema)"><RadzenIcon Icon="add" /> @Localizer["Add grouping column"]</button>
+                </fieldset>
+                <fieldset>
+                    <legend>@Localizer["Aggregate columns"]</legend>
+                    @for (var index = 0; index < aggregate.Aggregates.Count; index++)
+                    {
+                        var rowIndex = index;
+                        var output = aggregate.Aggregates[rowIndex];
+                        <div class="compact-row aggregate-row" @key="output.UiId">
+                            <label><span>@Localizer["Output name"]</span><input value="@output.Name" @onchange="async eventArgs => await SetAggregateName(output, eventArgs.Value?.ToString())" /></label>
+                            <label><span>@Localizer["Operation"]</span><select value="@output.Operation" @onchange="async eventArgs => await SetAggregateOperation(output, eventArgs.Value?.ToString())">@foreach (var operation in AggregateOperations){<option value="@operation.Value">@Localizer[operation.Label]</option>}</select></label>
+                            @if (AggregateNeedsColumn(output.Operation))
+                            {
+                                <label><span>@Localizer["Source column"]</span>@ColumnControl(output.Column ?? string.Empty, value => output.Column = value, PrimarySchema)</label>
+                            }
+                            @RowActions(rowIndex, aggregate.Aggregates.Count, () => Move(aggregate.Aggregates, rowIndex, -1), () => Move(aggregate.Aggregates, rowIndex, 1), () => RemoveAt(aggregate.Aggregates, rowIndex), Localizer["Aggregate output {0}", rowIndex + 1])
+                        </div>
+                    }
+                    <button class="add-row" type="button" disabled="@(aggregate.Aggregates.Count >= 64)" @onclick="async () => await AddAggregate(aggregate)"><RadzenIcon Icon="add" /> @Localizer["Add aggregate column"]</button>
+                </fieldset>
+                @BoundedNumber(Localizer["Maximum groups"], aggregate.MaximumGroups, value => aggregate.MaximumGroups = value)
+                break;
+
+            case DistinctRowsEditorSettings distinct:
+                <fieldset>
+                    <legend>@Localizer["Distinct rows"]</legend>
+                    <div class="segmented">
+                        <label><input type="radio" name="distinct-mode" checked="@distinct.UseAllColumns" @onchange="async () => await SetDistinctMode(distinct, true)" />@Localizer["Use all columns"]</label>
+                        <label><input type="radio" name="distinct-mode" checked="@(!distinct.UseAllColumns)" @onchange="async () => await SetDistinctMode(distinct, false)" />@Localizer["Use selected columns"]</label>
+                    </div>
+                    @if (!distinct.UseAllColumns)
+                    {
+                        @for (var index = 0; index < distinct.Columns.Count; index++)
+                        {
+                            var rowIndex = index;
+                            <div class="compact-row" @key="distinctRowKeys.Get(rowIndex)">
+                                <label><span>@Localizer["Column"]</span>@ColumnControl(distinct.Columns[rowIndex], value => distinct.Columns[rowIndex] = value, PrimarySchema)</label>
+                                @RowActions(rowIndex, distinct.Columns.Count, () => MoveString(distinct.Columns, distinctRowKeys, rowIndex, -1), () => MoveString(distinct.Columns, distinctRowKeys, rowIndex, 1), () => RemoveString(distinct.Columns, distinctRowKeys, rowIndex), Localizer["Distinct key column {0}", rowIndex + 1])
+                            </div>
+                        }
+                        <button class="add-row" type="button" disabled="@(distinct.Columns.Count >= 64)" @onclick="async () => await AddString(distinct.Columns, distinctRowKeys, PrimarySchema)"><RadzenIcon Icon="add" /> @Localizer["Add key column"]</button>
+                    }
+                </fieldset>
+                @BoundedNumber(Localizer["Maximum retained keys"], distinct.MaximumKeys, value => distinct.MaximumKeys = value)
+                break;
+
+            case SortRowsEditorSettings sort:
+                <fieldset>
+                    <legend>@Localizer["Sort keys"]</legend>
+                    @for (var index = 0; index < sort.Keys.Count; index++)
+                    {
+                        var rowIndex = index;
+                        var key = sort.Keys[rowIndex];
+                        <div class="compact-row sort-row" @key="key.UiId">
+                            <label><span>@Localizer["Column"]</span>@ColumnControl(key.Column, value => key.Column = value, PrimarySchema)</label>
+                            <label><span>@Localizer["Direction"]</span><select value="@key.Direction" @onchange="async eventArgs => await SetSortDirection(key, eventArgs.Value?.ToString())"><option value="ascending">@Localizer["Ascending"]</option><option value="descending">@Localizer["Descending"]</option></select></label>
+                            <label><span>@Localizer["Null values"]</span><select value="@key.Nulls" @onchange="async eventArgs => await SetSortNulls(key, eventArgs.Value?.ToString())"><option value="first">@Localizer["First"]</option><option value="last">@Localizer["Last"]</option></select></label>
+                            @RowActions(rowIndex, sort.Keys.Count, () => Move(sort.Keys, rowIndex, -1), () => Move(sort.Keys, rowIndex, 1), () => RemoveAt(sort.Keys, rowIndex), Localizer["Sort key {0}", rowIndex + 1])
+                        </div>
+                    }
+                    <button class="add-row" type="button" disabled="@(sort.Keys.Count >= 16)" @onclick="async () => await AddSortKey(sort)"><RadzenIcon Icon="add" /> @Localizer["Add sort key"]</button>
+                </fieldset>
+                @BoundedNumber(Localizer["Maximum buffered rows"], sort.MaximumBufferedRows, value => sort.MaximumBufferedRows = value)
+                break;
+        }
+    }
+
+    @if (!string.IsNullOrWhiteSpace(SchemaStatus))
+    {
+        <p class="schema-status" role="status"><RadzenIcon Icon="info_outline" /> @SchemaStatus</p>
+    }
+    <p class="validation-status @(!HasVisibleValidationIssue ? "valid" : "invalid")" aria-live="polite">
+        @(!HasVisibleValidationIssue ? Localizer["Transform settings are ready."] : Localizer["Transform settings need attention."])
+    </p>
+</section>
+
+@code {
+    [Parameter, EditorRequired] public WorkflowNodeKind Kind { get; set; }
+    [Parameter, EditorRequired] public string SettingsJson { get; set; } = "{}";
+    [Parameter, EditorRequired] public IReadOnlyList<WorkflowInputSchemaModel> Inputs { get; set; } = [];
+    [Parameter] public IReadOnlyList<string> VariableNames { get; set; } = [];
+    [Parameter] public EventCallback<string> SettingsJsonChanged { get; set; }
+
+    private TransformEditorSettings? Settings { get; set; }
+    private bool CodecValidationInvalid { get; set; }
+    private string? loadedJson;
+    private WorkflowNodeKind loadedKind;
+    private string? lastEmittedJson;
+    private readonly Dictionary<string, string> filterDraftErrors =
+        new(StringComparer.Ordinal);
+    private readonly StableEditorRowKeys selectRowKeys = new();
+    private readonly StableEditorRowKeys groupRowKeys = new();
+    private readonly StableEditorRowKeys distinctRowKeys = new();
+
+    private static readonly TabularDataType[] DataTypes = Enum.GetValues<TabularDataType>();
+    private static readonly (string Value, string Label)[] FilterOperations =
+    [
+        ("equals", "Equals"), ("notEquals", "Does not equal"), ("greaterThan", "Greater than"),
+        ("greaterThanOrEqual", "Greater than or equal"), ("lessThan", "Less than"),
+        ("lessThanOrEqual", "Less than or equal"), ("contains", "Contains"),
+        ("startsWith", "Starts with"), ("endsWith", "Ends with"),
+        ("isNull", "Is null"), ("isNotNull", "Is not null")
+    ];
+    private static readonly (string Value, string Label)[] AggregateOperations =
+    [
+        ("count", "Count rows"), ("countNonNull", "Count non-null"),
+        ("sum", "Sum"), ("average", "Average"), ("minimum", "Minimum"), ("maximum", "Maximum")
+    ];
+
+    private TabularSchema? PrimarySchema => Inputs.FirstOrDefault()?.Schema;
+    private string VariableSummary => VariableNames.Count == 0
+        ? Localizer["none"].Value
+        : string.Join(", ", VariableNames);
+    private string? SchemaStatus => Inputs.Count == 0
+        ? Localizer["Connect an upstream step to choose columns."].Value
+        : Inputs.Any(input => input.Schema is null)
+            ? Localizer["Some input schemas are unavailable. Column names can still be entered manually."].Value
+            : null;
+    private bool HasVisibleValidationIssue =>
+        Settings is null
+            || CodecValidationInvalid
+            || filterDraftErrors.Count > 0;
+
+    protected override void OnParametersSet()
+    {
+        if (Kind == loadedKind
+            && (string.Equals(SettingsJson, loadedJson, StringComparison.Ordinal)
+                || string.Equals(SettingsJson, lastEmittedJson, StringComparison.Ordinal)))
+        {
+            loadedJson = SettingsJson;
+            RevalidateFilterDrafts();
+            return;
+        }
+
+        loadedKind = Kind;
+        loadedJson = SettingsJson;
+        lastEmittedJson = null;
+        var parsed = TransformEditorSettingsCodec.Parse(Kind, SettingsJson);
+        Settings = parsed.Settings;
+        CodecValidationInvalid = !parsed.IsPublishable;
+        ResetStableRowKeys();
+        RevalidateFilterDrafts();
+    }
+
+    private async Task EmitAsync()
+    {
+        if (Settings is null)
+        {
+            return;
+        }
+
+        var candidate = TransformEditorSettingsCodec.Serialize(Settings);
+        CodecValidationInvalid = !candidate.IsPublishable;
+        if (!candidate.IsSuccess
+            || candidate.SettingsJson is null
+            || string.Equals(candidate.SettingsJson, lastEmittedJson, StringComparison.Ordinal)
+            || string.Equals(candidate.SettingsJson, SettingsJson, StringComparison.Ordinal))
+        {
+            return;
+        }
+
+        lastEmittedJson = candidate.SettingsJson;
+        await SettingsJsonChanged.InvokeAsync(candidate.SettingsJson);
+    }
+
+    private RenderFragment ColumnControl(string value, Action<string> setter, TabularSchema? schema) => builder =>
+    {
+        if (schema is { Columns.Count: > 0 })
+        {
+            builder.OpenElement(0, "select");
+            builder.AddAttribute(1, "value", value);
+            builder.AddAttribute(2, "onchange", EventCallback.Factory.Create<ChangeEventArgs>(this, async eventArgs =>
+            {
+                setter(eventArgs.Value?.ToString() ?? string.Empty);
+                await EmitAsync();
+            }));
+            builder.OpenElement(3, "option");
+            builder.AddAttribute(4, "value", "");
+            builder.AddContent(5, Localizer["Select column…"]);
+            builder.CloseElement();
+            var sequence = 6;
+            foreach (var column in schema.Columns)
+            {
+                builder.OpenElement(sequence++, "option");
+                builder.AddAttribute(sequence++, "value", column.Name);
+                builder.AddContent(sequence++, $"{column.Name} · {Localizer[column.DataType.ToString()]}");
+                builder.CloseElement();
+            }
+            builder.CloseElement();
+        }
+        else
+        {
+            builder.OpenElement(0, "input");
+            builder.AddAttribute(1, "value", value);
+            builder.AddAttribute(2, "maxlength", "128");
+            builder.AddAttribute(3, "placeholder", Localizer["Enter column name"]);
+            builder.AddAttribute(4, "onchange", EventCallback.Factory.Create<ChangeEventArgs>(this, async eventArgs =>
+            {
+                setter(eventArgs.Value?.ToString() ?? string.Empty);
+                await EmitAsync();
+            }));
+            builder.CloseElement();
+        }
+    };
+
+    private RenderFragment RowActions(int index, int count, Func<Task> up, Func<Task> down, Func<Task> remove, string label, bool canRemove = true) => builder =>
+    {
+        builder.OpenElement(0, "div");
+        builder.AddAttribute(1, "class", "row-actions");
+        Action<int, string, bool, Func<Task>> button = (sequence, icon, disabled, action) =>
+        {
+            builder.OpenElement(sequence, "button");
+            builder.AddAttribute(sequence + 1, "type", "button");
+            builder.AddAttribute(sequence + 2, "disabled", disabled);
+            builder.AddAttribute(sequence + 3, "aria-label", icon switch
+            {
+                "arrow_upward" => Localizer["Move {0} up", label],
+                "arrow_downward" => Localizer["Move {0} down", label],
+                _ => Localizer["Remove {0}", label]
+            });
+            builder.AddAttribute(sequence + 4, "onclick", EventCallback.Factory.Create(this, action));
+            builder.OpenComponent<RadzenIcon>(sequence + 5);
+            builder.AddAttribute(sequence + 6, "Icon", icon);
+            builder.CloseComponent();
+            builder.CloseElement();
+        };
+        button(10, "arrow_upward", index == 0, up);
+        button(20, "arrow_downward", index >= count - 1, down);
+        if (canRemove)
+        {
+            button(30, "delete_outline", false, remove);
+        }
+        builder.CloseElement();
+    };
+
+    private RenderFragment BoundedNumber(string label, int value, Action<int> setter) => builder =>
+    {
+        builder.OpenElement(0, "label");
+        builder.OpenElement(1, "span");
+        builder.AddContent(2, label);
+        builder.CloseElement();
+        builder.OpenElement(3, "input");
+        builder.AddAttribute(4, "type", "number");
+        builder.AddAttribute(5, "min", "1");
+        builder.AddAttribute(6, "max", "1000000");
+        builder.AddAttribute(7, "value", value);
+        builder.AddAttribute(8, "onchange", EventCallback.Factory.Create<ChangeEventArgs>(this, async eventArgs =>
+        {
+            if (int.TryParse(eventArgs.Value?.ToString(), NumberStyles.Integer, CultureInfo.InvariantCulture, out var parsed))
+            {
+                setter(parsed);
+                await EmitAsync();
+            }
+        }));
+        builder.CloseElement();
+        builder.CloseElement();
+    };
+
+    private TabularSchema? SchemaFor(string nodeId) => Inputs.FirstOrDefault(input => string.Equals(input.NodeId, nodeId, StringComparison.OrdinalIgnoreCase))?.Schema;
+    private string InputName(string nodeId) => Inputs.FirstOrDefault(input => string.Equals(input.NodeId, nodeId, StringComparison.OrdinalIgnoreCase))?.DisplayName ?? (string.IsNullOrWhiteSpace(nodeId) ? Localizer["Not connected"] : nodeId);
+    private static bool IsChecked(ChangeEventArgs args) => args.Value is bool value && value;
+    private static bool IsNullOperation(string operation) => operation is "isNull" or "isNotNull";
+    private static bool AggregateNeedsColumn(string operation) => operation != "count";
+
+    private async Task Move<T>(EditorList<T> rows, int index, int offset)
+    {
+        var target = index + offset;
+        if (target < 0 || target >= rows.Count) return;
+        var row = rows[index];
+        rows.RemoveAt(index);
+        rows.Insert(target, row);
+        await EmitAsync();
+    }
+    private async Task RemoveAt<T>(EditorList<T> rows, int index) { rows.RemoveAt(index); await EmitAsync(); }
+    private async Task MoveString(
+        EditorList<string> rows,
+        StableEditorRowKeys keys,
+        int index,
+        int offset)
+    {
+        var target = index + offset;
+        if (target < 0 || target >= rows.Count)
+        {
+            return;
+        }
+        var row = rows[index];
+        rows.RemoveAt(index);
+        rows.Insert(target, row);
+        keys.Move(index, target);
+        await EmitAsync();
+    }
+    private async Task RemoveString(
+        EditorList<string> rows,
+        StableEditorRowKeys keys,
+        int index)
+    {
+        rows.RemoveAt(index);
+        keys.RemoveAt(index);
+        await EmitAsync();
+    }
+    private async Task AddString(
+        EditorList<string> rows,
+        StableEditorRowKeys keys,
+        TabularSchema? schema)
+    {
+        rows.Add(schema?.Columns.FirstOrDefault()?.Name ?? string.Empty);
+        keys.Add();
+        await EmitAsync();
+    }
+
+    private async Task AddFilter(FilterRowsEditorSettings settings) { settings.Conditions.Add(new()); await EmitAsync(); }
+    private void SetFilterColumn(FilterConditionEditorRow row, string value)
+    {
+        row.Column = value;
+        ValidateFilterDraft(row);
+    }
+    private async Task UpdateFilterOperator(FilterConditionEditorRow row, string? value)
+    {
+        row.Operator = value ?? "equals";
+        if (IsNullOperation(row.Operator))
+        {
+            row.ClearValue();
+            filterDraftErrors.Remove(row.UiId);
+        }
+        else
+        {
+            ValidateFilterDraft(row);
+        }
+        await EmitAsync();
+    }
+    private async Task UpdateFilterValue(FilterConditionEditorRow row, string value)
+    {
+        var result = FilterScalarDraftParser.Parse(value, FindFilterColumn(row));
+        row.Value = result.Value;
+        SetFilterDraftError(row.UiId, result.ErrorCode);
+        await EmitAsync();
+    }
+
+    private void RevalidateFilterDrafts()
+    {
+        filterDraftErrors.Clear();
+        if (Settings is not FilterRowsEditorSettings filter)
+        {
+            return;
+        }
+
+        foreach (var row in filter.Conditions)
+        {
+            ValidateFilterDraft(row);
+        }
+    }
+
+    private void ValidateFilterDraft(FilterConditionEditorRow row)
+    {
+        if (IsNullOperation(row.Operator) || !row.HasValue)
+        {
+            filterDraftErrors.Remove(row.UiId);
+            return;
+        }
+
+        var result = FilterScalarDraftParser.Revalidate(
+            row.Value!.Value,
+            FindFilterColumn(row));
+        row.Value = result.Value;
+        SetFilterDraftError(row.UiId, result.ErrorCode);
+    }
+
+    private TabularColumn? FindFilterColumn(FilterConditionEditorRow row) =>
+        PrimarySchema?.Columns.FirstOrDefault(column => string.Equals(
+            column.Name,
+            row.Column,
+            StringComparison.OrdinalIgnoreCase));
+
+    private void SetFilterDraftError(string rowId, string? errorCode)
+    {
+        if (errorCode is null)
+        {
+            filterDraftErrors.Remove(rowId);
+        }
+        else
+        {
+            filterDraftErrors[rowId] = errorCode;
+        }
+    }
+
+    private string? FilterValueError(FilterConditionEditorRow row)
+    {
+        if (!filterDraftErrors.TryGetValue(row.UiId, out var errorCode))
+        {
+            return null;
+        }
+
+        return errorCode == "filter.value.required"
+            ? Localizer["Enter a value or choose a null operation."].Value
+            : Localizer["Enter a valid value for this column type."].Value;
+    }
+
+    private string? FilterValueAriaInvalid(FilterConditionEditorRow row) =>
+        filterDraftErrors.ContainsKey(row.UiId) ? "true" : null;
+
+    private string? FilterValueAriaDescribedBy(FilterConditionEditorRow row) =>
+        filterDraftErrors.ContainsKey(row.UiId) ? FilterErrorId(row) : null;
+
+    private static string FilterErrorId(FilterConditionEditorRow row) =>
+        $"filter-error-{row.UiId}";
+
+    private void ResetStableRowKeys()
+    {
+        selectRowKeys.Reset(
+            (Settings as SelectColumnsEditorSettings)?.Columns.Count ?? 0);
+        groupRowKeys.Reset(
+            (Settings as AggregateRowsEditorSettings)?.GroupBy.Count ?? 0);
+        distinctRowKeys.Reset(
+            (Settings as DistinctRowsEditorSettings)?.Columns.Count ?? 0);
+    }
+    private static string FilterValueText(FilterConditionEditorRow row) =>
+        row.Value is not { } value || value.ValueKind == JsonValueKind.Null
+            ? string.Empty
+            : value.ValueKind == JsonValueKind.String
+                ? value.GetString() ?? string.Empty
+                : value.GetRawText();
+
+    private async Task SwapJoin(JoinEditorSettings settings) { settings.SwapInputs(); await EmitAsync(); }
+    private async Task AddJoinKey(JoinEditorSettings settings) { settings.KeyPairs.Add(new()); await EmitAsync(); }
+    private async Task SetJoinKey(JoinKeyPairEditorRow row, bool left, string value) { if (left) row.LeftKey = value; else row.RightKey = value; await EmitAsync(); }
+    private async Task SetJoinType(JoinEditorSettings settings, string? value) { settings.JoinType = value ?? "inner"; await EmitAsync(); }
+    private async Task SetJoinMaximum(JoinEditorSettings settings, int value) { settings.MaximumBufferedRows = value; await EmitAsync(); }
+
+    private async Task SetUnionMatch(UnionRowsEditorSettings settings, string? value) { settings.MatchBy = value ?? "name"; await EmitAsync(); }
+    private async Task SetUnionMode(UnionRowsEditorSettings settings, string? value) { settings.Mode = value ?? "all"; await EmitAsync(); }
+
+    private async Task AddDerived(DeriveColumnsEditorSettings settings) { settings.Columns.Add(new()); await EmitAsync(); }
+    private async Task SetDerivedName(DerivedColumnEditorRow row, string? value) { row.Name = value ?? string.Empty; await EmitAsync(); }
+    private async Task SetDerivedType(DerivedColumnEditorRow row, string? value) { row.DataType = value ?? nameof(TabularDataType.String); await EmitAsync(); }
+    private async Task SetDerivedNullable(DerivedColumnEditorRow row, bool value) { row.IsNullable = value; await EmitAsync(); }
+    private async Task SetDerivedExpression(DerivedColumnEditorRow row, string? value) { row.Expression = value ?? string.Empty; await EmitAsync(); }
+
+    private async Task AddAggregate(AggregateRowsEditorSettings settings) { settings.Aggregates.Add(new()); await EmitAsync(); }
+    private async Task SetAggregateName(AggregateColumnEditorRow row, string? value) { row.Name = value ?? string.Empty; await EmitAsync(); }
+    private async Task SetAggregateOperation(AggregateColumnEditorRow row, string? value) { row.Operation = value ?? "count"; if (!AggregateNeedsColumn(row.Operation)) row.Column = null; await EmitAsync(); }
+    private async Task SetAggregateColumn(AggregateColumnEditorRow row, string value) { row.Column = value; await EmitAsync(); }
+    private async Task SetAggregateMaximum(AggregateRowsEditorSettings settings, int value) { settings.MaximumGroups = value; await EmitAsync(); }
+
+    private async Task SetDistinctMode(
+        DistinctRowsEditorSettings settings,
+        bool all)
+    {
+        settings.UseAllColumns = all;
+        if (all)
+        {
+            settings.Columns.Clear();
+            distinctRowKeys.Reset(0);
+        }
+        await EmitAsync();
+    }
+    private async Task SetDistinctMaximum(DistinctRowsEditorSettings settings, int value) { settings.MaximumKeys = value; await EmitAsync(); }
+
+    private async Task AddSortKey(SortRowsEditorSettings settings) { settings.Keys.Add(new()); await EmitAsync(); }
+    private async Task SetSortColumn(SortKeyEditorRow row, string value) { row.Column = value; await EmitAsync(); }
+    private async Task SetSortDirection(SortKeyEditorRow row, string? value) { row.Direction = value ?? "ascending"; await EmitAsync(); }
+    private async Task SetSortNulls(SortKeyEditorRow row, string? value) { row.Nulls = value ?? "last"; await EmitAsync(); }
+    private async Task SetSortMaximum(SortRowsEditorSettings settings, int value) { settings.MaximumBufferedRows = value; await EmitAsync(); }
+}

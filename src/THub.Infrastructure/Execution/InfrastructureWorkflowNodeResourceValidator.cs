@@ -97,7 +97,14 @@ public sealed class InfrastructureWorkflowNodeResourceValidator(
                     THub.Domain.Actions.TrustedActionKind.Executable,
                     cancellationToken).ConfigureAwait(false);
                 break;
-            case SelectColumnsNodeSettings or FilterRowsNodeSettings or JoinNodeSettings:
+            case SelectColumnsNodeSettings
+                or FilterRowsNodeSettings
+                or JoinNodeSettings
+                or UnionRowsNodeSettings
+                or DeriveColumnsNodeSettings
+                or AggregateRowsNodeSettings
+                or DistinctRowsNodeSettings
+                or SortRowsNodeSettings:
                 break;
             default:
                 throw ExecutionFailure.Configuration(

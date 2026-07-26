@@ -94,6 +94,11 @@ public static class DependencyInjection
         services.AddScoped<IWorkflowNodeExecutor, SelectColumnsNodeExecutor>();
         services.AddScoped<IWorkflowNodeExecutor, FilterRowsNodeExecutor>();
         services.AddScoped<IWorkflowNodeExecutor, JoinNodeExecutor>();
+        services.AddScoped<IWorkflowNodeExecutor, UnionRowsNodeExecutor>();
+        services.AddScoped<IWorkflowNodeExecutor, DeriveColumnsNodeExecutor>();
+        services.AddScoped<IWorkflowNodeExecutor, AggregateRowsNodeExecutor>();
+        services.AddScoped<IWorkflowNodeExecutor, DistinctRowsNodeExecutor>();
+        services.AddScoped<IWorkflowNodeExecutor, SortRowsNodeExecutor>();
         services.AddScoped<IWorkflowNodeExecutor, SqlTargetNodeExecutor>();
         services.AddScoped<IWorkflowNodeExecutor, MySqlTargetNodeExecutor>();
         services.AddScoped<IWorkflowNodeExecutor, PostgreSqlTargetNodeExecutor>();

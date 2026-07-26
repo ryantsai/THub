@@ -159,8 +159,8 @@ public sealed class CsvTargetNodeExecutorTests
         ConnectionKind.CsvFile,
         root,
         maximumFileBytes: 1_048_576,
-        maximumRows,
-        maximumColumns);
+        maximumRows: maximumRows,
+        maximumColumns: maximumColumns);
 
     private static WorkflowNodeExecutionContext Context() => new(
         Guid.NewGuid(),

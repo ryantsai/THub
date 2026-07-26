@@ -479,6 +479,50 @@ public sealed class BoundedWorkflowExecutionEngineTests
         Assert.Equal(0, sourceCalls);
     }
 
+    [Theory]
+    [InlineData(WorkflowNodeKind.UnionRows)]
+    [InlineData(WorkflowNodeKind.DeriveColumns)]
+    [InlineData(WorkflowNodeKind.AggregateRows)]
+    [InlineData(WorkflowNodeKind.DistinctRows)]
+    [InlineData(WorkflowNodeKind.SortRows)]
+    public async Task NewTransformKindsAcceptTransformExecutorRole(WorkflowNodeKind kind)
+    {
+        var sources = kind == WorkflowNodeKind.UnionRows
+            ? new[]
+            {
+                SourceFor(WorkflowNodeKind.SqlSource, _ => ValueTask.FromResult(Output(1))),
+                SourceFor(WorkflowNodeKind.CsvSource, _ => ValueTask.FromResult(Output(2)))
+            }
+            : [SourceFor(WorkflowNodeKind.SqlSource, _ => ValueTask.FromResult(Output(1)))];
+        var transform = new DelegateExecutor(
+            WorkflowNodeExecutorDescriptor.Transform(kind),
+            (context, _) => ValueTask.FromResult(Output(context.Inputs.Count)));
+        var nodes = kind == WorkflowNodeKind.UnionRows
+            ? new[]
+            {
+                Node("source-a", WorkflowNodeKind.SqlSource),
+                Node("source-b", WorkflowNodeKind.CsvSource),
+                Node("transform", kind)
+            }
+            : [Node("source-a", WorkflowNodeKind.SqlSource), Node("transform", kind)];
+        var edges = kind == WorkflowNodeKind.UnionRows
+            ? new[]
+            {
+                new WorkflowEdge("source-a", "transform"),
+                new WorkflowEdge("source-b", "transform")
+            }
+            : [new WorkflowEdge("source-a", "transform")];
+
+        var result = await CreateEngine([.. sources, transform]).ExecuteAsync(
+            Guid.NewGuid(),
+            new WorkflowGraph(nodes, edges),
+            CancellationToken.None);
+
+        Assert.Equal(WorkflowExecutionStatus.Succeeded, result.Status);
+        Assert.All(result.NodeOutcomes, outcome =>
+            Assert.Equal(WorkflowNodeExecutionStatus.Succeeded, outcome.Status));
+    }
+
     private static BoundedWorkflowExecutionEngine CreateEngine(
         IEnumerable<IWorkflowNodeExecutor> executors,
         IWorkflowExecutionEventSink? eventSink = null,

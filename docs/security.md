@@ -142,6 +142,33 @@ Workflow schema mapping uses the Web identity and the selected connection's refe
 - Jint is in-process and is not an operating-system sandbox. Keep the Worker least-privileged, monitor the dependency, and preserve host-level CPU/memory controls.
 - Do not log expressions with live row/variable values or resolved database scalars. Normalized errors may identify the variable or binding name but not its value.
 
+## Workflow transform boundary
+
+Transform settings and every upstream row are untrusted at the Worker boundary. Publish
+and execution reparse the strict kind-specific contracts; execution resolves configured
+columns against the actual input schema and rejects incompatible union/join types.
+`SelectColumns` can only select/reorder, and calculated columns can only append typed
+values through the same bounded Jint session described above. A transform cannot submit
+SQL text, open a connection, access a filesystem/network service, or replace host code.
+
+Join buffers only its configured right input, sort buffers only its configured maximum
+rows, aggregate retains only its configured maximum groups, and distinct retains only
+its configured maximum keys; each configurable bound is restricted to 1–1,000,000.
+Union-distinct retains one structural key per emitted unique row and is constrained by
+the engine's per-output and retained-workflow limits. These are in-memory limits, not a
+spill-to-disk implementation. Replay reconstructs the materialized intermediates and
+transform state from the beginning of the immutable graph.
+
+Key equality is type-aware and does not use formatted row text. Join keys containing
+null never match; null remains an ordinary structural key value for distinct,
+union-distinct, and grouping. Preserve cancellation checks in row, key-bucket, and
+comparison loops when extending these operations.
+
+Named-output conditional split/OR branching, pivot/unpivot, window functions, fuzzy
+matching, CDC/SCD, row-level error redirection, external-memory transforms, and
+arbitrary SQL transforms are unsupported. Do not approximate them by weakening the
+strict transform contracts or by accepting user-authored SQL.
+
 ## FTP connectors
 
 - Prefer explicit or implicit FTPS with normal certificate validation.
@@ -244,7 +271,7 @@ Email profiles, rules, outbox persistence, terminal-event integration, the `Emai
 
 ## Logging and data handling
 
-Structured logs may contain identities, workflow/run/step IDs, counts, timings, normalized error categories, and correlation IDs. They must not contain credentials, access tokens, unbounded row data, full connection strings, or raw sensitive payloads.
+Structured logs may contain identities, workflow/run/step IDs, aggregate row/batch/byte counts, timings, normalized error categories, and correlation IDs. Transform execution must not log row values, key values, group values, filter values, calculated results, or serialized intermediates. Logs must not contain credentials, access tokens, unbounded row data, full connection strings, or raw sensitive payloads.
 
 Publication access logs and audit records may add publication/version/token IDs and accepted-use outcomes, never bearer text or filter values. Email logs/audit records may add profile/delivery IDs, attempt numbers, and safe outcome categories, never SMTP credentials, recipients beyond approved operational policy, or full subjects/bodies. Editor change sets currently store bounded before/after values; their final classification and retention policy remains open in PD-009, while the audit stream deliberately does not copy those values.
 
