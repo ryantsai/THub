@@ -369,12 +369,12 @@ public static class PublicationSpreadsheetChangeMapper
             case PublicationDataType.Binary:
                 if (value is byte[] bytes)
                 {
-                    if (column.MaximumLength is int maximumLength && bytes.Length > maximumLength)
+                    if (column.MaximumLength is int maximumBinaryLength && bytes.Length > maximumBinaryLength)
                     {
                         normalized = null;
                         failure = new PublicationCellValidationFailure(
                             PublicationCellValidationCode.MaximumBinaryLength,
-                            maximumLength);
+                            maximumBinaryLength);
                         return false;
                     }
                     normalized = bytes;
@@ -384,12 +384,12 @@ public static class PublicationSpreadsheetChangeMapper
                 try
                 {
                     var parsed = Convert.FromBase64String(text);
-                    if (column.MaximumLength is int maximumLength && parsed.Length > maximumLength)
+                    if (column.MaximumLength is int maximumBinaryLength && parsed.Length > maximumBinaryLength)
                     {
                         normalized = null;
                         failure = new PublicationCellValidationFailure(
                             PublicationCellValidationCode.MaximumBinaryLength,
-                            maximumLength);
+                            maximumBinaryLength);
                         return false;
                     }
                     normalized = parsed;

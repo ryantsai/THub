@@ -68,6 +68,77 @@ public sealed record JoinNodeSettings(
     string JoinType,
     int MaximumBufferedRows) : WorkflowNodeSettings;
 
+public enum UnionMatchMode
+{
+    Name,
+    Position
+}
+
+public enum UnionRowMode
+{
+    All,
+    Distinct
+}
+
+public sealed record UnionRowsNodeSettings(
+    IReadOnlyList<string> InputNodeIds,
+    UnionMatchMode MatchBy,
+    UnionRowMode Mode) : WorkflowNodeSettings;
+
+public sealed record DerivedColumnSettings(
+    string Name,
+    TabularDataType DataType,
+    bool IsNullable,
+    string Expression);
+
+public sealed record DeriveColumnsNodeSettings(
+    IReadOnlyList<DerivedColumnSettings> Columns) : WorkflowNodeSettings;
+
+public enum AggregateOperation
+{
+    Count,
+    CountNonNull,
+    Sum,
+    Average,
+    Minimum,
+    Maximum
+}
+
+public sealed record AggregateColumnSettings(
+    string Name,
+    AggregateOperation Operation,
+    string? Column);
+
+public sealed record AggregateRowsNodeSettings(
+    IReadOnlyList<string> GroupBy,
+    IReadOnlyList<AggregateColumnSettings> Aggregates,
+    int MaximumGroups) : WorkflowNodeSettings;
+
+public sealed record DistinctRowsNodeSettings(
+    IReadOnlyList<string>? Columns,
+    int MaximumKeys) : WorkflowNodeSettings;
+
+public enum SortDirection
+{
+    Ascending,
+    Descending
+}
+
+public enum SortNullPlacement
+{
+    First,
+    Last
+}
+
+public sealed record SortKeySettings(
+    string Column,
+    SortDirection Direction,
+    SortNullPlacement Nulls);
+
+public sealed record SortRowsNodeSettings(
+    IReadOnlyList<SortKeySettings> Keys,
+    int MaximumBufferedRows) : WorkflowNodeSettings;
+
 public enum WorkflowValueBindingKind
 {
     Column,
@@ -181,6 +252,21 @@ public sealed class WorkflowNodeSettingsValidator
         ["column", "operator", "value"];
     private static readonly HashSet<string> JoinProperties =
         ["leftNodeId", "rightNodeId", "leftKeys", "rightKeys", "type", "maximumBufferedRows"];
+    private static readonly HashSet<string> UnionProperties =
+        ["inputNodeIds", "matchBy", "mode"];
+    private static readonly HashSet<string> DeriveProperties = ["columns"];
+    private static readonly HashSet<string> DerivedColumnProperties =
+        ["name", "type", "nullable", "expression"];
+    private static readonly HashSet<string> AggregateProperties =
+        ["groupBy", "aggregates", "maximumGroups"];
+    private static readonly HashSet<string> AggregateColumnProperties =
+        ["name", "operation", "column"];
+    private static readonly HashSet<string> DistinctProperties =
+        ["columns", "maximumKeys"];
+    private static readonly HashSet<string> SortProperties =
+        ["keys", "maximumBufferedRows"];
+    private static readonly HashSet<string> SortKeyProperties =
+        ["column", "direction", "nulls"];
     private static readonly HashSet<string> SqlTargetProperties =
         ["connectionId", "schema", "object", "mode", "keyColumns", "bindings"];
     private static readonly HashSet<string> BindingProperties =
@@ -216,6 +302,14 @@ public sealed class WorkflowNodeSettingsValidator
                 if (settings is JoinNodeSettings join)
                 {
                     ValidateJoinInputs(graph, node, join);
+                }
+                else if (settings is UnionRowsNodeSettings union)
+                {
+                    ValidateUnionInputs(graph, node, union);
+                }
+                else if (settings is DeriveColumnsNodeSettings derive)
+                {
+                    ValidateDerivedExpressions(derive);
                 }
                 else if (settings is SqlTargetNodeSettings target)
                 {
@@ -272,6 +366,28 @@ public sealed class WorkflowNodeSettingsValidator
                 throw Invalid(
                     "node.target.javascript.invalid",
                     $"JavaScript binding for target column '{binding.TargetColumn}' is invalid.");
+            }
+        }
+    }
+
+    private void ValidateDerivedExpressions(DeriveColumnsNodeSettings settings)
+    {
+        if (expressionSessionFactory is null)
+        {
+            return;
+        }
+
+        foreach (var column in settings.Columns)
+        {
+            try
+            {
+                expressionSessionFactory.ValidateExpression(column.Expression);
+            }
+            catch (Exception exception) when (exception is not OutOfMemoryException)
+            {
+                throw Invalid(
+                    "node.derive.expression.invalid",
+                    $"Derived column '{column.Name}' contains an invalid expression.");
             }
         }
     }
@@ -342,6 +458,24 @@ public sealed class WorkflowNodeSettingsValidator
         }
     }
 
+    private static void ValidateUnionInputs(
+        WorkflowGraph graph,
+        WorkflowNode node,
+        UnionRowsNodeSettings settings)
+    {
+        var incoming = graph.Edges
+            .Where(edge => string.Equals(edge.ToNodeId, node.Id, StringComparison.OrdinalIgnoreCase))
+            .Select(edge => edge.FromNodeId)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        if (incoming.Count != settings.InputNodeIds.Count
+            || !incoming.SetEquals(settings.InputNodeIds))
+        {
+            throw Invalid(
+                "node.union.inputs.mismatch",
+                "Union inputNodeIds must identify exactly its incoming workflow edges.");
+        }
+    }
+
     public WorkflowNodeSettings Parse(WorkflowNode node)
     {
         ArgumentNullException.ThrowIfNull(node);
@@ -370,6 +504,11 @@ public sealed class WorkflowNodeSettingsValidator
                 WorkflowNodeKind.SelectColumns => ReadSelect(root),
                 WorkflowNodeKind.FilterRows => ReadFilter(root),
                 WorkflowNodeKind.Join => ReadJoin(root),
+                WorkflowNodeKind.UnionRows => ReadUnion(root),
+                WorkflowNodeKind.DeriveColumns => ReadDerive(root),
+                WorkflowNodeKind.AggregateRows => ReadAggregate(root),
+                WorkflowNodeKind.DistinctRows => ReadDistinct(root),
+                WorkflowNodeKind.SortRows => ReadSort(root),
                 WorkflowNodeKind.SqlTarget or WorkflowNodeKind.MySqlTarget
                     or WorkflowNodeKind.PostgreSqlTarget or WorkflowNodeKind.OracleTarget =>
                     ReadSqlTarget(root),
@@ -546,9 +685,11 @@ public sealed class WorkflowNodeSettingsValidator
         }
 
         var joinType = ReadOptionalText(root, "type", 16) ?? "inner";
-        if (joinType is not ("inner" or "left"))
+        if (joinType is not ("inner" or "left" or "right" or "full"))
         {
-            throw Invalid("node.join.type.invalid", "Join type must be 'inner' or 'left'.");
+            throw Invalid(
+                "node.join.type.invalid",
+                "Join type must be 'inner', 'left', 'right', or 'full'.");
         }
 
         return new(
@@ -557,6 +698,211 @@ public sealed class WorkflowNodeSettingsValidator
             left,
             right,
             joinType,
+            ReadInt(root, "maximumBufferedRows", 1, 1_000_000));
+    }
+
+    private static UnionRowsNodeSettings ReadUnion(JsonElement root)
+    {
+        EnsureOnly(root, UnionProperties);
+        var inputNodeIds = ReadStringArray(root, "inputNodeIds", 2, 16, 128);
+        foreach (var inputNodeId in inputNodeIds)
+        {
+            ValidateNodeId(
+                inputNodeId,
+                "inputNodeIds",
+                "node.union.input.invalid");
+        }
+
+        var matchBy = ReadText(root, "matchBy", 16) switch
+        {
+            "name" => UnionMatchMode.Name,
+            "position" => UnionMatchMode.Position,
+            _ => throw Invalid(
+                "node.union.match.invalid",
+                "Union matchBy must be 'name' or 'position'.")
+        };
+        var mode = ReadText(root, "mode", 16) switch
+        {
+            "all" => UnionRowMode.All,
+            "distinct" => UnionRowMode.Distinct,
+            _ => throw Invalid(
+                "node.union.mode.invalid",
+                "Union mode must be 'all' or 'distinct'.")
+        };
+
+        return new(inputNodeIds, matchBy, mode);
+    }
+
+    private static DeriveColumnsNodeSettings ReadDerive(JsonElement root)
+    {
+        EnsureOnly(root, DeriveProperties);
+        var element = RequireArray(root, "columns");
+        var columns = new List<DerivedColumnSettings>();
+        var names = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var item in element.EnumerateArray())
+        {
+            if (columns.Count == 64)
+            {
+                throw Invalid(
+                    "node.derive.columns.limit",
+                    "A derive-columns node cannot define more than 64 columns.");
+            }
+
+            EnsureOnly(item, DerivedColumnProperties);
+            var name = ReadText(item, "name", TabularColumn.MaximumNameLength);
+            if (!names.Add(name))
+            {
+                throw Invalid(
+                    "node.derive.columns.duplicate",
+                    $"Derived output column '{name}' is configured more than once.");
+            }
+
+            columns.Add(new(
+                name,
+                ReadTabularDataType(item, "type"),
+                ReadBoolean(item, "nullable"),
+                ReadText(
+                    item,
+                    "expression",
+                    WorkflowGraphValidator.MaximumFunctionExpressionCharacters)));
+        }
+
+        if (columns.Count == 0)
+        {
+            throw Invalid(
+                "node.derive.columns.required",
+                "A derive-columns node requires at least one column.");
+        }
+
+        return new(columns.AsReadOnly());
+    }
+
+    private static AggregateRowsNodeSettings ReadAggregate(JsonElement root)
+    {
+        EnsureOnly(root, AggregateProperties);
+        var groupBy = ReadStringArray(root, "groupBy", 0, 16);
+        var element = RequireArray(root, "aggregates");
+        var aggregates = new List<AggregateColumnSettings>();
+        var names = groupBy.ToHashSet(StringComparer.OrdinalIgnoreCase);
+        foreach (var item in element.EnumerateArray())
+        {
+            if (aggregates.Count == 64)
+            {
+                throw Invalid(
+                    "node.aggregate.outputs.limit",
+                    "An aggregate node cannot define more than 64 outputs.");
+            }
+
+            EnsureOnly(item, AggregateColumnProperties);
+            var name = ReadText(item, "name", TabularColumn.MaximumNameLength);
+            if (!names.Add(name))
+            {
+                throw Invalid(
+                    "node.aggregate.outputs.duplicate",
+                    $"Aggregate output column '{name}' duplicates a grouping or aggregate output column.");
+            }
+
+            var operation = ReadText(item, "operation", 32) switch
+            {
+                "count" => AggregateOperation.Count,
+                "countNonNull" => AggregateOperation.CountNonNull,
+                "sum" => AggregateOperation.Sum,
+                "average" => AggregateOperation.Average,
+                "minimum" => AggregateOperation.Minimum,
+                "maximum" => AggregateOperation.Maximum,
+                _ => throw Invalid(
+                    "node.aggregate.operation.invalid",
+                    "Aggregate operation is not supported.")
+            };
+            var column = ReadOptionalText(item, "column", TabularColumn.MaximumNameLength);
+            if (operation == AggregateOperation.Count && column is not null)
+            {
+                throw Invalid(
+                    "node.aggregate.column.forbidden",
+                    "The count aggregate must omit its input column.");
+            }
+            if (operation != AggregateOperation.Count && column is null)
+            {
+                throw Invalid(
+                    "node.aggregate.column.required",
+                    "This aggregate operation requires an input column.");
+            }
+
+            aggregates.Add(new(name, operation, column));
+        }
+
+        if (aggregates.Count == 0)
+        {
+            throw Invalid(
+                "node.aggregate.outputs.required",
+                "An aggregate node requires at least one output.");
+        }
+
+        return new(
+            groupBy,
+            aggregates.AsReadOnly(),
+            ReadInt(root, "maximumGroups", 1, 1_000_000));
+    }
+
+    private static DistinctRowsNodeSettings ReadDistinct(JsonElement root)
+    {
+        EnsureOnly(root, DistinctProperties);
+        var columns = root.TryGetProperty("columns", out _)
+            ? ReadStringArray(root, "columns", 0, 64)
+            : null;
+        return new(columns, ReadInt(root, "maximumKeys", 1, 1_000_000));
+    }
+
+    private static SortRowsNodeSettings ReadSort(JsonElement root)
+    {
+        EnsureOnly(root, SortProperties);
+        var element = RequireArray(root, "keys");
+        var keys = new List<SortKeySettings>();
+        var columns = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var item in element.EnumerateArray())
+        {
+            if (keys.Count == 16)
+            {
+                throw Invalid(
+                    "node.sort.keys.limit",
+                    "A sort node cannot define more than 16 keys.");
+            }
+
+            EnsureOnly(item, SortKeyProperties);
+            var column = ReadText(item, "column", TabularColumn.MaximumNameLength);
+            if (!columns.Add(column))
+            {
+                throw Invalid(
+                    "node.sort.keys.duplicate",
+                    $"Sort column '{column}' is configured more than once.");
+            }
+
+            var direction = ReadText(item, "direction", 16) switch
+            {
+                "ascending" => SortDirection.Ascending,
+                "descending" => SortDirection.Descending,
+                _ => throw Invalid(
+                    "node.sort.direction.invalid",
+                    "Sort direction must be 'ascending' or 'descending'.")
+            };
+            var nulls = ReadText(item, "nulls", 16) switch
+            {
+                "first" => SortNullPlacement.First,
+                "last" => SortNullPlacement.Last,
+                _ => throw Invalid(
+                    "node.sort.nulls.invalid",
+                    "Sort null placement must be 'first' or 'last'.")
+            };
+            keys.Add(new(column, direction, nulls));
+        }
+
+        if (keys.Count == 0)
+        {
+            throw Invalid("node.sort.keys.required", "A sort node requires at least one key.");
+        }
+
+        return new(
+            keys.AsReadOnly(),
             ReadInt(root, "maximumBufferedRows", 1, 1_000_000));
     }
 
@@ -948,14 +1294,21 @@ public sealed class WorkflowNodeSettingsValidator
     private static string ReadNodeId(JsonElement root, string propertyName)
     {
         var value = ReadText(root, propertyName, 128);
+        ValidateNodeId(value, propertyName, "node.join.input.invalid");
+        return value;
+    }
+
+    private static void ValidateNodeId(
+        string value,
+        string propertyName,
+        string errorCode)
+    {
         if (!char.IsLetterOrDigit(value[0])
             || value.Any(character => !char.IsLetterOrDigit(character)
                 && character is not ('.' or '_' or '-')))
         {
-            throw Invalid("node.join.input.invalid", $"'{propertyName}' is not a valid workflow node id.");
+            throw Invalid(errorCode, $"'{propertyName}' is not a valid workflow node id.");
         }
-
-        return value;
     }
 
     private static string ReadRelativePath(JsonElement root, string propertyName, string extension)
@@ -1176,6 +1529,34 @@ public sealed class WorkflowNodeSettingsValidator
         }
 
         return value;
+    }
+
+    private static JsonElement RequireArray(JsonElement root, string propertyName)
+    {
+        var value = Require(root, propertyName);
+        if (value.ValueKind != JsonValueKind.Array)
+        {
+            throw Invalid("node.settings.array.invalid", $"'{propertyName}' must be an array.");
+        }
+
+        return value;
+    }
+
+    private static TabularDataType ReadTabularDataType(
+        JsonElement root,
+        string propertyName)
+    {
+        var typeText = ReadText(root, propertyName, 32);
+        if (!Enum.TryParse<TabularDataType>(typeText, ignoreCase: true, out var dataType)
+            || !Enum.IsDefined(dataType)
+            || int.TryParse(typeText, out _))
+        {
+            throw Invalid(
+                "node.derive.type.invalid",
+                $"Column type '{typeText}' is not supported.");
+        }
+
+        return dataType;
     }
 
     private static void EnsureOnly(JsonElement root, IReadOnlySet<string> allowed)

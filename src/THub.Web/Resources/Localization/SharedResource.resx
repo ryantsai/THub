@@ -3129,4 +3129,107 @@ subsidiary.example.com</value>
   <data name="String" xml:space="preserve"><value>Text</value></data>
   <data name="Binary" xml:space="preserve"><value>Binary</value></data>
   <data name="Select a value…" xml:space="preserve"><value>Select a value…</value></data>
+  <data name="A Join step accepts exactly two inputs." xml:space="preserve"><value>A Join step accepts exactly two inputs.</value></data>
+  <data name="A Union rows step accepts at most sixteen inputs." xml:space="preserve"><value>A Union rows step accepts at most sixteen inputs.</value></data>
+  <data name="Actions" xml:space="preserve"><value>Actions</value></data>
+  <data name="Add aggregate column" xml:space="preserve"><value>Add aggregate column</value></data>
+  <data name="Add calculated column" xml:space="preserve"><value>Add calculated column</value></data>
+  <data name="Add column" xml:space="preserve"><value>Add column</value></data>
+  <data name="Add condition" xml:space="preserve"><value>Add condition</value></data>
+  <data name="Add grouping column" xml:space="preserve"><value>Add grouping column</value></data>
+  <data name="Add key column" xml:space="preserve"><value>Add key column</value></data>
+  <data name="Add key pair" xml:space="preserve"><value>Add key pair</value></data>
+  <data name="Add sort key" xml:space="preserve"><value>Add sort key</value></data>
+  <data name="Add typed expression results" xml:space="preserve"><value>Add typed expression results</value></data>
+  <data name="Aggregate columns" xml:space="preserve"><value>Aggregate columns</value></data>
+  <data name="Aggregate output {0}" xml:space="preserve"><value>Aggregate output {0}</value></data>
+  <data name="Aggregate rows" xml:space="preserve"><value>Aggregate rows</value></data>
+  <data name="All conditions must match (AND)." xml:space="preserve"><value>All conditions must match (AND).</value></data>
+  <data name="Ascending" xml:space="preserve"><value>Ascending</value></data>
+  <data name="Bounded duplicate removal" xml:space="preserve"><value>Bounded duplicate removal</value></data>
+  <data name="Bounded grouped summaries" xml:space="preserve"><value>Bounded grouped summaries</value></data>
+  <data name="Calculated column {0}" xml:space="preserve"><value>Calculated column {0}</value></data>
+  <data name="Calculated columns" xml:space="preserve"><value>Calculated columns</value></data>
+  <data name="Columns are emitted in this order. Selection does not rename or convert values." xml:space="preserve"><value>Columns are emitted in this order. Selection does not rename or convert values.</value></data>
+  <data name="Columns to keep" xml:space="preserve"><value>Columns to keep</value></data>
+  <data name="Compatible row union" xml:space="preserve"><value>Compatible row union</value></data>
+  <data name="Connect an upstream step to choose columns." xml:space="preserve"><value>Connect an upstream step to choose columns.</value></data>
+  <data name="Data type" xml:space="preserve"><value>Data type</value></data>
+  <data name="Destinations" xml:space="preserve"><value>Destinations</value></data>
+  <data name="Direction" xml:space="preserve"><value>Direction</value></data>
+  <data name="Disabled by administrator policy" xml:space="preserve"><value>Disabled by administrator policy</value></data>
+  <data name="Distinct key column {0}" xml:space="preserve"><value>Distinct key column {0}</value></data>
+  <data name="Distinct rows" xml:space="preserve"><value>Distinct rows</value></data>
+  <data name="Duplicate rows" xml:space="preserve"><value>Duplicate rows</value></data>
+  <data name="Enter column name" xml:space="preserve"><value>Enter column name</value></data>
+  <data name="Expressions can read row.ColumnName and the available workflow variables: {0}" xml:space="preserve"><value>Expressions can read row.ColumnName and the available workflow variables: {0}</value></data>
+  <data name="Filter condition {0}" xml:space="preserve"><value>Filter condition {0}</value></data>
+  <data name="Filter conditions" xml:space="preserve"><value>Filter conditions</value></data>
+  <data name="First" xml:space="preserve"><value>First</value></data>
+  <data name="Full outer" xml:space="preserve"><value>Full outer</value></data>
+  <data name="Graphical editing is unavailable" xml:space="preserve"><value>Graphical editing is unavailable</value></data>
+  <data name="Group by" xml:space="preserve"><value>Group by</value></data>
+  <data name="Group rows and calculate summaries" xml:space="preserve"><value>Group rows and calculate summaries</value></data>
+  <data name="Grouping column {0}" xml:space="preserve"><value>Grouping column {0}</value></data>
+  <data name="Inner" xml:space="preserve"><value>Inner</value></data>
+  <data name="Input limit reached" xml:space="preserve"><value>Input limit reached</value></data>
+  <data name="Input order follows the links unless you reorder it here." xml:space="preserve"><value>Input order follows the links unless you reorder it here.</value></data>
+  <data name="JavaScript expression" xml:space="preserve"><value>JavaScript expression</value></data>
+  <data name="Join" xml:space="preserve"><value>Join</value></data>
+  <data name="Join inputs" xml:space="preserve"><value>Join inputs</value></data>
+  <data name="Join key pair {0}" xml:space="preserve"><value>Join key pair {0}</value></data>
+  <data name="Join type" xml:space="preserve"><value>Join type</value></data>
+  <data name="Keep all rows" xml:space="preserve"><value>Keep all rows</value></data>
+  <data name="Keep selected columns in order" xml:space="preserve"><value>Keep selected columns in order</value></data>
+  <data name="Last" xml:space="preserve"><value>Last</value></data>
+  <data name="Left column" xml:space="preserve"><value>Left column</value></data>
+  <data name="Left outer" xml:space="preserve"><value>Left outer</value></data>
+  <data name="Match columns" xml:space="preserve"><value>Match columns</value></data>
+  <data name="Match columns by name" xml:space="preserve"><value>Match columns by name</value></data>
+  <data name="Match columns by position" xml:space="preserve"><value>Match columns by position</value></data>
+  <data name="Maximum buffered rows" xml:space="preserve"><value>Maximum buffered rows</value></data>
+  <data name="Maximum groups" xml:space="preserve"><value>Maximum groups</value></data>
+  <data name="Maximum retained keys" xml:space="preserve"><value>Maximum retained keys</value></data>
+  <data name="Move {0} down" xml:space="preserve"><value>Move {0} down</value></data>
+  <data name="Move {0} up" xml:space="preserve"><value>Move {0} up</value></data>
+  <data name="none" xml:space="preserve"><value>none</value></data>
+  <data name="Null values" xml:space="preserve"><value>Null values</value></data>
+  <data name="Nullable" xml:space="preserve"><value>Nullable</value></data>
+  <data name="Order rows by one or more keys" xml:space="preserve"><value>Order rows by one or more keys</value></data>
+  <data name="Ordered column selection" xml:space="preserve"><value>Ordered column selection</value></data>
+  <data name="Output name" xml:space="preserve"><value>Output name</value></data>
+  <data name="Remove {0}" xml:space="preserve"><value>Remove {0}</value></data>
+  <data name="Remove duplicate rows" xml:space="preserve"><value>Remove duplicate rows</value></data>
+  <data name="Remove link from {0}" xml:space="preserve"><value>Remove link from {0}</value></data>
+  <data name="Remove rows with duplicate keys" xml:space="preserve"><value>Remove rows with duplicate keys</value></data>
+  <data name="Right column" xml:space="preserve"><value>Right column</value></data>
+  <data name="Right outer" xml:space="preserve"><value>Right outer</value></data>
+  <data name="Schema is unavailable." xml:space="preserve"><value>Schema is unavailable.</value></data>
+  <data name="Select columns" xml:space="preserve"><value>Select columns</value></data>
+  <data name="Selected column {0}" xml:space="preserve"><value>Selected column {0}</value></data>
+  <data name="Settings need attention: {0}" xml:space="preserve"><value>Settings need attention: {0}</value></data>
+  <data name="Some input schemas are unavailable. Column names can still be entered manually." xml:space="preserve"><value>Some input schemas are unavailable. Column names can still be entered manually.</value></data>
+  <data name="Sort key {0}" xml:space="preserve"><value>Sort key {0}</value></data>
+  <data name="Sort keys" xml:space="preserve"><value>Sort keys</value></data>
+  <data name="Sort rows" xml:space="preserve"><value>Sort rows</value></data>
+  <data name="Sources" xml:space="preserve"><value>Sources</value></data>
+  <data name="Stable bounded ordering" xml:space="preserve"><value>Stable bounded ordering</value></data>
+  <data name="Stack two to sixteen compatible streams" xml:space="preserve"><value>Stack two to sixteen compatible streams</value></data>
+  <data name="Swap" xml:space="preserve"><value>Swap</value></data>
+  <data name="Swap left and right inputs" xml:space="preserve"><value>Swap left and right inputs</value></data>
+  <data name="These settings cannot be edited safely. Use Advanced settings JSON to repair them without losing the original value." xml:space="preserve"><value>These settings cannot be edited safely. Use Advanced settings JSON to repair them without losing the original value.</value></data>
+  <data name="To join a third table, connect another Join step after this one." xml:space="preserve"><value>To join a third table, connect another Join step after this one.</value></data>
+  <data name="Transform" xml:space="preserve"><value>Transform</value></data>
+  <data name="Transform settings" xml:space="preserve"><value>Transform settings</value></data>
+  <data name="Transform settings are ready." xml:space="preserve"><value>Transform settings are ready.</value></data>
+  <data name="Typed AND conditions" xml:space="preserve"><value>Typed AND conditions</value></data>
+  <data name="Typed calculated columns" xml:space="preserve"><value>Typed calculated columns</value></data>
+  <data name="Union input {0}" xml:space="preserve"><value>Union input {0}</value></data>
+  <data name="Union inputs" xml:space="preserve"><value>Union inputs</value></data>
+  <data name="Union rows" xml:space="preserve"><value>Union rows</value></data>
+  <data name="Use all columns" xml:space="preserve"><value>Use all columns</value></data>
+  <data name="Use selected columns" xml:space="preserve"><value>Use selected columns</value></data>
+  <data name="Transform settings need attention." xml:space="preserve"><value>Transform settings need attention.</value></data>
+  <data name="Enter a value or choose a null operation." xml:space="preserve"><value>Enter a value or choose a null operation.</value></data>
+  <data name="Enter a valid value for this column type." xml:space="preserve"><value>Enter a valid value for this column type.</value></data>
 </root>

@@ -3,8 +3,8 @@
 .designer-actions { display: flex; align-items: center; gap: 7px; }.draft-state { margin-right: 8px; display: flex; align-items: center; gap: 6px; color: #73827e; font-size: 11px; }.draft-state i { width: 6px; height: 6px; border-radius: 50%; background: #e5a246; }.designer-actions ::deep .rz-button { min-height: 34px; border-radius: 6px; box-shadow: none; font-size: 11px; text-transform: none; }.designer-actions ::deep .rz-button.rz-primary { background: #203f39; }
 .designer-shell { height: calc(100vh - 122px); margin: 0 calc(-1 * var(--page-gutter)) -36px; display: grid; grid-template-columns: minmax(500px, 1fr); overflow: hidden; background: #edf2f0; }
 .designer-shell.library-open { grid-template-columns: 250px minmax(500px, 1fr); }
-.designer-shell.inspector-open { grid-template-columns: minmax(500px, 1fr) 400px; }
-.designer-shell.library-open.inspector-open { grid-template-columns: 250px minmax(500px, 1fr) 400px; }
+.designer-shell.inspector-open { grid-template-columns: minmax(500px, 1fr) 430px; }
+.designer-shell.library-open.inspector-open { grid-template-columns: 250px minmax(500px, 1fr) 430px; }
 .node-palette, .properties-panel { min-height: 0; overflow-y: auto; background: white; }.node-palette { border-right: 1px solid var(--border); }.properties-panel { border-left: 1px solid var(--border); }
 .palette-head { height: 64px; padding: 12px 12px 9px 16px; display: flex; align-items: center; justify-content: space-between; gap: 12px; }.palette-head > div { display: grid; }.palette-head strong { font: 700 14px Manrope, sans-serif; }.palette-head small { color: #7d8c88; font-size: 11px; }.palette-head button { width: 30px; height: 30px; display: grid; place-items: center; border: 0; border-radius: 6px; background: transparent; color: #70807b; cursor: pointer; }.palette-head button:hover { background: #eef3f1; }
 .palette-search { height: 36px; margin: 0 12px 12px; padding: 0 9px; display: flex; align-items: center; gap: 6px; border: 1px solid #dfe6e4; border-radius: 7px; background: #fbfcfc; }.palette-search ::deep .rzi { color: #83938e; font-size: 16px; }.palette-search input { width: 100%; border: 0; outline: 0; background: transparent; color: #44524f; font-size: 12px; }
@@ -37,6 +37,10 @@
     .designer-shell.library-open { grid-template-columns: 220px minmax(500px, 1fr); }
     .designer-shell.inspector-open { grid-template-columns: minmax(500px, 1fr) 360px; }
     .designer-shell.library-open.inspector-open { grid-template-columns: 220px minmax(500px, 1fr) 360px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .canvas-node { transition: none; }
 }
 
 @media (max-width: 760px) {

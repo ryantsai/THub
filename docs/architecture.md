@@ -94,7 +94,7 @@ Responsibilities now:
 - enqueue idempotent THub run records when Quartz fires and advance the next occurrence;
 - atomically claim queued or abandoned runs, renew their leases, and prevent overlapping active runs for one workflow;
 - reload and verify the exact immutable version identity/checksum before executing its validated DAG;
-- execute bounded relational, local-file, and FTP/FTPS sources and targets plus Email targets, select/filter/join transforms, and Email actions with cancellation, timeouts, retry-safety policy, and normalized errors;
+- execute bounded relational, local-file, and FTP/FTPS sources and targets plus Email targets, the core select/filter/calculated-column/aggregate/distinct/sort/union/join transforms, and Email actions with cancellation, timeouts, retry-safety policy, and normalized errors;
 - persist node attempts, progress counters, skips/failures, durable cancellation, and terminal run state;
 - claim and apply approved editor change sets with a least-privilege source-write identity;
 - claim and dispatch durable Email outbox rows through approved SMTP profiles;
@@ -208,14 +208,43 @@ Implemented v1 node behavior:
 - **CSV source/target:** resolves a relative `.csv` path beneath an approved root and enforces file/row/column limits. Targets support explicit create-new, append, or replace modes and bounded placeholders for frozen run values or workflow variables. The designer displays the complete Worker path, while the persisted path remains relative to the approved root. Append and replace stage beside the destination before publishing; append emits headers only for a new or empty file.
 - **Excel source/target:** applies the same approved-root and size/shape bounds to `.xlsx`/`.xlsm` and reads an approved worksheet/range. Targets support create-new, append, or replace plus final-filename placeholders. Append stages a copy and adds rows to the selected worksheet; replace stages a new workbook before publishing.
 - **FTP/FTPS source/target:** transfers only an absolute traversal-free remote path after applying connection file/time bounds, then reuses the bounded delimited/Excel parser or writer in a unique Worker temporary directory. Targets support create-new, append, or replace plus final-filename placeholders. Append downloads the prior bounded file; every completed result uploads to a unique remote `.partial` sibling before a same-directory move publishes it. Plain FTP is an explicit unencrypted compatibility mode; FTPS is preferred. SFTP and remote watchers are not implemented.
-- **Transforms:** select projects configured columns; filter applies up to 32 typed scalar predicates; inner/left join binds exactly two named incoming nodes and bounds the buffered right side.
+- **Transforms:** select projects existing columns in configured order without rename or cast; filter applies one to 32 typed scalar predicates with AND semantics; calculated columns append typed bounded-JavaScript results without replacing incoming columns; aggregate, distinct, and stable sort retain explicitly bounded state; compatible-schema union aligns two to 16 inputs by name or position and keeps all or structurally distinct rows; and join binds exactly two named inputs for inner, left, right, or full processing. Chaining two-input join nodes provides multi-table processing.
 - **Email action:** enqueues durable delivery intent through the governed Email profile/outbox boundary; recovered graph attempts reuse its stable run/node deduplication identity.
 - **Email target:** converts one input to an HTML-encoded table or UTF-8 CSV attachment, applies the custom subject/body template, and enqueues the bounded payload through the same durable outbox.
 - **Webhook:** sends one bounded workflow-authored non-secret body to an exact administrator-owned destination through a redirect-free, DNS/IP-validated HTTP client. Fixed headers, authentication reference, private-network decision, timeout, and request/response limits belong to the trusted action.
 - **Executable:** starts one administrator-owned canonical local path with fixed `ArgumentList` templates and environment. It may run as the Worker or an encrypted referenced Windows account; timeout, cancellation, combined output limit, reparse-point checks, and process-tree termination are enforced. THub is not an operating-system sandbox.
 - **REST/editor publication nodes:** intentionally rejected as workflow operations; their implemented lifecycle is the separately governed Publications surface.
 
+Core transform configuration and retained-state limits are:
+
+| Transform | Contract and limit |
+| --- | --- |
+| Select | 1–512 existing columns; order is significant; no rename or cast |
+| Filter | 1–32 typed scalar conditions; every condition is ANDed |
+| Calculated columns | 1–64 add-only typed columns; expressions use the bounded workflow JavaScript session |
+| Aggregate | 0–16 grouping columns, 1–64 count/count-non-null/sum/average/minimum/maximum outputs, and `maximumGroups` of 1–1,000,000 |
+| Distinct | all columns or up to 64 selected key columns, and `maximumKeys` of 1–1,000,000 |
+| Sort | 1–16 keys with direction and null placement, and `maximumBufferedRows` of 1–1,000,000; original ordinal breaks complete ties |
+| Union | 2–16 exact incoming node IDs, name or position matching, and all or distinct mode; distinct retains one structural key per emitted row under the engine output/retention budgets |
+| Join | exactly two inputs, 1–16 equal-type key pairs, inner/left/right/full mode, and a buffered right-side `maximumBufferedRows` of 1–1,000,000 |
+
+Distinct, union-distinct, aggregate grouping, and join use type-aware structural keys
+instead of invariant string formatting. Null values participate in distinct/grouping
+keys, while any join key containing null is deliberately nonmatching. Join output applies
+outer-side nullability, and colliding right-side names receive deterministic `right.`
+names and suffixes.
+
 Nodes execute in deterministic topological order. A failed/cancelled dependency causes downstream nodes to be durably skipped. `Execution:MaximumConcurrency` bounds concurrently claimed runs, not parallel nodes inside one run.
+
+Every transform consumes replayable inputs materialized by the bounded Worker data-set
+store. Join, sort, aggregate, distinct, and union-distinct may retain additional rows,
+groups, or keys while the node runs, but they remain subject to their settings and the
+engine's per-output and retained-workflow row/byte/batch budgets. No transform spills to
+disk or checkpoints partial state, and no transform accepts arbitrary SQL.
+
+Named-output conditional split and OR branching, pivot/unpivot, window functions, fuzzy
+matching, CDC/SCD, row-level error redirection, external-memory transforms, and arbitrary
+SQL transforms are not implemented.
 
 ### Email alerts, actions, and data destinations
 
