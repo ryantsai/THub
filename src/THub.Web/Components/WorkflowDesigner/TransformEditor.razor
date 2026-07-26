@@ -270,7 +270,7 @@
 
     @if (!string.IsNullOrWhiteSpace(SchemaStatus))
     {
-        <p class="schema-status" role="status"><RadzenIcon Icon="info_outline" /> @SchemaStatus</p>
+        <p class="schema-status" role="status"><RadzenIcon Icon="info" /> @SchemaStatus</p>
     }
     <p class="validation-status @(!HasVisibleValidationIssue ? "valid" : "invalid")" aria-live="polite">
         @(!HasVisibleValidationIssue ? Localizer["Transform settings are ready."] : Localizer["Transform settings need attention."])
@@ -439,15 +439,16 @@
     private RenderFragment BoundedNumber(string label, int value, Action<int> setter) => builder =>
     {
         builder.OpenElement(0, "label");
-        builder.OpenElement(1, "span");
-        builder.AddContent(2, label);
+        builder.AddAttribute(1, "class", "bounded-number");
+        builder.OpenElement(2, "span");
+        builder.AddContent(3, label);
         builder.CloseElement();
-        builder.OpenElement(3, "input");
-        builder.AddAttribute(4, "type", "number");
-        builder.AddAttribute(5, "min", "1");
-        builder.AddAttribute(6, "max", "1000000");
-        builder.AddAttribute(7, "value", value);
-        builder.AddAttribute(8, "onchange", EventCallback.Factory.Create<ChangeEventArgs>(this, async eventArgs =>
+        builder.OpenElement(4, "input");
+        builder.AddAttribute(5, "type", "number");
+        builder.AddAttribute(6, "min", "1");
+        builder.AddAttribute(7, "max", "1000000");
+        builder.AddAttribute(8, "value", value);
+        builder.AddAttribute(9, "onchange", EventCallback.Factory.Create<ChangeEventArgs>(this, async eventArgs =>
         {
             if (int.TryParse(eventArgs.Value?.ToString(), NumberStyles.Integer, CultureInfo.InvariantCulture, out var parsed))
             {

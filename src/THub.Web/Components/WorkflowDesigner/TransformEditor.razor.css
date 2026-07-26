@@ -75,9 +75,9 @@ label > span,
     text-transform: uppercase;
 }
 
-input,
-select,
-textarea {
+.transform-editor ::deep input,
+.transform-editor ::deep select,
+.transform-editor ::deep textarea {
     width: 100%;
     min-height: 44px;
     padding: 7px 9px;
@@ -90,30 +90,44 @@ textarea {
     font-size: 11px;
 }
 
-textarea {
+.transform-editor ::deep textarea {
     resize: vertical;
     line-height: 1.45;
 }
 
-input:focus-visible,
-select:focus-visible,
-textarea:focus-visible,
-button:focus-visible {
+.transform-editor ::deep input:focus-visible,
+.transform-editor ::deep select:focus-visible,
+.transform-editor ::deep textarea:focus-visible,
+.transform-editor ::deep button:focus-visible {
     outline: 2px solid #7558a6;
     outline-offset: 2px;
+}
+
+.transform-editor ::deep .bounded-number {
+    min-width: 0;
+    display: grid;
+    gap: 5px;
+}
+
+.transform-editor ::deep .bounded-number > span {
+    color: #677671;
+    font-size: 9px;
+    font-weight: 750;
+    letter-spacing: .035em;
+    text-transform: uppercase;
 }
 
 .wide {
     grid-column: 1 / -2;
 }
 
-.row-actions {
+.transform-editor ::deep .row-actions {
     display: flex;
     align-items: center;
     gap: 2px;
 }
 
-.row-actions button,
+.transform-editor ::deep .row-actions button,
 .input-order button {
     width: 44px;
     min-width: 44px;
@@ -128,22 +142,22 @@ button:focus-visible {
     cursor: pointer;
 }
 
-.row-actions button:hover,
+.transform-editor ::deep .row-actions button:hover,
 .input-order button:hover {
     background: #f0edf7;
     color: #694e98;
 }
 
-.row-actions button:last-child {
+.transform-editor ::deep .row-actions button:last-child {
     color: #9a5b54;
 }
 
-.row-actions button:disabled {
+.transform-editor ::deep .row-actions button:disabled {
     opacity: .3;
     cursor: default;
 }
 
-.row-actions ::deep .rzi {
+.transform-editor ::deep .row-actions .rzi {
     font-size: 16px;
 }
 
@@ -298,6 +312,12 @@ button:focus-visible {
     gap: 6px;
     align-items: center;
     background: #f3f5f5;
+}
+
+.schema-status ::deep .rzi {
+    flex: 0 0 auto;
+    font-size: 16px;
+    line-height: 1;
 }
 
 .validation-status {
