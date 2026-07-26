@@ -48,37 +48,48 @@
     }
     else
     {
-        <div class="table-scroll">
-            <table class="activity-table run-table">
-                <thead><tr><th>@Localizer["Workflow"]</th><th>@Localizer["Status"]</th><th>@Localizer["Version"]</th><th>@Localizer["Queued"]</th><th>@Localizer["Duration"]</th><th>@Localizer["Trigger"]</th><th></th></tr></thead>
-                <tbody>
-                    @foreach (var run in Items)
-                    {
-                        <tr class="@(Selected?.Id == run.Id ? "selected" : null)">
-                            <td><button class="run-link" type="button" @onclick="() => SelectAsync(run.Id)"><strong>@run.WorkflowName</strong><small>@ShortId(run.Id)</small></button></td>
-                            <td><span class="status-chip @StatusCss(run.Status)">@run.Status</span></td>
-                            <td class="muted">v@(run.WorkflowVersion) · attempt @run.AttemptCount</td>
-                            <td class="muted">@run.QueuedAtUtc.ToLocalTime().ToString("g")</td>
-                            <td class="duration">@FormatDuration(run.StartedAtUtc, run.CompletedAtUtc)</td>
-                            <td class="muted">@run.TriggeredBy</td>
-                            <td class="run-actions">
-                                <button type="button" @onclick="() => SelectAsync(run.Id)">@Localizer["Details"]</button>
-                                @if (ExecutableRuns.Contains(run.Id))
+        <div class="workflow-run-groups">
+            @foreach (var group in WorkflowGroups)
+            {
+                <section class="workflow-run-group">
+                    <div class="workflow-run-group-head">
+                        <h3>@group.WorkflowName</h3>
+                        <span>@Localizer["Runs: {0}", group.Runs.Count]</span>
+                    </div>
+                    <div class="table-scroll">
+                        <table class="activity-table run-table">
+                            <thead><tr><th>@Localizer["Run"]</th><th>@Localizer["Status"]</th><th>@Localizer["Version"]</th><th>@Localizer["Queued"]</th><th>@Localizer["Duration"]</th><th>@Localizer["Trigger"]</th><th></th></tr></thead>
+                            <tbody>
+                                @foreach (var run in group.Runs)
                                 {
-                                    @if (run.Status is WorkflowRunStatus.Queued or WorkflowRunStatus.Running)
-                                    {
-                                        <button type="button" disabled="@(Busy || run.CancellationRequested)" @onclick="() => CancelAsync(run.Id)">@(run.CancellationRequested ? "Cancelling" : "Cancel")</button>
-                                    }
-                                    else if (run.Status == WorkflowRunStatus.Failed)
-                                    {
-                                        <button type="button" disabled="@Busy" @onclick="() => RetryAsync(run.Id)">@Localizer["Retry exact version"]</button>
-                                    }
+                                    <tr class="@(Selected?.Id == run.Id ? "selected" : null)">
+                                        <td><button class="run-link" type="button" @onclick="() => SelectAsync(run.Id)"><strong>@ShortId(run.Id)</strong></button></td>
+                                        <td><span class="status-chip @StatusCss(run.Status)">@run.Status</span></td>
+                                        <td class="muted">v@(run.WorkflowVersion) · attempt @run.AttemptCount</td>
+                                        <td class="muted">@run.QueuedAtUtc.ToLocalTime().ToString("g")</td>
+                                        <td class="duration">@FormatDuration(run.StartedAtUtc, run.CompletedAtUtc)</td>
+                                        <td class="muted">@run.TriggeredBy</td>
+                                        <td class="run-actions">
+                                            <button type="button" @onclick="() => SelectAsync(run.Id)">@Localizer["Details"]</button>
+                                            @if (ExecutableRuns.Contains(run.Id))
+                                            {
+                                                @if (run.Status is WorkflowRunStatus.Queued or WorkflowRunStatus.Running)
+                                                {
+                                                    <button type="button" disabled="@(Busy || run.CancellationRequested)" @onclick="() => CancelAsync(run.Id)">@(run.CancellationRequested ? "Cancelling" : "Cancel")</button>
+                                                }
+                                                else if (run.Status == WorkflowRunStatus.Failed)
+                                                {
+                                                    <button type="button" disabled="@Busy" @onclick="() => RetryAsync(run.Id)">@Localizer["Retry exact version"]</button>
+                                                }
+                                            }
+                                        </td>
+                                    </tr>
                                 }
-                            </td>
-                        </tr>
-                    }
-                </tbody>
-            </table>
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
+            }
         </div>
     }
 </section>
@@ -130,6 +141,13 @@
     private string? Error { get; set; }
     private HashSet<Guid> ExecutableRuns { get; } = [];
     private Dictionary<Guid, Guid> RunWorkflowIds { get; } = [];
+
+    private IReadOnlyList<WorkflowRunGroup> WorkflowGroups => Items
+        .GroupBy(run => run.WorkflowId)
+        .Select(group => new WorkflowRunGroup(
+            group.First().WorkflowName,
+            group.ToArray()))
+        .ToArray();
 
     private static IReadOnlyList<StatusOption> StatusOptions { get; } = Enum
         .GetValues<WorkflowRunStatus>()
@@ -348,4 +366,7 @@
     }
 
     private sealed record StatusOption(WorkflowRunStatus Value, string Label);
+    private sealed record WorkflowRunGroup(
+        string WorkflowName,
+        IReadOnlyList<WorkflowRunListRecord> Runs);
 }

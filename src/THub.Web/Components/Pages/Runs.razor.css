@@ -1,9 +1,13 @@
 .heading-actions .rz-dropdown { min-width: 150px; height: 36px; font-size: 11px; }
 .table-scroll { overflow-x: auto; }
+.workflow-run-groups { display: grid; }
+.workflow-run-group + .workflow-run-group { border-top: 1px solid #dfe7e5; }
+.workflow-run-group-head { min-height: 54px; padding: 0 18px; display: flex; align-items: center; justify-content: space-between; gap: 16px; background: #f7faf9; }
+.workflow-run-group-head h3 { margin: 0; font-size: 13px; }
+.workflow-run-group-head span { color: #7b8b87; font-size: 10px; white-space: nowrap; }
 .run-table tr.selected td { background: #f2f8f6; }
 .run-link { display: grid; gap: 3px; padding: 0; border: 0; background: none; color: inherit; text-align: left; cursor: pointer; }
-.run-link strong { font-size: 11px; }
-.run-link small { color: #8b9895; font: 9px/1.2 ui-monospace, monospace; }
+.run-link strong { color: #17775f; font: 700 10px/1.2 ui-monospace, monospace; letter-spacing: .35px; }
 .run-actions { white-space: nowrap; }
 .run-actions button { margin-right: 8px; padding: 0; border: 0; background: none; color: #17775f; font-size: 10px; font-weight: 700; cursor: pointer; }
 .run-actions button:disabled { color: #a2adaa; cursor: not-allowed; }

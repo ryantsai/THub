@@ -1798,6 +1798,9 @@ subsidiary.example.com</value>
   <data name="Rules subscribe to terminal run events and queue through the same durable Email outbox." xml:space="preserve">
     <value>Rules subscribe to terminal run events and queue through the same durable Email outbox.</value>
   </data>
+  <data name="Run" xml:space="preserve">
+    <value>Run</value>
+  </data>
   <data name="Run access is not permitted." xml:space="preserve">
     <value>Run access is not permitted.</value>
   </data>
@@ -1866,6 +1869,9 @@ subsidiary.example.com</value>
   </data>
   <data name="Runs today" xml:space="preserve">
     <value>Runs today</value>
+  </data>
+  <data name="Runs: {0}" xml:space="preserve">
+    <value>Runs: {0}</value>
   </data>
   <data name="runStartedAtUtc" xml:space="preserve">
     <value>runStartedAtUtc</value>

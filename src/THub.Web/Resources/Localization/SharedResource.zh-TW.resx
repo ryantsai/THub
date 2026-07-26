@@ -1798,6 +1798,9 @@
   <data name="Rules subscribe to terminal run events and queue through the same durable Email outbox." xml:space="preserve">
     <value>規則會訂閱執行結束事件，並透過同一個持久性電子郵件寄件匣排入佇列。</value>
   </data>
+  <data name="Run" xml:space="preserve">
+    <value>執行紀錄</value>
+  </data>
   <data name="Run access is not permitted." xml:space="preserve">
     <value>不允許執行存取。</value>
   </data>
@@ -1866,6 +1869,9 @@
   </data>
   <data name="Runs today" xml:space="preserve">
     <value>今日執行次數</value>
+  </data>
+  <data name="Runs: {0}" xml:space="preserve">
+    <value>執行紀錄：{0} 筆</value>
   </data>
   <data name="runStartedAtUtc" xml:space="preserve">
     <value>runStartedAtUtc</value>
