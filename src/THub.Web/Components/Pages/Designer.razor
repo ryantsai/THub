@@ -14,6 +14,7 @@
 @using THub.Domain.Actions
 @using THub.Domain.Security
 @using THub.Domain.Workflows
+@using THub.Web.Components.WorkflowDesigner
 @inject ConnectionManagementService ConnectionService
 @inject EmailAlertAdministrationService EmailAdministration
 @inject TrustedActionAdministrationService TrustedActionAdministration
@@ -22,6 +23,7 @@
 @inject WorkflowGraphSerializer GraphSerializer
 @inject WorkflowCatalogService WorkflowCatalog
 @inject WorkflowSchemaInspectionService SchemaInspection
+@inject WorkflowTabularSchemaService TabularSchemaService
 @inject AuthenticationStateProvider AuthenticationStateProvider
 @inject NotificationService Notifications
 @inject NavigationManager Navigation
@@ -69,7 +71,7 @@ else
                     <h3>@group.Name</h3>
                     @foreach (var tool in group.Tools)
                     {
-                        <button class="tool-item" type="button" disabled="@(!tool.IsOperational)" title="@(tool.IsOperational ? tool.Description : "Disabled by administrator policy")" @onclick="() => AddNode(tool)">
+                        <button class="tool-item" type="button" disabled="@(!tool.IsOperational)" title="@(tool.IsOperational ? tool.Description : Localizer["Disabled by administrator policy"])" @onclick="() => AddNode(tool)">
                             <span class="tool-icon @tool.Tone"><RadzenIcon Icon="@tool.Icon" /></span>
                             <span><strong>@tool.Name</strong><small>@tool.Description</small></span>
                             <RadzenIcon Icon="@(tool.IsOperational ? "add" : "lock")" />
@@ -441,10 +443,6 @@ else
                             </select>
                         </label>
                     }
-                    @if (SelectedNode.Kind == WorkflowNodeKind.Join)
-                    {
-                        <div class="join-input-summary"><span>@Localizer["Left input"]</span><code>@(GetSettingString(SelectedNode, "leftNodeId") ?? "Not connected")</code><span>@Localizer["Right input"]</span><code>@(GetSettingString(SelectedNode, "rightNodeId") ?? "Not connected")</code></div>
-                    }
                     @if (IsRelationalNode(SelectedNode.Kind))
                     {
                         <section class="schema-designer" aria-label='@Localizer["Database object schema"]'>
@@ -585,6 +583,19 @@ else
                             <button class="format-settings" type="button" @onclick="FormatSelectedSettings"><RadzenIcon Icon="data_object" /> @Localizer["Format JSON"]</button>
                         </details>
                     }
+                    else if (IsTransform(SelectedNode.Kind))
+                    {
+                        <TransformEditor Kind="@SelectedNode.Kind"
+                                         SettingsJson="@SelectedNode.SettingsJson"
+                                         Inputs="@GetTransformInputs(SelectedNode)"
+                                         VariableNames="@AvailableVariableNames.ToArray()"
+                                         SettingsJsonChanged="@SetTransformSettingsAsync" />
+                        <details class="advanced-settings">
+                            <summary><RadzenIcon Icon="data_object" /> @Localizer["Advanced settings JSON"]</summary>
+                            <label>@Localizer["Settings JSON"]<textarea class="settings-json" rows="11" spellcheck="false" value="@SelectedNode.SettingsJson" @onchange="SetRawSettings"></textarea></label>
+                            <button class="format-settings" type="button" @onclick="FormatSelectedSettings"><RadzenIcon Icon="data_object" /> @Localizer["Format JSON"]</button>
+                        </details>
+                    }
                     else if (IsFileTarget(SelectedNode.Kind))
                     {
                         <details class="advanced-settings">
@@ -618,7 +629,7 @@ else
                             <button type="button" @onclick="ConnectSelected"><RadzenIcon Icon="add_link" /> @Localizer["Add"]</button>
                             @foreach (var edge in IncomingEdges)
                             {
-                                <div class="link-row"><span>@NodeName(edge.From)</span><button type="button" aria-label="Remove link from @NodeName(edge.From)" @onclick="() => RemoveEdge(edge)"><RadzenIcon Icon="close" /></button></div>
+                                <div class="link-row"><span>@NodeName(edge.From)</span><button type="button" aria-label='@Localizer["Remove link from {0}", NodeName(edge.From)]' @onclick="() => RemoveEdge(edge)"><RadzenIcon Icon="close" /></button></div>
                             }
                         </div>
                     }
@@ -692,23 +703,31 @@ else
 
     private IEnumerable<DesignerEdge> IncomingEdges => SelectedNode is null
         ? []
-        : Edges.Where(edge => edge.To == SelectedNode.Id).ToArray();
+        : Edges.Where(edge => string.Equals(
+            edge.To,
+            SelectedNode.Id,
+            StringComparison.OrdinalIgnoreCase)).ToArray();
 
     private PaletteGroup[] Groups =>
     [
-        new("Sources", [
-            new("SQL Server", "Read an approved table", WorkflowNodeKind.SqlSource, "database", "blue", true),
-            new("MySQL", "Read an approved table or view", WorkflowNodeKind.MySqlSource, "database", "blue", true),
-            new("PostgreSQL", "Read an approved table or view", WorkflowNodeKind.PostgreSqlSource, "database", "blue", true),
-            new("Oracle", "Read an approved table or view", WorkflowNodeKind.OracleSource, "database", "blue", true),
-            new("FTP file", "Read CSV, tab text, or Excel", WorkflowNodeKind.FtpSource, "cloud_download", "green", true),
-            new("CSV file", "Read a bounded local CSV", WorkflowNodeKind.CsvSource, "description", "green", true),
-            new("Excel workbook", "Read XLSX or XLSM", WorkflowNodeKind.ExcelSource, "grid_on", "green", true)]),
-        new("Transform", [
-            new("Select & map", "Rename and cast columns", WorkflowNodeKind.SelectColumns, "schema", "violet", true),
-            new("Filter rows", "Apply typed conditions", WorkflowNodeKind.FilterRows, "filter_alt", "amber", true),
-            new("Join", "Combine exactly two streams", WorkflowNodeKind.Join, "join_inner", "violet", true)]),
-        new("Destinations", [
+        new(Localizer["Sources"], [
+            new(Localizer["SQL Server"], Localizer["Read an approved table"], WorkflowNodeKind.SqlSource, "database", "blue", true),
+            new(Localizer["MySQL"], Localizer["Read an approved table or view"], WorkflowNodeKind.MySqlSource, "database", "blue", true),
+            new(Localizer["PostgreSQL"], Localizer["Read an approved table or view"], WorkflowNodeKind.PostgreSqlSource, "database", "blue", true),
+            new(Localizer["Oracle"], Localizer["Read an approved table or view"], WorkflowNodeKind.OracleSource, "database", "blue", true),
+            new(Localizer["FTP file"], Localizer["Read CSV, tab text, or Excel"], WorkflowNodeKind.FtpSource, "cloud_download", "green", true),
+            new(Localizer["CSV file"], Localizer["Read a bounded local CSV"], WorkflowNodeKind.CsvSource, "description", "green", true),
+            new(Localizer["Excel workbook"], Localizer["Read XLSX or XLSM"], WorkflowNodeKind.ExcelSource, "grid_on", "green", true)]),
+        new(Localizer["Transform"], [
+            new(Localizer["Select columns"], Localizer["Keep selected columns in order"], WorkflowNodeKind.SelectColumns, "schema", "violet", true),
+            new(Localizer["Filter rows"], Localizer["Apply typed conditions"], WorkflowNodeKind.FilterRows, "filter_alt", "violet", true),
+            new(Localizer["Join"], Localizer["Combine exactly two streams"], WorkflowNodeKind.Join, "join_inner", "violet", true),
+            new(Localizer["Union rows"], Localizer["Stack two to sixteen compatible streams"], WorkflowNodeKind.UnionRows, "merge", "violet", true),
+            new(Localizer["Calculated columns"], Localizer["Add typed expression results"], WorkflowNodeKind.DeriveColumns, "function", "violet", true),
+            new(Localizer["Aggregate rows"], Localizer["Group rows and calculate summaries"], WorkflowNodeKind.AggregateRows, "calculate", "violet", true),
+            new(Localizer["Distinct rows"], Localizer["Remove rows with duplicate keys"], WorkflowNodeKind.DistinctRows, "filter_none", "violet", true),
+            new(Localizer["Sort rows"], Localizer["Order rows by one or more keys"], WorkflowNodeKind.SortRows, "sort", "violet", true)]),
+        new(Localizer["Destinations"], [
             new("SQL target", "Insert, upsert, or delete approved rows", WorkflowNodeKind.SqlTarget, "storage", "blue", true),
             new("MySQL target", "Insert, upsert, or delete approved rows", WorkflowNodeKind.MySqlTarget, "storage", "blue", true),
             new("PostgreSQL target", "Insert, upsert, or delete approved rows", WorkflowNodeKind.PostgreSqlTarget, "storage", "blue", true),
@@ -717,7 +736,7 @@ else
             new("CSV target", "Write beneath an approved root", WorkflowNodeKind.CsvTarget, "description", "green", true),
             new("Excel target", "Write an XLSX workbook", WorkflowNodeKind.ExcelTarget, "grid_on", "green", true),
             new(Localizer["Email"], Localizer["Send rows inline or as a CSV attachment"], WorkflowNodeKind.EmailTarget, "forward_to_inbox", "rose", true)]),
-        new("Actions", [
+        new(Localizer["Actions"], [
             new("Email alert", "Send an email when something happens", WorkflowNodeKind.EmailAlert, "mail", "rose", true),
             new("Webhook", "Call an authorized trusted destination", WorkflowNodeKind.Webhook, "webhook", "rose", TrustedActions.Any(action => action.Kind == TrustedActionKind.Webhook)),
             new("Executable", "Run an authorized trusted executable", WorkflowNodeKind.Executable, "terminal", "slate", TrustedActions.Any(action => action.Kind == TrustedActionKind.Executable))])
@@ -1075,6 +1094,7 @@ else
         if (previous is not null && !IsSource(tool.Kind))
         {
             Edges.Add(new(previous.Id, node.Id));
+            SynchronizeTransformInputs(node);
         }
         SelectedNode = node;
         NodeLibraryOpen = false;
@@ -1106,9 +1126,12 @@ else
         {
             return;
         }
+        var deletedNodeId = SelectedNode.Id;
+        var affectedNodeIds = DesignerEdgeSet.Downstream(Edges, deletedNodeId);
         Nodes.Remove(SelectedNode);
-        Edges.RemoveAll(edge => edge.From == SelectedNode.Id || edge.To == SelectedNode.Id);
-        LoadedSchemas.Remove(SelectedNode.Id);
+        DesignerEdgeSet.RemoveIncident(Edges, deletedNodeId);
+        LoadedSchemas.Remove(deletedNodeId);
+        SynchronizeTransformInputs(affectedNodeIds);
         SelectedNode = null;
         ValidationIssues = [];
     }
@@ -1119,10 +1142,28 @@ else
         {
             return;
         }
-        if (!Edges.Any(edge => edge.From == ConnectFromNodeId && edge.To == SelectedNode.Id))
+        if (!DesignerEdgeSet.Contains(
+                Edges,
+                ConnectFromNodeId,
+                SelectedNode.Id))
         {
+            var incomingCount = DesignerEdgeSet.DistinctIncomingCount(
+                Edges,
+                SelectedNode.Id);
+            if ((SelectedNode.Kind == WorkflowNodeKind.Join && incomingCount >= 2)
+                || (SelectedNode.Kind == WorkflowNodeKind.UnionRows && incomingCount >= 16))
+            {
+                Notifications.Notify(
+                    NotificationSeverity.Warning,
+                    Localizer["Input limit reached"],
+                    SelectedNode.Kind == WorkflowNodeKind.Join
+                        ? Localizer["A Join step accepts exactly two inputs."]
+                        : Localizer["A Union rows step accepts at most sixteen inputs."]);
+                ConnectFromNodeId = string.Empty;
+                return;
+            }
             Edges.Add(new(ConnectFromNodeId, SelectedNode.Id));
-            SynchronizeJoinInputs();
+            SynchronizeTransformInputs(SelectedNode);
         }
         ConnectFromNodeId = string.Empty;
     }
@@ -1130,24 +1171,137 @@ else
     private void RemoveEdge(DesignerEdge edge)
     {
         Edges.Remove(edge);
-        SynchronizeJoinInputs();
+        SynchronizeTransformInputs(
+            Nodes.FirstOrDefault(node => string.Equals(
+                node.Id,
+                edge.To,
+                StringComparison.OrdinalIgnoreCase)));
     }
 
-    private void SynchronizeJoinInputs()
+    private void SynchronizeTransformInputs(IEnumerable<string> nodeIds)
     {
-        if (SelectedNode?.Kind != WorkflowNodeKind.Join)
+        foreach (var nodeId in nodeIds)
+        {
+            SynchronizeTransformInputs(
+                Nodes.FirstOrDefault(node => string.Equals(
+                    node.Id,
+                    nodeId,
+                    StringComparison.OrdinalIgnoreCase)));
+        }
+    }
+
+    private void SynchronizeTransformInputs(DesignerNode? node)
+    {
+        if (node?.Kind is not (WorkflowNodeKind.Join or WorkflowNodeKind.UnionRows))
         {
             return;
         }
 
-        var inputs = Edges
-            .Where(edge => edge.To == SelectedNode.Id)
-            .Select(edge => edge.From)
-            .Distinct(StringComparer.OrdinalIgnoreCase)
-            .Take(2)
+        var incoming = DesignerEdgeSet.Incoming(Edges, node.Id);
+        var parsed = TransformEditorSettingsCodec.Parse(node.Kind, node.SettingsJson);
+        if (!parsed.IsSuccess || parsed.Settings is null)
+        {
+            return;
+        }
+
+        switch (parsed.Settings)
+        {
+            case JoinEditorSettings join:
+            {
+                var result = TransformInputSynchronizer.SynchronizeJoin(join, incoming);
+                if (result.Outcome == InputSynchronizationOutcome.CapacityExceeded)
+                {
+                    return;
+                }
+                join.LeftNodeId = result.LeftNodeId;
+                join.RightNodeId = result.RightNodeId;
+                break;
+            }
+            case UnionRowsEditorSettings union:
+            {
+                var result = TransformInputSynchronizer.SynchronizeUnion(union, incoming);
+                if (result.Outcome == InputSynchronizationOutcome.CapacityExceeded)
+                {
+                    return;
+                }
+                union.Inputs.Clear();
+                union.Inputs.AddRange(
+                    result.Inputs.Select(input => new UnionInputEditorRow(input.NodeId)));
+                break;
+            }
+        }
+
+        var candidate = TransformEditorSettingsCodec.Serialize(parsed.Settings);
+        if (candidate.IsSuccess
+            && candidate.SettingsJson is not null
+            && !string.Equals(
+                candidate.SettingsJson,
+                node.SettingsJson,
+                StringComparison.Ordinal))
+        {
+            node.SettingsJson = candidate.SettingsJson;
+            ValidationIssues = [];
+        }
+    }
+
+    private Task SetTransformSettingsAsync(string settingsJson)
+    {
+        if (SelectedNode is not null
+            && IsTransform(SelectedNode.Kind)
+            && !string.Equals(
+                SelectedNode.SettingsJson,
+                settingsJson,
+                StringComparison.Ordinal))
+        {
+            SelectedNode.SettingsJson = settingsJson;
+            ValidationIssues = [];
+        }
+
+        return Task.CompletedTask;
+    }
+
+    private void SetRawSettings(ChangeEventArgs eventArgs)
+    {
+        if (SelectedNode is null)
+        {
+            return;
+        }
+
+        SelectedNode.SettingsJson = eventArgs.Value?.ToString() ?? string.Empty;
+        ValidationIssues = [];
+    }
+
+    private IReadOnlyList<WorkflowInputSchemaModel> GetTransformInputs(
+        DesignerNode node)
+    {
+        var graph = BuildGraph();
+        var knownSchemas = LoadedSchemas
+            .Where(entry => Nodes.Any(candidate =>
+                string.Equals(candidate.Id, entry.Key, StringComparison.OrdinalIgnoreCase)
+                && IsSource(candidate.Kind))
+                && entry.Value.Columns.Count > 0)
+            .ToDictionary(
+                entry => entry.Key,
+                entry => new TabularSchema(entry.Value.Columns.Select(column =>
+                    new TabularColumn(
+                        column.Name,
+                        column.DataType,
+                        column.IsNullable))),
+                StringComparer.OrdinalIgnoreCase);
+
+        var inputNodeIds = DesignerEdgeSet.Incoming(Edges, node.Id);
+        var results = TabularSchemaService.Resolve(graph, inputNodeIds, knownSchemas);
+        return inputNodeIds
+            .Select((inputNodeId, index) =>
+            {
+                var result = results[index];
+                return new WorkflowInputSchemaModel(
+                    inputNodeId,
+                    NodeName(inputNodeId),
+                    result.Schema,
+                    result.IsSuccess ? null : Localizer["Schema is unavailable."].Value);
+            })
             .ToArray();
-        SetSettingString(SelectedNode, "leftNodeId", inputs.ElementAtOrDefault(0));
-        SetSettingString(SelectedNode, "rightNodeId", inputs.ElementAtOrDefault(1));
     }
 
     private void FormatSelectedSettings()
@@ -1170,6 +1324,7 @@ else
                 throw new JsonException("Settings must be an object.");
             }
             SelectedNode.SettingsJson = node.ToJsonString(new JsonSerializerOptions { WriteIndented = true });
+            ValidationIssues = [];
         }
         catch (JsonException exception)
         {
@@ -1575,12 +1730,8 @@ else
         var visited = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { target.Id };
         while (visited.Count <= Nodes.Count)
         {
-            var incoming = Edges
-                .Where(edge => string.Equals(edge.To, current.Id, StringComparison.OrdinalIgnoreCase))
-                .Select(edge => edge.From)
-                .Distinct(StringComparer.OrdinalIgnoreCase)
-                .ToArray();
-            if (incoming.Length != 1)
+            var incoming = DesignerEdgeSet.Incoming(Edges, current.Id);
+            if (incoming.Count != 1)
             {
                 return null;
             }
@@ -1629,12 +1780,8 @@ else
         var visited = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { target.Id };
         while (!string.Equals(current.Id, sourceNode.Id, StringComparison.OrdinalIgnoreCase))
         {
-            var incoming = Edges
-                .Where(edge => string.Equals(edge.To, current.Id, StringComparison.OrdinalIgnoreCase))
-                .Select(edge => edge.From)
-                .Distinct(StringComparer.OrdinalIgnoreCase)
-                .ToArray();
-            if (incoming.Length != 1)
+            var incoming = DesignerEdgeSet.Incoming(Edges, current.Id);
+            if (incoming.Count != 1)
             {
                 return [];
             }
@@ -2261,13 +2408,22 @@ else
     }
 
     private string NodeName(string id) =>
-        Nodes.FirstOrDefault(node => node.Id == id)?.Name ?? id;
+        Nodes.FirstOrDefault(node => string.Equals(
+            node.Id,
+            id,
+            StringComparison.OrdinalIgnoreCase))?.Name ?? id;
 
     private static bool IsSource(WorkflowNodeKind kind) => kind is
         WorkflowNodeKind.SqlSource or WorkflowNodeKind.MySqlSource
             or WorkflowNodeKind.PostgreSqlSource or WorkflowNodeKind.OracleSource
             or WorkflowNodeKind.FtpSource or WorkflowNodeKind.CsvSource
             or WorkflowNodeKind.ExcelSource;
+
+    private static bool IsTransform(WorkflowNodeKind kind) => kind is
+        WorkflowNodeKind.SelectColumns or WorkflowNodeKind.FilterRows
+            or WorkflowNodeKind.Join or WorkflowNodeKind.UnionRows
+            or WorkflowNodeKind.DeriveColumns or WorkflowNodeKind.AggregateRows
+            or WorkflowNodeKind.DistinctRows or WorkflowNodeKind.SortRows;
 
     private static bool IsRelationalNode(WorkflowNodeKind kind) => kind is
         WorkflowNodeKind.SqlSource or WorkflowNodeKind.MySqlSource
@@ -2300,6 +2456,11 @@ else
         WorkflowNodeKind.SelectColumns => "{\"columns\":[]}",
         WorkflowNodeKind.FilterRows => "{\"conditions\":[]}",
         WorkflowNodeKind.Join => "{\"leftNodeId\":\"\",\"rightNodeId\":\"\",\"leftKeys\":[],\"rightKeys\":[],\"type\":\"inner\",\"maximumBufferedRows\":100000}",
+        WorkflowNodeKind.UnionRows => "{\"inputNodeIds\":[],\"matchBy\":\"name\",\"mode\":\"all\"}",
+        WorkflowNodeKind.DeriveColumns => "{\"columns\":[]}",
+        WorkflowNodeKind.AggregateRows => "{\"groupBy\":[],\"aggregates\":[],\"maximumGroups\":100000}",
+        WorkflowNodeKind.DistinctRows => "{\"maximumKeys\":100000}",
+        WorkflowNodeKind.SortRows => "{\"keys\":[],\"maximumBufferedRows\":100000}",
         WorkflowNodeKind.SqlTarget => "{\"connectionId\":\"\",\"schema\":\"dbo\",\"object\":\"\",\"mode\":\"insert\",\"bindings\":[]}",
         WorkflowNodeKind.MySqlTarget => "{\"connectionId\":\"\",\"schema\":\"warehouse\",\"object\":\"\",\"mode\":\"insert\",\"bindings\":[]}",
         WorkflowNodeKind.PostgreSqlTarget => "{\"connectionId\":\"\",\"schema\":\"public\",\"object\":\"\",\"mode\":\"insert\",\"bindings\":[]}",
@@ -2330,9 +2491,14 @@ else
         WorkflowNodeKind.FtpSource => "Bounded FTP file input",
         WorkflowNodeKind.CsvSource => "Bounded CSV input",
         WorkflowNodeKind.ExcelSource => "XLSX/XLSM input",
-        WorkflowNodeKind.SelectColumns => "Column mapping",
-        WorkflowNodeKind.FilterRows => "Typed conditions",
-        WorkflowNodeKind.Join => "Two-input join",
+        WorkflowNodeKind.SelectColumns => Localizer["Ordered column selection"],
+        WorkflowNodeKind.FilterRows => Localizer["Typed AND conditions"],
+        WorkflowNodeKind.Join => Localizer["Two-input join"],
+        WorkflowNodeKind.UnionRows => Localizer["Compatible row union"],
+        WorkflowNodeKind.DeriveColumns => Localizer["Typed calculated columns"],
+        WorkflowNodeKind.AggregateRows => Localizer["Bounded grouped summaries"],
+        WorkflowNodeKind.DistinctRows => Localizer["Bounded duplicate removal"],
+        WorkflowNodeKind.SortRows => Localizer["Stable bounded ordering"],
         WorkflowNodeKind.SqlTarget => "SQL table output",
         WorkflowNodeKind.MySqlTarget => "MySQL table output",
         WorkflowNodeKind.PostgreSqlTarget => "PostgreSQL table output",
@@ -2360,6 +2526,11 @@ else
         WorkflowNodeKind.SelectColumns => "schema",
         WorkflowNodeKind.FilterRows => "filter_alt",
         WorkflowNodeKind.Join => "join_inner",
+        WorkflowNodeKind.UnionRows => "merge",
+        WorkflowNodeKind.DeriveColumns => "function",
+        WorkflowNodeKind.AggregateRows => "calculate",
+        WorkflowNodeKind.DistinctRows => "filter_none",
+        WorkflowNodeKind.SortRows => "sort",
         WorkflowNodeKind.EmailTarget => "forward_to_inbox",
         WorkflowNodeKind.EmailAlert => "mail",
         WorkflowNodeKind.Webhook => "webhook",
@@ -2374,8 +2545,10 @@ else
             or WorkflowNodeKind.OracleSource or WorkflowNodeKind.OracleTarget => "blue",
         WorkflowNodeKind.FtpSource or WorkflowNodeKind.FtpTarget => "green",
         WorkflowNodeKind.CsvSource or WorkflowNodeKind.CsvTarget or WorkflowNodeKind.ExcelSource or WorkflowNodeKind.ExcelTarget => "green",
-        WorkflowNodeKind.SelectColumns or WorkflowNodeKind.Join => "violet",
-        WorkflowNodeKind.FilterRows => "amber",
+        WorkflowNodeKind.SelectColumns or WorkflowNodeKind.FilterRows
+            or WorkflowNodeKind.Join or WorkflowNodeKind.UnionRows
+            or WorkflowNodeKind.DeriveColumns or WorkflowNodeKind.AggregateRows
+            or WorkflowNodeKind.DistinctRows or WorkflowNodeKind.SortRows => "violet",
         WorkflowNodeKind.EmailTarget or WorkflowNodeKind.EmailAlert or WorkflowNodeKind.Webhook => "rose",
         _ => "slate"
     };
@@ -2384,8 +2557,14 @@ else
 
     private string GetEdgePath(DesignerEdge edge)
     {
-        var from = Nodes.First(node => node.Id == edge.From);
-        var to = Nodes.First(node => node.Id == edge.To);
+        var from = Nodes.First(node => string.Equals(
+            node.Id,
+            edge.From,
+            StringComparison.OrdinalIgnoreCase));
+        var to = Nodes.First(node => string.Equals(
+            node.Id,
+            edge.To,
+            StringComparison.OrdinalIgnoreCase));
         var x1 = from.X + 184;
         var y1 = from.Y + 39;
         var x2 = to.X;
@@ -2402,8 +2581,6 @@ else
 
     private sealed record PaletteGroup(string Name, PaletteTool[] Tools);
     private sealed record PaletteTool(string Name, string Description, WorkflowNodeKind Kind, string Icon, string Tone, bool IsOperational);
-    private sealed record DesignerEdge(string From, string To);
-
     private sealed class WorkflowVariableEditor
     {
         public WorkflowVariableEditor()

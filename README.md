@@ -2,7 +2,7 @@
 
 THub is an intranet-first data workflow orchestration and visual-design platform inspired by SSIS, n8n, DolphinScheduler, Kestra, and Azure Data Factory. Its workflow connector boundary includes SQL Server, MySQL, PostgreSQL, Oracle Database, local CSV/Excel files, and FTP/FTPS CSV, tab-delimited, and Excel files.
 
-> **Repository status:** functional v1 foundation. The persisted designer/catalog, schema-versioned graph validation, immutable checksummed workflow versions, manual and scheduled run queues, SQL-leased Worker execution, durable step attempts, bounded relational/local-file/FTP nodes, select/filter/join transforms, Email alerts and data destinations, SQL-backed trusted webhook/executable actions, governed relational publications, and append-only control-plane audit viewer are present. Writable publications model separate read and Worker apply connections across SQL Server, MySQL, PostgreSQL, and Oracle. The solution build, automated suite, apply migration, Swagger UI, and responsive publication builder were validated before the audit change; the audit migration and viewer have not yet received an authorized build/test/browser validation. Live-provider integration remains required before production enablement. Publication canvas nodes remain intentionally non-operational. Production readiness also requires deployment-specific identities, secrets, readiness/metrics, and retention work.
+> **Repository status:** functional v1 foundation. The persisted designer/catalog, schema-versioned graph validation, immutable checksummed workflow versions, manual and scheduled run queues, SQL-leased Worker execution, durable step attempts, bounded relational/local-file/FTP nodes, core select/filter/calculated-column/aggregate/distinct/sort/union/join transforms, Email alerts and data destinations, SQL-backed trusted webhook/executable actions, governed relational publications, and append-only control-plane audit viewer are present. Writable publications model separate read and Worker apply connections across SQL Server, MySQL, PostgreSQL, and Oracle. The solution build, automated suite, apply migration, Swagger UI, and responsive publication builder were validated before the audit change; the audit migration and viewer have not yet received an authorized build/test/browser validation. Live-provider integration remains required before production enablement. Publication canvas nodes remain intentionally non-operational. Production readiness also requires deployment-specific identities, secrets, readiness/metrics, and retention work.
 
 ## Architecture at a glance
 
@@ -35,13 +35,34 @@ Quartz owns schedule timing, persistence, misfire handling, and scheduler cluste
 | Relational/file execution | Implemented v1; expanded file-target validation pending | SQL Server, MySQL, PostgreSQL, and Oracle table/view sources plus transactional insert, primary-key upsert, and incoming-key delete targets; bounded local and FTP/FTPS CSV, tab-delimited, and modern Excel create-new/append/replace targets with run-variable file names |
 | Connection authentication | Implemented v1 | SQL Server supports Windows integrated or referenced credentials; database/FTP username-password values are AES-GCM ciphertext in SQL with one external master key |
 | Connection lifecycle | Implemented; validation pending | Authorized administrators can create, edit, test, enable, disable, and soft-delete connections; deletion stops future workflow/publication resolution while preserving immutable historical references |
-| Schema mapping and transforms | Implemented v1 | The designer opens live SQL Server/MySQL/PostgreSQL/Oracle source and target schemas, selects source columns, and edits target mappings graphically; advanced JSON remains available for import/troubleshooting |
+| Schema mapping and transforms | Implemented v1; browser validation pending | The designer opens live SQL Server/MySQL/PostgreSQL/Oracle source and target schemas and edits their mappings graphically. First-party graphical editors cover all eight core transforms, use propagated schemas for column controls with a bounded manual-text fallback when schema is unavailable, and retain raw JSON under an advanced disclosure. Real-browser visual and interaction behavior remains unverified. |
 | Workflow variables and expressions | Implemented v1 | Destination bindings can use source columns, run values, typed workflow globals, bounded one-row database lookups, or constrained reusable JavaScript expressions |
 | Email alerts/actions/data destination | Implemented; validation pending | Administrator-managed profiles/rules, terminal-event and `EmailAlert` action enqueueing, an `EmailTarget` destination with bounded inline HTML or UTF-8 CSV attachment data, deduplicated SQL outbox, leased Worker dispatch, normalized SMTP rejection logging, bounded retries/dead letters, and MailKit SMTP delivery; credential-backed SMTP requires an approved `ISecretResolver` deployment integration |
 | Webhook/executable execution | Implemented with trusted-action policies | System Administrators approve fixed definitions and encrypted credentials; per-resource role grants control publication; Worker execution revalidates enabled policy, network/path, timeout, output, and identity boundaries |
 | Publication canvas nodes | Gated and separated | `PublishRestApi` and `PublishDataEditor` cannot run in a workflow; create the implemented governed resources under Publications instead |
 | Isolated REST publication host | Implemented; live-provider validation pending | Separate read-only `/schema` and `/rows` routes use managed bearer tokens, atomic accepted-use metering, typed filters/sorts, keyset cursors, schema checks, response/time limits, and process-local admission; `/swagger` and `/openapi/v1.json` describe the consumer contract |
 | Role-governed Spreadsheet editor | Provider-neutral staged apply implemented; export/count/type-aware editor validation pending | Stable `/data/{slug}` routes, independent View/Insert/Update/Delete/Approve grants, bounded 250–2,000-row pages with explicit totals, governed full-table XLSX export, metadata-driven typed cell controls and constraints, foreign-key lookup cells, staged review, and separate read/Worker apply connections |
+
+### Core transform scope
+
+- `SelectColumns` selects and reorders existing columns only; it does not rename or cast values.
+- Filters apply one to 32 typed scalar conditions with AND semantics.
+- Calculated columns append one to 64 typed expression results without replacing incoming columns.
+- Aggregate, distinct, and stable multi-key sort are bounded. Aggregate retains at most the configured 1–1,000,000 groups, distinct at most 1–1,000,000 keys, and sort at most 1–1,000,000 buffered rows.
+- Union combines two to 16 compatible inputs, aligns equal data types by name or position, and either keeps all rows or removes structural duplicates. Union-distinct retains one key per emitted unique row under the engine's per-output and retained-workflow limits.
+- A join combines exactly two named inputs using one to 16 equal-type key pairs and inner, left, right, or full semantics. Its configured right-side buffer is 1–1,000,000 rows. Join steps can be chained to process three or more tables.
+
+Structural keys compare typed values rather than formatted text. A join key containing a
+null never matches; distinct, union-distinct, and grouping treat null as a structural key
+value. Sort preserves source order when all configured keys compare equal.
+
+Transform inputs and outputs use replayable materialized Worker intermediates subject to
+row, byte, batch, and retained-workflow budgets. The engine does not spill transforms to
+disk, accept an arbitrary SQL transform, or write row values to execution logs.
+
+Named-output conditional split and OR branching, pivot/unpivot, window functions, fuzzy
+matching, CDC/SCD, row-level error redirection, external-memory transforms, and arbitrary
+SQL transforms are not implemented.
 
 ## Technology
 

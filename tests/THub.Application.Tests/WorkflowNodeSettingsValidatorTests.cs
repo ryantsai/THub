@@ -17,6 +17,12 @@ public sealed class WorkflowNodeSettingsValidatorTests
     [InlineData(WorkflowNodeKind.ExcelSource, """{"connectionId":"11111111-1111-1111-1111-111111111111","relativePath":"inbound/orders.xlsx","worksheet":"Orders","hasHeader":true}""")]
     [InlineData(WorkflowNodeKind.SelectColumns, """{"columns":["Id","Name"]}""")]
     [InlineData(WorkflowNodeKind.FilterRows, """{"conditions":[{"column":"Id","operator":"greaterThan","value":0}]}""")]
+    [InlineData(WorkflowNodeKind.UnionRows, """{"inputNodeIds":["north","south"],"matchBy":"name","mode":"all"}""")]
+    [InlineData(WorkflowNodeKind.DeriveColumns, """{"columns":[{"name":"Total","type":"Decimal","nullable":false,"expression":"row.Quantity * row.Price"}]}""")]
+    [InlineData(WorkflowNodeKind.AggregateRows, """{"groupBy":["Region"],"aggregates":[{"name":"OrderCount","operation":"count"},{"name":"Revenue","operation":"sum","column":"Amount"}],"maximumGroups":100000}""")]
+    [InlineData(WorkflowNodeKind.DistinctRows, """{"columns":["CustomerId"],"maximumKeys":100000}""")]
+    [InlineData(WorkflowNodeKind.DistinctRows, """{"maximumKeys":100000}""")]
+    [InlineData(WorkflowNodeKind.SortRows, """{"keys":[{"column":"CreatedAt","direction":"descending","nulls":"last"}],"maximumBufferedRows":100000}""")]
     [InlineData(WorkflowNodeKind.SqlTarget, """{"connectionId":"11111111-1111-1111-1111-111111111111","schema":"dbo","object":"Orders","mode":"insert","bindings":[{"targetColumn":"CreatedAtUtc","kind":"Variable","value":"runStartedAtUtc"}]}""")]
     [InlineData(WorkflowNodeKind.MySqlTarget, """{"connectionId":"11111111-1111-1111-1111-111111111111","schema":"warehouse","object":"Orders","mode":"insert"}""")]
     [InlineData(WorkflowNodeKind.PostgreSqlTarget, """{"connectionId":"11111111-1111-1111-1111-111111111111","schema":"public","object":"Orders","mode":"insert"}""")]
@@ -37,6 +43,184 @@ public sealed class WorkflowNodeSettingsValidatorTests
         var parsed = _validator.Parse(new WorkflowNode("node", kind, "Node", 0, 0, settingsJson));
 
         Assert.NotNull(parsed);
+    }
+
+    [Fact]
+    public void ParseCreatesCanonicalTransformContracts()
+    {
+        var union = Assert.IsType<UnionRowsNodeSettings>(_validator.Parse(Node(
+            WorkflowNodeKind.UnionRows,
+            """{"inputNodeIds":["north","south"],"matchBy":"name","mode":"all"}""")));
+        Assert.Equal(["north", "south"], union.InputNodeIds);
+        Assert.Equal(UnionMatchMode.Name, union.MatchBy);
+        Assert.Equal(UnionRowMode.All, union.Mode);
+
+        var derive = Assert.IsType<DeriveColumnsNodeSettings>(_validator.Parse(Node(
+            WorkflowNodeKind.DeriveColumns,
+            """{"columns":[{"name":"Total","type":"Decimal","nullable":false,"expression":"row.Quantity * row.Price"}]}""")));
+        var derived = Assert.Single(derive.Columns);
+        Assert.Equal("Total", derived.Name);
+        Assert.Equal(TabularDataType.Decimal, derived.DataType);
+        Assert.False(derived.IsNullable);
+        Assert.Equal("row.Quantity * row.Price", derived.Expression);
+
+        var aggregate = Assert.IsType<AggregateRowsNodeSettings>(_validator.Parse(Node(
+            WorkflowNodeKind.AggregateRows,
+            """{"groupBy":["Region"],"aggregates":[{"name":"OrderCount","operation":"count"},{"name":"Revenue","operation":"sum","column":"Amount"}],"maximumGroups":100000}""")));
+        Assert.Equal(["Region"], aggregate.GroupBy);
+        Assert.Collection(
+            aggregate.Aggregates,
+            item =>
+            {
+                Assert.Equal("OrderCount", item.Name);
+                Assert.Equal(AggregateOperation.Count, item.Operation);
+                Assert.Null(item.Column);
+            },
+            item =>
+            {
+                Assert.Equal("Revenue", item.Name);
+                Assert.Equal(AggregateOperation.Sum, item.Operation);
+                Assert.Equal("Amount", item.Column);
+            });
+        Assert.Equal(100_000, aggregate.MaximumGroups);
+
+        var distinct = Assert.IsType<DistinctRowsNodeSettings>(_validator.Parse(Node(
+            WorkflowNodeKind.DistinctRows,
+            """{"columns":[],"maximumKeys":100000}""")));
+        Assert.Empty(Assert.IsAssignableFrom<IReadOnlyList<string>>(distinct.Columns));
+        Assert.Equal(100_000, distinct.MaximumKeys);
+
+        var sort = Assert.IsType<SortRowsNodeSettings>(_validator.Parse(Node(
+            WorkflowNodeKind.SortRows,
+            """{"keys":[{"column":"CreatedAt","direction":"descending","nulls":"last"}],"maximumBufferedRows":100000}""")));
+        var key = Assert.Single(sort.Keys);
+        Assert.Equal("CreatedAt", key.Column);
+        Assert.Equal(SortDirection.Descending, key.Direction);
+        Assert.Equal(SortNullPlacement.Last, key.Nulls);
+        Assert.Equal(100_000, sort.MaximumBufferedRows);
+
+        var fullJoin = Assert.IsType<JoinNodeSettings>(_validator.Parse(Node(
+            WorkflowNodeKind.Join,
+            """{"leftNodeId":"north","rightNodeId":"south","leftKeys":["Id"],"rightKeys":["Id"],"type":"full","maximumBufferedRows":100000}""")));
+        Assert.Equal("full", fullJoin.JoinType);
+
+        var rightJoin = Assert.IsType<JoinNodeSettings>(_validator.Parse(Node(
+            WorkflowNodeKind.Join,
+            """{"leftNodeId":"north","rightNodeId":"south","leftKeys":["Id"],"rightKeys":["Id"],"type":"right","maximumBufferedRows":100000}""")));
+        Assert.Equal("right", rightJoin.JoinType);
+    }
+
+    [Theory]
+    [InlineData(WorkflowNodeKind.UnionRows, """{"inputNodeIds":["north","NORTH"],"matchBy":"name","mode":"all"}""", "node.settings.array.duplicate")]
+    [InlineData(WorkflowNodeKind.DeriveColumns, """{"columns":[{"name":"Total","type":"Decimal","nullable":false,"expression":"row.Amount"},{"name":"TOTAL","type":"Decimal","nullable":true,"expression":"row.Tax"}]}""", "node.derive.columns.duplicate")]
+    [InlineData(WorkflowNodeKind.AggregateRows, """{"groupBy":[],"aggregates":[{"name":"Total","operation":"sum","column":"Amount"},{"name":"TOTAL","operation":"maximum","column":"Amount"}],"maximumGroups":100}""", "node.aggregate.outputs.duplicate")]
+    [InlineData(WorkflowNodeKind.AggregateRows, """{"groupBy":[],"aggregates":[{"name":"Total","operation":"median","column":"Amount"}],"maximumGroups":100}""", "node.aggregate.operation.invalid")]
+    [InlineData(WorkflowNodeKind.AggregateRows, """{"groupBy":[],"aggregates":[{"name":"Total","operation":"sum"}],"maximumGroups":100}""", "node.aggregate.column.required")]
+    [InlineData(WorkflowNodeKind.AggregateRows, """{"groupBy":[],"aggregates":[{"name":"Count","operation":"count","column":"Amount"}],"maximumGroups":100}""", "node.aggregate.column.forbidden")]
+    [InlineData(WorkflowNodeKind.DistinctRows, """{"columns":["CustomerId","CUSTOMERID"],"maximumKeys":100}""", "node.settings.array.duplicate")]
+    [InlineData(WorkflowNodeKind.SortRows, """{"keys":[{"column":"CreatedAt","direction":"ascending","nulls":"first"},{"column":"CREATEDAT","direction":"descending","nulls":"last"}],"maximumBufferedRows":100}""", "node.sort.keys.duplicate")]
+    [InlineData(WorkflowNodeKind.SortRows, """{"keys":[{"column":"CreatedAt","direction":"newest","nulls":"last"}],"maximumBufferedRows":100}""", "node.sort.direction.invalid")]
+    [InlineData(WorkflowNodeKind.SortRows, """{"keys":[{"column":"CreatedAt","direction":"ascending","nulls":"middle"}],"maximumBufferedRows":100}""", "node.sort.nulls.invalid")]
+    [InlineData(WorkflowNodeKind.Join, """{"leftNodeId":"north","rightNodeId":"south","leftKeys":["Id"],"rightKeys":["Id"],"type":"Right","maximumBufferedRows":100}""", "node.join.type.invalid")]
+    [InlineData(WorkflowNodeKind.AggregateRows, """{"groupBy":[],"aggregates":[{"name":"Count","operation":"count"}],"maximumGroups":0}""", "node.settings.number.limit")]
+    [InlineData(WorkflowNodeKind.DistinctRows, """{"maximumKeys":1000001}""", "node.settings.number.limit")]
+    [InlineData(WorkflowNodeKind.SortRows, """{"keys":[{"column":"CreatedAt","direction":"ascending","nulls":"first"}],"maximumBufferedRows":0}""", "node.settings.number.limit")]
+    public void ParseRejectsInvalidTransformSettings(
+        WorkflowNodeKind kind,
+        string settingsJson,
+        string expectedCode)
+    {
+        var exception = Assert.Throws<WorkflowNodeSettingsException>(
+            () => _validator.Parse(Node(kind, settingsJson)));
+
+        Assert.Equal(expectedCode, exception.Code);
+    }
+
+    [Fact]
+    public void AggregateOutputNamesCannotDuplicateGroupByColumns()
+    {
+        var exception = Assert.Throws<WorkflowNodeSettingsException>(() => _validator.Parse(Node(
+            WorkflowNodeKind.AggregateRows,
+            """{"groupBy":["Region"],"aggregates":[{"name":"REGION","operation":"count"}],"maximumGroups":100}""")));
+
+        Assert.Equal("node.aggregate.outputs.duplicate", exception.Code);
+    }
+
+    [Theory]
+    [InlineData(
+        WorkflowNodeKind.UnionRows,
+        """{"inputNodeIds":["north","invalid/id"],"matchBy":"name","mode":"all"}""",
+        "node.union.input.invalid")]
+    [InlineData(
+        WorkflowNodeKind.Join,
+        """{"leftNodeId":"north","rightNodeId":"invalid/id","leftKeys":["Id"],"rightKeys":["Id"],"type":"inner","maximumBufferedRows":100}""",
+        "node.join.input.invalid")]
+    public void TransformInputNodeIdsUseKindSpecificInvalidCodes(
+        WorkflowNodeKind kind,
+        string settingsJson,
+        string expectedCode)
+    {
+        var exception = Assert.Throws<WorkflowNodeSettingsException>(() => _validator.Parse(Node(
+            kind,
+            settingsJson)));
+
+        Assert.Equal(expectedCode, exception.Code);
+    }
+
+    [Theory]
+    [MemberData(nameof(UnknownTransformPropertyCases))]
+    public void ParseRejectsUnknownTransformProperties(
+        WorkflowNodeKind kind,
+        string settingsJson)
+    {
+        var exception = Assert.Throws<WorkflowNodeSettingsException>(
+            () => _validator.Parse(Node(kind, settingsJson)));
+
+        Assert.Equal("node.settings.property.unsupported", exception.Code);
+    }
+
+    [Theory]
+    [MemberData(nameof(DuplicateTransformPropertyCases))]
+    public void ParseRejectsDuplicateTransformProperties(
+        WorkflowNodeKind kind,
+        string settingsJson)
+    {
+        var exception = Assert.Throws<WorkflowNodeSettingsException>(
+            () => _validator.Parse(Node(kind, settingsJson)));
+
+        Assert.Equal("node.settings.property.duplicate", exception.Code);
+    }
+
+    [Theory]
+    [MemberData(nameof(TransformCollectionLimitCases))]
+    public void ParseRejectsTransformCollectionCountsAboveTheirBounds(
+        WorkflowNodeKind kind,
+        string settingsJson,
+        string expectedCode)
+    {
+        var exception = Assert.Throws<WorkflowNodeSettingsException>(
+            () => _validator.Parse(Node(kind, settingsJson)));
+
+        Assert.Equal(expectedCode, exception.Code);
+    }
+
+    [Fact]
+    public void ValidateRejectsInvalidDerivedColumnExpression()
+    {
+        var validator = new WorkflowNodeSettingsValidator(new RejectingExpressionSessionFactory());
+        var graph = new WorkflowGraph(
+            [
+                new("source", WorkflowNodeKind.SqlSource, "Source", 0, 0, SqlSourceSettings()),
+                Node(
+                    WorkflowNodeKind.DeriveColumns,
+                    """{"columns":[{"name":"Total","type":"Decimal","nullable":false,"expression":"row."}]}""")
+            ],
+            [new("source", "node")]);
+
+        var issue = Assert.Single(validator.Validate(graph));
+
+        Assert.Equal("node.derive.expression.invalid", issue.Code);
+        Assert.Equal("node", issue.NodeId);
     }
 
     [Fact]
@@ -106,6 +290,29 @@ public sealed class WorkflowNodeSettingsValidatorTests
 
         Assert.Equal("node.join.inputs.mismatch", issue.Code);
         Assert.Equal("join", issue.NodeId);
+    }
+
+    [Fact]
+    public void ValidateRequiresUnionInputIdsToMatchIncomingEdges()
+    {
+        var graph = new WorkflowGraph(
+            [
+                new("north", WorkflowNodeKind.SqlSource, "North", 0, 0, SqlSourceSettings()),
+                new("south", WorkflowNodeKind.SqlSource, "South", 0, 0, SqlSourceSettings()),
+                new(
+                    "union",
+                    WorkflowNodeKind.UnionRows,
+                    "Union",
+                    0,
+                    0,
+                    """{"inputNodeIds":["north","other"],"matchBy":"name","mode":"all"}""")
+            ],
+            [new("north", "union"), new("south", "union")]);
+
+        var issue = Assert.Single(_validator.Validate(graph));
+
+        Assert.Equal("node.union.inputs.mismatch", issue.Code);
+        Assert.Equal("union", issue.NodeId);
     }
 
     [Fact]
@@ -311,4 +518,128 @@ public sealed class WorkflowNodeSettingsValidatorTests
 
     private static string SqlSourceSettings() =>
         """{"connectionId":"11111111-1111-1111-1111-111111111111","schema":"dbo","object":"Orders","batchSize":1000}""";
+
+    private static WorkflowNode Node(WorkflowNodeKind kind, string settingsJson) =>
+        new("node", kind, "Node", 0, 0, settingsJson);
+
+    public static TheoryData<WorkflowNodeKind, string> UnknownTransformPropertyCases => new()
+    {
+        {
+            WorkflowNodeKind.UnionRows,
+            """{"inputNodeIds":["north","south"],"matchBy":"name","mode":"all","extra":true}"""
+        },
+        {
+            WorkflowNodeKind.DistinctRows,
+            """{"maximumKeys":100,"extra":true}"""
+        },
+        {
+            WorkflowNodeKind.DeriveColumns,
+            """{"columns":[{"name":"Total","type":"Decimal","nullable":false,"expression":"row.Amount","extra":true}]}"""
+        },
+        {
+            WorkflowNodeKind.AggregateRows,
+            """{"groupBy":[],"aggregates":[{"name":"Count","operation":"count","extra":true}],"maximumGroups":100}"""
+        },
+        {
+            WorkflowNodeKind.SortRows,
+            """{"keys":[{"column":"CreatedAt","direction":"ascending","nulls":"first","extra":true}],"maximumBufferedRows":100}"""
+        }
+    };
+
+    public static TheoryData<WorkflowNodeKind, string> DuplicateTransformPropertyCases => new()
+    {
+        {
+            WorkflowNodeKind.UnionRows,
+            """{"inputNodeIds":["north","south"],"matchBy":"name","mode":"all","mode":"distinct"}"""
+        },
+        {
+            WorkflowNodeKind.DeriveColumns,
+            """{"columns":[{"name":"Total","name":"Other","type":"Decimal","nullable":false,"expression":"row.Amount"}]}"""
+        },
+        {
+            WorkflowNodeKind.AggregateRows,
+            """{"groupBy":[],"aggregates":[{"name":"Count","operation":"count","operation":"sum"}],"maximumGroups":100}"""
+        },
+        {
+            WorkflowNodeKind.SortRows,
+            """{"keys":[{"column":"CreatedAt","direction":"ascending","nulls":"first","nulls":"last"}],"maximumBufferedRows":100}"""
+        }
+    };
+
+    public static TheoryData<WorkflowNodeKind, string, string> TransformCollectionLimitCases
+    {
+        get
+        {
+            var unionInputs = JsonStringArray("source", 17);
+            var derivedColumns = JsonObjectArray(
+                65,
+                index => $$"""{"name":"Column{{index}}","type":"String","nullable":true,"expression":"row.Value"}""");
+            var groupBy = JsonStringArray("Group", 17);
+            var aggregates = JsonObjectArray(
+                65,
+                index => $$"""{"name":"Count{{index}}","operation":"count"}""");
+            var distinctColumns = JsonStringArray("Column", 65);
+            var sortKeys = JsonObjectArray(
+                17,
+                index => $$"""{"column":"Column{{index}}","direction":"ascending","nulls":"first"}""");
+
+            return new()
+            {
+                {
+                    WorkflowNodeKind.UnionRows,
+                    $$"""{"inputNodeIds":{{unionInputs}},"matchBy":"name","mode":"all"}""",
+                    "node.settings.array.limit"
+                },
+                {
+                    WorkflowNodeKind.DeriveColumns,
+                    $$"""{"columns":{{derivedColumns}}}""",
+                    "node.derive.columns.limit"
+                },
+                {
+                    WorkflowNodeKind.AggregateRows,
+                    $$"""{"groupBy":{{groupBy}},"aggregates":[{"name":"Count","operation":"count"}],"maximumGroups":100}""",
+                    "node.settings.array.limit"
+                },
+                {
+                    WorkflowNodeKind.AggregateRows,
+                    $$"""{"groupBy":[],"aggregates":{{aggregates}},"maximumGroups":100}""",
+                    "node.aggregate.outputs.limit"
+                },
+                {
+                    WorkflowNodeKind.DistinctRows,
+                    $$"""{"columns":{{distinctColumns}},"maximumKeys":100}""",
+                    "node.settings.array.limit"
+                },
+                {
+                    WorkflowNodeKind.SortRows,
+                    $$"""{"keys":{{sortKeys}},"maximumBufferedRows":100}""",
+                    "node.sort.keys.limit"
+                }
+            };
+        }
+    }
+
+    private static string JsonStringArray(string prefix, int count) =>
+        "[" + string.Join(
+            ",",
+            Enumerable.Range(0, count).Select(index => $"\"{prefix}{index}\"")) + "]";
+
+    private static string JsonObjectArray(int count, Func<int, string> createObject) =>
+        "[" + string.Join(",", Enumerable.Range(0, count).Select(createObject)) + "]";
+
+    private sealed class RejectingExpressionSessionFactory : IWorkflowExpressionSessionFactory
+    {
+        public IWorkflowExpressionSession Create(
+            IReadOnlyList<WorkflowFunction> functions,
+            IReadOnlyDictionary<string, TabularValue> variables,
+            CancellationToken cancellationToken) =>
+            throw new NotSupportedException();
+
+        public void Validate(IReadOnlyList<WorkflowFunction> functions)
+        {
+        }
+
+        public void ValidateExpression(string expression) =>
+            throw new InvalidOperationException("Invalid expression.");
+    }
 }

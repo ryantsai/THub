@@ -187,7 +187,31 @@ Quartz rows are operational projections, not the source of truth for workflow de
 }
 ```
 
-The serializer requires the explicit `schemaVersion` envelope, rejects unknown/duplicate properties and unsupported versions, and canonicalizes saved documents. Each node retains a JSON `settings` object in the graph, but publish and Worker execution parse it through a strict kind-specific contract with required fields, bounds, allow-listed properties/operators/modes, graph-aware join inputs, and destination value bindings. Schema version 1 is intentionally unsupported because the application has not been released.
+The serializer requires the explicit `schemaVersion` envelope, rejects unknown/duplicate properties and unsupported versions, and canonicalizes saved documents. Each node retains a JSON `settings` object in the graph, but publish and Worker execution parse it through a strict kind-specific contract with required fields, bounds, allow-listed properties/operators/modes, graph-aware join/union inputs, and destination value bindings. Schema version 1 is intentionally unsupported because the application has not been released.
+
+Core transform settings are durable graph configuration rather than separate relational
+tables:
+
+| Node | Persisted contract |
+| --- | --- |
+| `SelectColumns` | 1–512 existing column names in output order; selection/reordering only, with no rename or cast |
+| `FilterRows` | 1–32 typed scalar conditions evaluated with AND semantics |
+| `DeriveColumns` | 1–64 unique add-only output names, declared type/nullability, and bounded expression |
+| `AggregateRows` | 0–16 grouping columns, 1–64 unique aggregate outputs, and `maximumGroups` in 1–1,000,000 |
+| `DistinctRows` | omitted/empty key list for all columns or 1–64 named key columns, and `maximumKeys` in 1–1,000,000 |
+| `SortRows` | 1–16 unique sort columns with direction/null placement, and `maximumBufferedRows` in 1–1,000,000 |
+| `UnionRows` | the exact ordered set of 2–16 incoming node IDs, name/position schema matching, and all/distinct row mode |
+| `Join` | exactly two named incoming node IDs, 1–16 left/right equal-type key pairs, inner/left/right/full type, and right-side `maximumBufferedRows` in 1–1,000,000 |
+
+A graph combines more than two tables by chaining two-input joins. Union inputs must have
+equal column counts and compatible logical types, with by-name mode also requiring the
+same case-insensitive names. Union-distinct has no separate graph-level key count:
+retained unique keys correspond to emitted rows and are bounded by the execution
+engine's per-output and retained-workflow budgets.
+
+Runtime structural keys preserve logical types; they are not persisted or serialized
+formatted values. Null-containing join keys never match. Null remains a structural value
+for distinct, union-distinct, and aggregate grouping.
 
 Workflow package schema version 1 wraps the current editable metadata, schedule, graph,
 and non-secret connection identity hints. Import creates a new draft identity and does not
@@ -205,7 +229,11 @@ These concepts are governed by accepted ADRs. Each subsection states whether its
 - `WorkflowRuns`: exact version foreign key/number, retry origin, cancellation state, attempt count, lease owner/expiry/heartbeat, normalized error, and row-version concurrency.
 - `WorkflowStepRuns`: node identity, attempt, state, timing, row/batch/byte counters, normalized error, and row-version concurrency.
 
-An atomic SQL claim plus a per-workflow application lock owns one run until its lease expires and prevents another unexpired run for that workflow from starting. Lease ownership is checked before recording step or terminal state. Error columns never contain secrets, SQL values, connection strings, or row payloads. The current model has no step-output checkpoint or staging table; bounded replayable intermediates live only in Worker memory for the active attempt.
+An atomic SQL claim plus a per-workflow application lock owns one run until its lease expires and prevents another unexpired run for that workflow from starting. Lease ownership is checked before recording step or terminal state. Error columns never contain secrets, SQL values, connection strings, or row payloads. The current model has no step-output checkpoint, transform-state table, or staging table; bounded replayable intermediates and join/sort/group/distinct/union-distinct state live only in Worker memory for the active attempt. They do not spill to disk and are rebuilt when an attempt replays.
+
+The graph contract has no named-output conditional split/OR branch, pivot/unpivot,
+window, fuzzy-match, CDC/SCD, row-level error-redirection, external-memory transform, or
+arbitrary SQL transform node.
 
 ### Governed publications (implemented)
 

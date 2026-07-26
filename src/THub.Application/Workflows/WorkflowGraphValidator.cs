@@ -377,14 +377,27 @@ public sealed class WorkflowGraphValidator
                 continue;
             }
 
-            var requiredInputs = node.Kind == WorkflowNodeKind.Join ? 2 : 1;
-            if (incoming[node.Id] != requiredInputs)
+            if (node.Kind == WorkflowNodeKind.UnionRows)
             {
-                issues.Add(new(
-                    "node.input.cardinality",
-                    $"{node.Kind} requires exactly {requiredInputs} incoming " +
-                    (requiredInputs == 1 ? "edge." : "edges."),
-                    node.Id));
+                if (incoming[node.Id] is < 2 or > 16)
+                {
+                    issues.Add(new(
+                        "node.input.cardinality",
+                        "UnionRows requires 2 to 16 incoming edges.",
+                        node.Id));
+                }
+            }
+            else
+            {
+                var requiredInputs = node.Kind == WorkflowNodeKind.Join ? 2 : 1;
+                if (incoming[node.Id] != requiredInputs)
+                {
+                    issues.Add(new(
+                        "node.input.cardinality",
+                        $"{node.Kind} requires exactly {requiredInputs} incoming " +
+                        (requiredInputs == 1 ? "edge." : "edges."),
+                        node.Id));
+                }
             }
         }
     }

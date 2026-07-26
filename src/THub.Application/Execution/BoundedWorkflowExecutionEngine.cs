@@ -879,7 +879,10 @@ public sealed class BoundedWorkflowExecutionEngine
             or WorkflowNodeKind.FtpSource or WorkflowNodeKind.CsvSource
             or WorkflowNodeKind.ExcelSource =>
             role == WorkflowNodeRole.Source,
-        WorkflowNodeKind.SelectColumns or WorkflowNodeKind.FilterRows or WorkflowNodeKind.Join =>
+        WorkflowNodeKind.SelectColumns or WorkflowNodeKind.FilterRows or WorkflowNodeKind.Join
+            or WorkflowNodeKind.UnionRows or WorkflowNodeKind.DeriveColumns
+            or WorkflowNodeKind.AggregateRows or WorkflowNodeKind.DistinctRows
+            or WorkflowNodeKind.SortRows =>
             role == WorkflowNodeRole.Transform,
         WorkflowNodeKind.SqlTarget or WorkflowNodeKind.MySqlTarget
             or WorkflowNodeKind.PostgreSqlTarget or WorkflowNodeKind.OracleTarget

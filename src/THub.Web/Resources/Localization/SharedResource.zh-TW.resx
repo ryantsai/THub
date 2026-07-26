@@ -466,7 +466,7 @@
     <value>欄位對應</value>
   </data>
   <data name="Combine exactly two streams" xml:space="preserve">
-    <value>恰好合併兩個流</value>
+    <value>精確合併兩個資料流</value>
   </data>
   <data name="Command timeout (seconds)" xml:space="preserve">
     <value>命令逾時（秒）</value>
@@ -1409,7 +1409,7 @@
     <value>開放API文檔</value>
   </data>
   <data name="Operation" xml:space="preserve">
-    <value>手術</value>
+    <value>運算</value>
   </data>
   <data name="Operational data could not be loaded." xml:space="preserve">
     <value>無法載入操作資料。</value>
@@ -1661,7 +1661,7 @@
     <value>重載電流</value>
   </data>
   <data name="Remove" xml:space="preserve">
-    <value>消除</value>
+    <value>移除</value>
   </data>
   <data name="Remove filter" xml:space="preserve">
     <value>移除篩選條件</value>
@@ -2081,7 +2081,7 @@
     <value>來源及版本</value>
   </data>
   <data name="Source column" xml:space="preserve">
-    <value>來源專欄</value>
+    <value>來源欄位</value>
   </data>
   <data name="Source columns" xml:space="preserve">
     <value>來源專欄</value>
@@ -2474,7 +2474,7 @@
     <value>再試一次</value>
   </data>
   <data name="Two-input join" xml:space="preserve">
-    <value>兩個輸入連線</value>
+    <value>雙輸入聯結</value>
   </data>
   <data name="Type" xml:space="preserve">
     <value>類型</value>
@@ -2534,7 +2534,7 @@
     <value>驗證需要注意</value>
   </data>
   <data name="Value" xml:space="preserve">
-    <value>價值</value>
+    <value>值</value>
   </data>
   <data name="Value column" xml:space="preserve">
     <value>數值欄</value>
@@ -3129,4 +3129,107 @@
   <data name="String" xml:space="preserve"><value>文字</value></data>
   <data name="Binary" xml:space="preserve"><value>二進位資料</value></data>
   <data name="Select a value…" xml:space="preserve"><value>請選擇值…</value></data>
+  <data name="A Join step accepts exactly two inputs." xml:space="preserve"><value>「聯結」步驟僅接受兩個輸入。</value></data>
+  <data name="A Union rows step accepts at most sixteen inputs." xml:space="preserve"><value>「合併資料列」步驟最多接受十六個輸入。</value></data>
+  <data name="Actions" xml:space="preserve"><value>動作</value></data>
+  <data name="Add aggregate column" xml:space="preserve"><value>新增彙總欄位</value></data>
+  <data name="Add calculated column" xml:space="preserve"><value>新增計算欄位</value></data>
+  <data name="Add column" xml:space="preserve"><value>新增欄位</value></data>
+  <data name="Add condition" xml:space="preserve"><value>新增條件</value></data>
+  <data name="Add grouping column" xml:space="preserve"><value>新增群組欄位</value></data>
+  <data name="Add key column" xml:space="preserve"><value>新增索引鍵欄位</value></data>
+  <data name="Add key pair" xml:space="preserve"><value>新增索引鍵配對</value></data>
+  <data name="Add sort key" xml:space="preserve"><value>新增排序鍵</value></data>
+  <data name="Add typed expression results" xml:space="preserve"><value>新增具型別的運算式結果</value></data>
+  <data name="Aggregate columns" xml:space="preserve"><value>彙總欄位</value></data>
+  <data name="Aggregate output {0}" xml:space="preserve"><value>彙總輸出 {0}</value></data>
+  <data name="Aggregate rows" xml:space="preserve"><value>彙總資料列</value></data>
+  <data name="All conditions must match (AND)." xml:space="preserve"><value>所有條件都必須符合（AND）。</value></data>
+  <data name="Ascending" xml:space="preserve"><value>遞增</value></data>
+  <data name="Bounded duplicate removal" xml:space="preserve"><value>有界限的重複資料移除</value></data>
+  <data name="Bounded grouped summaries" xml:space="preserve"><value>有界限的分組摘要</value></data>
+  <data name="Calculated column {0}" xml:space="preserve"><value>計算欄位 {0}</value></data>
+  <data name="Calculated columns" xml:space="preserve"><value>計算欄位</value></data>
+  <data name="Columns are emitted in this order. Selection does not rename or convert values." xml:space="preserve"><value>欄位會依此順序輸出。選取欄位不會重新命名或轉換值。</value></data>
+  <data name="Columns to keep" xml:space="preserve"><value>要保留的欄位</value></data>
+  <data name="Compatible row union" xml:space="preserve"><value>相容資料列合併</value></data>
+  <data name="Connect an upstream step to choose columns." xml:space="preserve"><value>連接上游步驟以選擇欄位。</value></data>
+  <data name="Data type" xml:space="preserve"><value>資料型別</value></data>
+  <data name="Destinations" xml:space="preserve"><value>目的地</value></data>
+  <data name="Direction" xml:space="preserve"><value>方向</value></data>
+  <data name="Disabled by administrator policy" xml:space="preserve"><value>已由管理員原則停用</value></data>
+  <data name="Distinct key column {0}" xml:space="preserve"><value>相異索引鍵欄位 {0}</value></data>
+  <data name="Distinct rows" xml:space="preserve"><value>相異資料列</value></data>
+  <data name="Duplicate rows" xml:space="preserve"><value>重複資料列</value></data>
+  <data name="Enter column name" xml:space="preserve"><value>輸入欄位名稱</value></data>
+  <data name="Expressions can read row.ColumnName and the available workflow variables: {0}" xml:space="preserve"><value>運算式可讀取 row.ColumnName 與可用的工作流程變數：{0}</value></data>
+  <data name="Filter condition {0}" xml:space="preserve"><value>篩選條件 {0}</value></data>
+  <data name="Filter conditions" xml:space="preserve"><value>篩選條件</value></data>
+  <data name="First" xml:space="preserve"><value>最前</value></data>
+  <data name="Full outer" xml:space="preserve"><value>完整外部聯結</value></data>
+  <data name="Graphical editing is unavailable" xml:space="preserve"><value>無法使用圖形化編輯</value></data>
+  <data name="Group by" xml:space="preserve"><value>群組依據</value></data>
+  <data name="Group rows and calculate summaries" xml:space="preserve"><value>群組資料列並計算摘要</value></data>
+  <data name="Grouping column {0}" xml:space="preserve"><value>群組欄位 {0}</value></data>
+  <data name="Inner" xml:space="preserve"><value>內部聯結</value></data>
+  <data name="Input limit reached" xml:space="preserve"><value>已達輸入上限</value></data>
+  <data name="Input order follows the links unless you reorder it here." xml:space="preserve"><value>輸入順序會跟隨連結，除非您在此重新排序。</value></data>
+  <data name="JavaScript expression" xml:space="preserve"><value>JavaScript 運算式</value></data>
+  <data name="Join" xml:space="preserve"><value>聯結</value></data>
+  <data name="Join inputs" xml:space="preserve"><value>聯結輸入</value></data>
+  <data name="Join key pair {0}" xml:space="preserve"><value>聯結索引鍵配對 {0}</value></data>
+  <data name="Join type" xml:space="preserve"><value>聯結類型</value></data>
+  <data name="Keep all rows" xml:space="preserve"><value>保留所有資料列</value></data>
+  <data name="Keep selected columns in order" xml:space="preserve"><value>依序保留所選欄位</value></data>
+  <data name="Last" xml:space="preserve"><value>最後</value></data>
+  <data name="Left column" xml:space="preserve"><value>左側欄位</value></data>
+  <data name="Left outer" xml:space="preserve"><value>左外部聯結</value></data>
+  <data name="Match columns" xml:space="preserve"><value>比對欄位</value></data>
+  <data name="Match columns by name" xml:space="preserve"><value>依名稱比對欄位</value></data>
+  <data name="Match columns by position" xml:space="preserve"><value>依位置比對欄位</value></data>
+  <data name="Maximum buffered rows" xml:space="preserve"><value>緩衝資料列上限</value></data>
+  <data name="Maximum groups" xml:space="preserve"><value>群組上限</value></data>
+  <data name="Maximum retained keys" xml:space="preserve"><value>保留索引鍵上限</value></data>
+  <data name="Move {0} down" xml:space="preserve"><value>將{0}下移</value></data>
+  <data name="Move {0} up" xml:space="preserve"><value>將{0}上移</value></data>
+  <data name="none" xml:space="preserve"><value>無</value></data>
+  <data name="Null values" xml:space="preserve"><value>Null 值</value></data>
+  <data name="Nullable" xml:space="preserve"><value>可為 Null</value></data>
+  <data name="Order rows by one or more keys" xml:space="preserve"><value>依一或多個索引鍵排序資料列</value></data>
+  <data name="Ordered column selection" xml:space="preserve"><value>有順序的欄位選取</value></data>
+  <data name="Output name" xml:space="preserve"><value>輸出名稱</value></data>
+  <data name="Remove {0}" xml:space="preserve"><value>移除{0}</value></data>
+  <data name="Remove duplicate rows" xml:space="preserve"><value>移除重複資料列</value></data>
+  <data name="Remove link from {0}" xml:space="preserve"><value>移除來自 {0} 的連結</value></data>
+  <data name="Remove rows with duplicate keys" xml:space="preserve"><value>移除索引鍵重複的資料列</value></data>
+  <data name="Right column" xml:space="preserve"><value>右側欄位</value></data>
+  <data name="Right outer" xml:space="preserve"><value>右外部聯結</value></data>
+  <data name="Schema is unavailable." xml:space="preserve"><value>結構描述目前無法使用。</value></data>
+  <data name="Select columns" xml:space="preserve"><value>選取欄位</value></data>
+  <data name="Selected column {0}" xml:space="preserve"><value>所選欄位 {0}</value></data>
+  <data name="Settings need attention: {0}" xml:space="preserve"><value>設定需要處理：{0}</value></data>
+  <data name="Some input schemas are unavailable. Column names can still be entered manually." xml:space="preserve"><value>部分輸入結構描述無法使用，仍可手動輸入欄位名稱。</value></data>
+  <data name="Sort key {0}" xml:space="preserve"><value>排序鍵 {0}</value></data>
+  <data name="Sort keys" xml:space="preserve"><value>排序鍵</value></data>
+  <data name="Sort rows" xml:space="preserve"><value>排序資料列</value></data>
+  <data name="Sources" xml:space="preserve"><value>來源</value></data>
+  <data name="Stable bounded ordering" xml:space="preserve"><value>穩定且有界限的排序</value></data>
+  <data name="Stack two to sixteen compatible streams" xml:space="preserve"><value>堆疊二至十六個相容資料流</value></data>
+  <data name="Swap" xml:space="preserve"><value>交換</value></data>
+  <data name="Swap left and right inputs" xml:space="preserve"><value>交換左右輸入</value></data>
+  <data name="These settings cannot be edited safely. Use Advanced settings JSON to repair them without losing the original value." xml:space="preserve"><value>無法安全地編輯這些設定。請使用「進階設定 JSON」修復，原始值不會遺失。</value></data>
+  <data name="To join a third table, connect another Join step after this one." xml:space="preserve"><value>若要聯結第三個資料表，請在此步驟後連接另一個「聯結」步驟。</value></data>
+  <data name="Transform" xml:space="preserve"><value>轉換</value></data>
+  <data name="Transform settings" xml:space="preserve"><value>轉換設定</value></data>
+  <data name="Transform settings are ready." xml:space="preserve"><value>轉換設定已就緒。</value></data>
+  <data name="Typed AND conditions" xml:space="preserve"><value>具型別的 AND 條件</value></data>
+  <data name="Typed calculated columns" xml:space="preserve"><value>具型別的計算欄位</value></data>
+  <data name="Union input {0}" xml:space="preserve"><value>合併輸入 {0}</value></data>
+  <data name="Union inputs" xml:space="preserve"><value>合併輸入</value></data>
+  <data name="Union rows" xml:space="preserve"><value>合併資料列</value></data>
+  <data name="Use all columns" xml:space="preserve"><value>使用所有欄位</value></data>
+  <data name="Use selected columns" xml:space="preserve"><value>使用所選欄位</value></data>
+  <data name="Transform settings need attention." xml:space="preserve"><value>轉換設定需要處理。</value></data>
+  <data name="Enter a value or choose a null operation." xml:space="preserve"><value>請輸入值或選擇 Null 運算。</value></data>
+  <data name="Enter a valid value for this column type." xml:space="preserve"><value>請輸入符合此欄位型別的有效值。</value></data>
 </root>
